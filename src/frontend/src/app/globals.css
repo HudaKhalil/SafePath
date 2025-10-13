@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+html, body, #__next { height: 100%; }
+
+body { @apply bg-brand-50 antialiased; }
+.card { @apply bg-white rounded-2xl shadow-soft; }
