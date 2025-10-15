@@ -1,25 +1,40 @@
+// src/components/BottomNav.jsx
+"use client";
 import { Home, Map, AlertTriangle, ParkingCircle, Users2 } from "lucide-react";
 
 const Item = ({ icon: Icon, label, active }) => (
   <button
-    className={`flex flex-col items-center gap-1 text-xs ${
-      active ? "text-green-700" : "text-slate-500"
-    }`}
+    className={[
+      "flex flex-col items-center justify-center gap-1 px-2 py-1",
+      "text-[11px] md:text-sm leading-none",
+      active ? "text-sp-title" : "text-slate-500 hover:text-sp-title/80",
+      "transition-colors"
+    ].join(" ")}
+    aria-current={active ? "page" : undefined}
   >
-    <Icon />
-    {label}
+    <Icon className="h-5 w-5 md:h-6 md:w-6" />
+    <span className="mt-0.5">{label}</span>
   </button>
 );
 
 export default function BottomNav() {
   return (
-    <nav className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200">
-      <div className="mx-auto max-w-3xl px-6 py-3 grid grid-cols-5">
-        <Item icon={Home} label="Home" active />
-        <Item icon={Map} label="Routes" />
-        <Item icon={AlertTriangle} label="Report" />
-        <Item icon={ParkingCircle} label="Bike Park" />
-        <Item icon={Users2} label="Find Buddy" />
+    <nav
+      className={[
+        "fixed bottom-0 left-0 right-0 z-40",
+        "bg-white/95 backdrop-blur border-t border-slate-200"
+      ].join(" ")}
+      role="navigation"
+      aria-label="Primary"
+    >
+      <div className="mx-auto w-full max-w-7xl">
+        <div className="px-5 md:px-8 py-2.5 md:py-3 grid grid-cols-5 place-items-center">
+          <Item icon={Home} label="Home" active />
+          <Item icon={Map} label="Routes" />
+          <Item icon={AlertTriangle} label="Report" />
+          <Item icon={ParkingCircle} label="Bike Park" />
+          <Item icon={Users2} label="Find Buddy" />
+        </div>
       </div>
     </nav>
   );
