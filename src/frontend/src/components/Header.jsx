@@ -1,44 +1,54 @@
-Header
-// src/components/Header.jsx
+"use client";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { Menu } from "lucide-react";
+import SideDrawer from "./SideDrawer";
 
 export default function Header() {
-  return (
-    <header className="px-6 pt-2 pb-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 md:gap-4">
-        {/* logo circle */}
-        <div className="w-18 h-18 rounded-full bg-gray-500 shadow-sm flex overflow-hidden">
-          <Image
-            src="/logo.png"
-            alt="SafePath Logo"
-            width={70}
-            height={70}
-            className="object-cover"
-            priority
-          />
-        </div>
-</div>
-        {/* title */}
-        <h1 className="text-4xl text-center md:text-4xl font-bold tracking-tight text-sp-title">
-          SafePath
-        </h1>
+  const [open, setOpen] = useState(false);
+  const openMenu = useCallback(() => setOpen(true), []);
+  const closeMenu = useCallback(() => setOpen(false), []);
 
-        {/* profile */}
-        <button
-          className="w-16 h-16 rounded-full shadow-sm hover:shadow-md transition-shadow flex overflow-hidden"
-          aria-label="Open profile menu"
-        >
+  // 👇 listen for SidebarRail’s custom event
+  useEffect(() => {
+    const handler = () => setOpen((v) => !v);
+    window.addEventListener("safepath:toggle-drawer", handler);
+    return () => window.removeEventListener("safepath:toggle-drawer", handler);
+  }, []);
+
+  return (
+    <>
+      <header className="px-6 pt-6 pb-3 md:pl-0">
+        <div className="flex items-center justify-between">
+          {/* mobile burger (desktop uses the rail) */}
+          <button
+            onClick={openMenu}
+            className="inline-flex items-center justify-center rounded-lg p-3 hover:bg-slate-100 md:hidden"
+            aria-label="Open main menu"
+          >
+            <Menu className="h-6 w-6 text-sp-title" />
+          </button>
+
+          <a href="/" className="flex items-center gap-2 md:gap-3">
+            <Image src="/logo.png" alt="SafePath" width={32} height={32} />
+            <span className="hidden sm:inline-block text-lg md:text-xl font-semibold text-sp-title">
+              SafePath
+            </span>
+          </a>
+
           <Image
-            className="rounded-full ring-2 ring-white/80"
             src="/user.png"
             alt="User profile"
-            width={70}
-            height={70}
+            width={40}
+            height={40}
+            className="rounded-full"
           />
-        </button>
-      </div>
-    </header>
+        </div>
+      </header>
+
+      {/* the actual drawer */}
+      <SideDrawer open={open} onClose={closeMenu} />
+    </>
   );
 }
 
