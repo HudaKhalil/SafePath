@@ -1,19 +1,27 @@
+// src/components/SearchBar.jsx
+"use client";
 import { Mic, Search } from "lucide-react";
 
-export default function SearchBar() {
+export default function SearchBar({ value = "", onChange }) {
   return (
-    <div className="mt-5">
-      <label htmlFor="search" className="sr-only">Enter your start and destination</label>
-      <div className="flex items-center gap-3 rounded-2xl bg-white/90 shadow-lg px-4 py-4">
-        <Search className="shrink-0" />
+    <div>
+      <label htmlFor="to" className="sr-only">Enter your destination</label>
+      <div className="flex items-center gap-3 rounded-xl2 bg-sp-card shadow-soft px-4 py-4">
+        <Search className="shrink-0 text-sp-inkMuted" />
         <input
-          id="search"
+          id="to"
           type="text"
-          placeholder="Enter your start and destination"
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder="Where to go ? (e.g., O’Connell Bridge)"
           className="w-full bg-transparent outline-none placeholder:text-slate-400"
         />
-        <button aria-label="Voice input" className="p-2 rounded-full hover:bg-slate-100">
-          <Mic />
+        <button
+          type="button"
+          aria-label="Voice input"
+          className="p-2 rounded-full hover:bg-sp-cardAlt"
+        >
+          <Mic className="text-sp-inkMuted" />
         </button>
       </div>
     </div>
