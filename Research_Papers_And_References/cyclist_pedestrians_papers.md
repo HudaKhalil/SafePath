@@ -32,6 +32,46 @@ Neset, T.-S., Navarra, C., Graça, M., Opach, T., Wilk, J., Wallin, P., … Rød
 Evaluating the influence of cyclists’ route choices incorporation into travel demand modelling: A case study in greater Helsinki
 Tarkkala, K., Vosough, S., West, J., & Roncoli, C. (2024). Evaluating the influence of cyclists’ route choices incorporation into travel demand modelling: A case study in greater Helsinki. Transportation Research Interdisciplinary Perspectives, 27, 101224. https://doi.org/10.1016/j.trip.2024.101224
 
+Kapousizis, G., Goodman, A., & Aldred, R. (2021). Cycling injury risk in Britain: A case-crossover study of infrastructural and route environment correlates. Accident Analysis & Prevention, 154, 106063. https://doi.org/10.1016/j.aap.2021.106063 
+Bennett, D. L. (2017). Bumps and bicycles: Women's experience of cycle-commuting during pregnancy. Journal of Transport & Health, 6, 439-451. https://doi.org/10.1016/j.jth.2017.02.003 
+
+Marshall, W. E., & Ferenchak, N. N. (2019). Why cities with high bicycling rates are safer for all road users. Journal of Transport & Health, 13, 100539. https://doi.org/10.1016/j.jth.2019.03.004
+
+Utriainen, R., O’Hern, S., & Pöllänen, M. (2023). Review on single-bicycle crashes in the recent scientific literature. Transport reviews, 43(2), 159-177. https://doi.org/10.1080/01441647.2022.2055674 
+
+Wang, Y., Chau, C. K., Ng, W. Y., & Leung, T. M. (2016). A review on the effects of physical built environment attributes on enhancing walking and cycling activity levels within residential neighborhoods. Cities, 50, 1-15. https://doi.org/10.1016/j.cities.2015.08.004
+
+General Routing Algorithms & Preference-Based Routing
+Delling, D., Goldberg, A. V., Pajor, T., & Werneck, R. F. (2017). Customizable route planning in road networks. Transportation Science, 51(2), 566-591. https://doi.org/10.1287/trsc.2014.0579
+
+Wang, R., Zhou, M., Gao, K., Alabdulwahab, A., & Rawa, M. J. (2021). Personalized route planning system based on driver preference. Sensors, 22(1), 11. https://doi.org/10.3390/s22010011 
+
+Pahlavani, P., & Delavar, M. R. (2014). Multi-criteria route planning based on a driver’s preferences in multi-criteria route selection. Transportation research part C: emerging technologies, 40, 14-35. https://doi.org/10.1016/j.trc.2014.01.001
+Quercia, D., Schifanella, R., & Aiello, L. M. (2014, September). The shortest path to happiness: Recommending beautiful, quiet, and happy routes in the city. In Proceedings of the 25th ACM conference on Hypertext and social media (pp. 116-125). https://doi.org/10.1145/2631775.2631799 
+
+Safety, Crime, and Multi-Objective Routing
+Sohrabi, S., & Lord, D. (2022). Navigating to safety: Necessity, requirements, and barriers to considering safety in route finding. Transportation research part C: emerging technologies, 137, 103542. https://doi.org/10.1016/j.trc.2021.103542 
+
+Zhu, S. (2022). Multi-objective route planning problem for cycle-tourists. Transportation Letters, 14(3), 298-306. https://doi.org/10.1080/19427867.2020.1860355 
+Kim, D., Baek, J., Yang, J., Roh, H., Jeong, H., Ruiz, B., ... & Matson, E. T. (2023, July). Safe route recommendation based on crime risk prediction with urban and crime data. In 2023 IEEE Ninth International Conference on Big Data Computing Service and Applications (BigDataService) (pp. 111-118). IEEE. https://doi.org/10.1109/BigDataService58306.2023.00022 
+
+Garg, S., Mittal, A., & Sathiyasuntharam, V. (2025, February). Deep Learning Based Model to Recommend Safe Route Navigation System. In 2025 2nd International Conference on Computational Intelligence, Communication Technology and Networking (CICTN) (pp. 181-186). IEEE. https://doi.org/10.1109/CICTN64563.2025.10932570 
+
+Agarwal, K., Srivastava, A., Sharma, K., Satapathy, S. K., Cho, S. B., Mishra, S., ... & Pal, A. (2024). SafeRoutes: Charting a Secure Path-A Holistic Approach to Women’s Safety through Advanced Clustering and GPS Integration. IEEE Access. https://doi.org/10.1109/ACCESS.2024.3488784 
+
+Novack, T., Vorbeck, L., & Zipf, A. (2024). An investigation of the temporality of OpenStreetMap data contribution activities. Geo-spatial Information Science, 27(2), 259-275. https://doi.org/10.1080/10095020.2022.2124127 
+
+Telima, M., El Esawey, M., El-Basyouny, K., & Osama, A. (2023). The use of crowdsourcing data for analyzing pedestrian safety in urban areas. Ain Shams engineering journal, 14(6), 102140. https://doi.org/10.1016/j.asej.2023.102140 
+Prediction Models (Accident/Crime)
+
+Al-Omari, A., Alsaleh, M., & Shatnawi, N. (2025). Spatial-Temporal Analysis and Severity Prediction of Traffic Accidents. Engineered Science, 34, 1472. http://dx.doi.org/10.30919/es1472 
+
+Kang, H. W., & Kang, H. B. (2017). Prediction of crime occurrence from multi-modal data using deep learning. PloS one, 12(4), e0176244. https://doi.org/10.1371/journal.pone.0176244
+
+Kumar, A., Maurya, A., Kumar, P., Gupta, A., & Saini, J. (2024, December). Optimizing Safe Routes with Machine Learning: A Crime Prediction System for Urban Safety. In 2024 International Conference on Emerging Technologies and Innovation for Sustainability (EmergIN) (pp. 368-372). IEEE. https://doi.org/10.1109/EmergIN63207.2024.10961735 
+
+Zhang, Y., Cheng, T., & Ren, Y. (2019). A graph deep learning method for short‐term traffic forecasting on large road networks. Computer‐Aided Civil and Infrastructure Engineering, 34(10), 877-896. https://doi.org/10.1111/mice.12450
+
 # Best cycling apps 2025 | 19 of the best iPhone and Android apps to download
 https://www.bikeradar.com/advice/buyers-guides/best-cycling-apps
 
