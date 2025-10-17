@@ -33,7 +33,7 @@ export default function SideDrawer({ open, onClose }) {
     { icon: Map,           label: "Routes",       href: "/routes" },
     { icon: AlertTriangle, label: "Report Hazard",href: "/report" },
     { icon: ParkingCircle, label: "Bike Park",    href: "/bike-park" },
-    { icon: Users2,        label: "Find Buddy",   href: "/buddy" },
+    { icon: Users2,        label: "Find Buddy",   href: "/findBuddy" },
     { icon: Settings,      label: "Settings",     href: "/settings" },
     { icon: User,          label: "Profile",      href: "/profile" },
   ];

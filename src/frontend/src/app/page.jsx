@@ -93,16 +93,7 @@ export default function HomePage() {
       {/* desktop rail */}
       <SidebarRail />
 
-      {/* add left padding equal to rail width on md+ */}
-      <div className="md:pl-20">
-        <div className="mx-auto max-w-7xl px-5 md:px-8 pt-6 pb-32">
-          <Header />
-          {/* ...everything else exactly as you have it (search panel, map, buttons, ad) */}
-        </div>
-      </div>
-      <div className="md:hidden">
-      <BottomNav />
-      </div>
+    
     </main>
   );
 }
