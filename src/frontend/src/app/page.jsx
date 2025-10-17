@@ -93,7 +93,10 @@ export default function HomePage() {
       {/* desktop rail */}
       <SidebarRail />
 
-    
+      {/* mobile bottom nav */}
+      <div className="block md:hidden">
+      <BottomNav />
+      </div>
     </main>
   );
 }
