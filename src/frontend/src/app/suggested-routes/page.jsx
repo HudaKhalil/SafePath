@@ -105,15 +105,21 @@ export default function SuggestedRoutesPage() {
 
   return (
     <main className="mx-auto max-w-screen-sm p-4 pb-24">
-      <div className="mb-3 flex items-center justify-between">
-        <button className="icon-btn" aria-label="Back">
-          ←
-        </button>
-        <h1 className="text-lg font-semibold">Suggested Routes</h1>
-        <button className="icon-btn" aria-label="Settings">
-          ⚙️
-        </button>
-      </div>
+     <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <button 
+              onClick={() => window.history.back()}
+              className="p-2 rounded-lg transition cursor-pointer"
+              style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.1)'}
+              type="button"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h1 className="text-xl sm:text-2xl font-bold">Suggested Routes</h1>
+          </div>
 
       <div className="map-card relative mb-4">
         <div className="h-44 rounded-2xl bg-gradient-to-b from-sky-50 to-emerald-50" />

@@ -30,8 +30,8 @@ export default function SideDrawer({ open, onClose }) {
   };
 
   const items = [
-    { icon: Map,           label: "Routes",       href: "/routes" },
-    { icon: AlertTriangle, label: "Report Hazard",href: "/report" },
+    { icon: Map,           label: "Routes",       href: "/suggested-routes" },
+    { icon: AlertTriangle, label: "Report Hazard",href: "/report-hazards" },
     { icon: ParkingCircle, label: "Bike Park",    href: "/bike-park" },
     { icon: Users2,        label: "Find Buddy",   href: "/findBuddy" },
     { icon: Settings,      label: "Settings",     href: "/settings" },
