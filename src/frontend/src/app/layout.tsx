@@ -1,18 +1,30 @@
-import "./globals.css";
+import './globals.css'
+import Navbar from '../components/Header'
+import Footer from '../components/BottomNav'
 
 export const metadata = {
-  title: "SafePath — Smarter, Safer Journeys",
-  description: "Safety-first navigation for cyclists and pedestrians.",
-};
+  title: 'London Safety Routing System',
+  description: 'Find safer routes across London with intelligent routing, community insights, and real-time hazard awareness.',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
+  openGraph: {
+    title: 'London Safety Routing System',
+    description: 'Find safer routes across London with intelligent routing, community insights, and real-time hazard awareness.',
+    images: ['/logo.png'],
+  },
+}
 
-import { ReactNode } from "react";
-
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
-      <body className="min-h-screen bg-sp-bg text-sp-ink antialiased">
-        <div className="mx-auto max-w-5xl px-4 py-6">{children}</div>
+    <html lang="en">
+      <body>
+        <Navbar />
+        <main className="min-h-screen animate-fadeIn">{children}</main>
+        <Footer />
       </body>
     </html>
-  );
+  )
 }

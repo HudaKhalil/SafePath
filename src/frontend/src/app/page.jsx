@@ -1,102 +1,86 @@
-"use client";
-import { useMemo, useState } from "react";
-import Header from "@/components/Header";
-import SearchBar from "@/components/SearchBar";
-import MapViewCard from "@/components/MapViewCard";
-import RouteButtons from "@/components/RouteButtons";
-import AdCard from "@/components/AdCard";
-import BottomNav from "@/components/BottomNav";
-import SidebarRail from "@/components/SidebarRail";
 
-export default function HomePage() {
-  const [destination, setDestination] = useState(null);
+import Link from "next/link";
 
-  // Dublin center
-  const center = [53.3498, -6.2603];
-
-  // Demo routes: arrays of [lng, lat]
-  const routes = useMemo(
-    () => [
-      {
-        id: "safe-1",
-        safety_score: 82,
-        distance: 3200,
-        duration: 900,
-        coordinates: [
-          [-6.2675, 53.3463],
-          [-6.2652, 53.3476],
-          [-6.2622, 53.3489],
-          [-6.2603, 53.3498],
-        ],
-        risk_areas: [{ risk_type: "Low lighting" }, { risk_type: "Traffic", severity: "Low" }],
-      },
-      {
-        id: "fast-1",
-        safety_score: 62,
-        distance: 2900,
-        duration: 780,
-        coordinates: [
-          [-6.276, 53.345],
-          [-6.27, 53.346],
-          [-6.265, 53.347],
-          [-6.26, 53.349],
-        ],
-        risk_areas: [{ risk_type: "High traffic", severity: "Medium" }],
-      },
-    ],
-    []
-  );
-
-  const selectedRoute = routes[0];
-
-  const handleLocationSelect = (value /* "lat, lng" string */, type) => {
-    setDestination(value);
-    // later: update the "To" input in SearchBar
-    console.log("Selected on map:", { value, type });
-  };
-
+export default function Home() {
   return (
-    <main>
-      <div className="mx-auto max-w-7xl px-5 md:px-8 pt-6 pb-32">
-        <Header />
-        <p className="mt-4 text-lg text-sp-inkMuted">
-          Hi, <span className="font-medium">Sarah</span> 👋 Ready for a safer ride today?
-        </p>
+    <div className="min-h-screen bg-primary-dark text-text-primary">
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div className="container mx-auto px-6 py-28 text-center">
+          <h1 className="hero-title">Navigate</h1>
+          <h2 className="hero-subtitle">Safely &amp; Smart</h2>
 
-        <div className="mt-5 grid gap-6 md:gap-8 md:grid-cols-2 items-start">
-          <section className="order-2 md:order-1">
-            <SearchBar />
-            <div className="mt-6">
-              <RouteButtons />
-            </div>
-            <div className="mt-6">
-              <AdCard />
-            </div>
-          </section>
-
-          <aside className="order-1 md:order-2">
-            <MapViewCard
-              center={center}
-              routes={routes}
-              selectedRoute={selectedRoute}
-              onLocationSelect={handleLocationSelect}
-            />
-          </aside>
-        </div>
-
-        {destination && (
-          <p className="mt-4 text-sm text-slate-600">
-            Destination set from map: <span className="font-medium">{destination}</span>
+          <p className="max-w-3xl mx-auto text-lg md:text-xl text-text-secondary leading-relaxed">
+            Discover the safest routes with real-time hazard data,
+            community insights, and intelligent routing for pedestrians and cyclists.
           </p>
-        )}
-      </div>
-      {/* desktop rail */}
-      <SidebarRail />
 
-      {/* mobile bottom nav */}
-      <div className="block md:hidden">
-      <BottomNav />
-      </div>
-    </main>
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/suggested-routes" className="btn-primary inline-flex items-center gap-2 justify-center">
+              🗺️ Find Safe Routes
+            </Link>
+            <Link href="/hazard-reporting" className="btn-secondary inline-flex items-center gap-2 justify-center">
+              ⚠️ Report Hazard
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Highlights */}
+      <section className="py-16">
+        <div className="container mx-auto px-6">
+          <div className="grid gap-6 md:grid-cols-3 max-w-6xl mx-auto">
+            <article className="card p-8 text-center">
+              <div className="mx-auto mb-6 h-14 w-14 rounded-full flex items-center justify-center bg-accent/15">
+                <span className="text-2xl">🧭</span>
+              </div>
+              <h3 className="text-2xl font-semibold text-primary-dark mb-2">Smart Routing</h3>
+              <p className="text-slate-600">
+                Safety-aware paths using live conditions, hazards, and comfortable streets.
+              </p>
+            </article>
+
+            <article className="card p-8 text-center">
+              <div className="mx-auto mb-6 h-14 w-14 rounded-full flex items-center justify-center bg-accent/15">
+                <span className="text-2xl">📣</span>
+              </div>
+              <h3 className="text-2xl font-semibold text-primary-dark mb-2">Community Alerts</h3>
+              <p className="text-slate-600">
+                Report and view hazards like poor lighting, roadworks, or blocked lanes.
+              </p>
+            </article>
+
+            <article className="card p-8 text-center">
+              <div className="mx-auto mb-6 h-14 w-14 rounded-full flex items-center justify-center bg-accent/15">
+                <span className="text-2xl">👥</span>
+              </div>
+              <h3 className="text-2xl font-semibold text-primary-dark mb-2">Travel Buddies</h3>
+              <p className="text-slate-600">
+                Connect with nearby walkers and cyclists for safer, social journeys.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20 bg-white text-primary-dark">
+        <div className="container mx-auto px-6 text-center">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">Ready to Navigate Safely?</h2>
+          <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10">
+            Pick safest, fastest, or balanced routes—then go with confidence.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/suggested-routes" className="btn-primary inline-flex items-center gap-2 justify-center">
+              🚀 Start Routing
+            </Link>
+            <Link href="/find-buddy" className="inline-flex items-center gap-2 justify-center px-6 py-3 rounded-lg font-semibold
+              bg-primary-dark text-text-primary hover:bg-primary transition-all duration-200 shadow-lg hover:shadow-xl">
+              👥 Find a Buddy
+            </Link>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
