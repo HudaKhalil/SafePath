@@ -31,7 +31,7 @@ export default function Navbar() {
               className="w-10 h-10 object-contain"
             />
           </div>
-          <div className="text-white font-bold text-lg">Safety Routing</div>
+          <div className="text-white font-bold text-lg">SafePath</div>
         </Link>
 
         <nav className="hidden md:flex gap-8 items-center">
