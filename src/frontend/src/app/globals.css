@@ -2,68 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
-html, body, #__next { height: 100%; }
+/* Custom styles for address autocomplete */
+.custom-marker {
+  background: none !important;
+  border: none !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+}
 
-body { @apply bg-brand-50 antialiased; }
-.card { @apply bg-white rounded-2xl shadow-soft; }
+/* Leaflet popup styles */
+.leaflet-popup-content-wrapper {
+  border-radius: 8px !important;
+}
 
-@layer components {
-  .card {
-    @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-neutral-200;
-  }
-  .chip {
-    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium shadow-sm;
-  }
-  .btn-primary {
-    @apply rounded-xl px-4 py-3 text-white font-medium transition;
-  }
-  .icon-btn {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-neutral-200;
-  }
-  .progress {
-    @apply h-2 w-full rounded-[10px] bg-neutral-200 overflow-hidden;
-  }
-  .map-card {
-    @apply relative overflow-hidden rounded-3xl shadow-md ring-1 ring-black/5;
-  }
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+  font-family: inherit !important;
 }
 
 @layer components {
+  .btn-primary {
+    @apply bg-accent hover:bg-accent/90 text-primary-dark font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-secondary {
+    @apply bg-transparent border-2 border-accent text-accent hover:bg-accent hover:text-primary-dark font-semibold px-6 py-3 rounded-lg transition-all duration-200;
+  }
+  
   .card {
-    @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-neutral-200;
+    @apply bg-white/95 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl;
   }
-  .icon-btn {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-neutral-200;
+  
+  .hero-title {
+    @apply text-5xl md:text-6xl lg:text-7xl font-bold text-text-primary mb-6;
   }
-  .icon-badge {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-full;
+  
+  .hero-subtitle {
+    @apply text-xl md:text-2xl font-medium text-accent mb-8;
   }
+}
 
-  /* Buttons */
-  .btn-solid-red {
-    @apply w-full rounded-xl bg-red-600 px-4 py-3 font-medium text-white shadow-sm transition hover:bg-red-700;
-  }
-  .btn-outlined-red {
-    @apply rounded-xl border border-red-500 px-4 py-3 font-medium text-red-600 hover:bg-red-50;
-  }
-  .btn-ghost-red {
-    @apply rounded-xl border border-neutral-300 px-4 py-3 font-medium text-red-600 bg-white hover:bg-neutral-50;
-  }
+body {
+  @apply bg-primary-dark text-text-primary antialiased;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  min-height: 100vh;
+}
 
-  /* Hazard tiles */
-  .hazard-tile {
-    @apply flex h-24 flex-col items-center justify-center gap-1 rounded-2xl bg-neutral-50 text-neutral-800 ring-1 ring-neutral-200 transition hover:bg-neutral-100;
-  }
-  .tile-selected {
-    @apply bg-red-50 ring-red-300;
-  }
+.map-placeholder {
+  @apply bg-gray-200 text-gray-600 flex items-center justify-center rounded-lg h-48 border-2 border-dashed border-gray-300;
+}
 
-  /* Upload area */
-  .upload-zone {
-    @apply rounded-2xl border-2 border-dashed border-red-300 bg-red-50/60 p-6 text-neutral-800 hover:bg-red-50 cursor-pointer;
-  }
-  .upload-zone.has-file {
-    @apply border-green-300 bg-green-50/60;
-  }
+.table-alt tr:nth-child(odd) {
+  background-color: rgba(6, 214, 160, 0.05);
+}
+
+.glass-effect {
+  @apply bg-white/10 backdrop-blur-md border border-white/20;
 }
