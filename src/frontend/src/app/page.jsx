@@ -19,9 +19,7 @@ export default function Home() {
             <Link href="/suggested-routes" className="btn-primary inline-flex items-center gap-2 justify-center">
               🗺️ Find Safe Routes
             </Link>
-            <Link href="/hazard-reporting" className="btn-secondary inline-flex items-center gap-2 justify-center">
-              ⚠️ Report Hazard
-            </Link>
+           
           </div>
         </div>
       </section>
@@ -54,7 +52,7 @@ export default function Home() {
               <div className="mx-auto mb-6 h-14 w-14 rounded-full flex items-center justify-center bg-accent/15">
                 <span className="text-2xl">👥</span>
               </div>
-              <h3 className="text-2xl font-semibold text-primary-dark mb-2">Travel Buddies</h3>
+              <h3 className="text-2xl font-semibold text-primary-dark mb-2">Find Buddies</h3>
               <p className="text-slate-600">
                 Connect with nearby walkers and cyclists for safer, social journeys.
               </p>
