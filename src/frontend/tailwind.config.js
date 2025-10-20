@@ -1,42 +1,31 @@
-// tailwind.config.js (at project root)
+/** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: "class",
   content: [
-    "./src/**/*.{js,ts,jsx,tsx,mdx}",     // covers src/app and src/components
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",     // (in case you didn't use /src)
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,jsx,ts,tsx}"
   ],
   theme: {
     container: { center: true, padding: "1rem", screens: { "2xl": "1200px" } },
     extend: {
       colors: {
-        brand: {
-          DEFAULT: "#1F6A3B",
-          50: "#EEF7F1",
-          100: "#DCEFE3",
-          200: "#B7E0C6",
-          300: "#8FD1A9",
-          400: "#66C18B",
-          500: "#3EB16E",
-          600: "#1F6A3B",
-          700: "#17502C",
-          800: "#0F371E",
-          900: "#081F11",
-        },
-        sp: {
-          bg: "#ECF5EB",
-          ink: "#293333",
-          inkMuted: "#41504C",
-          title: "#3F6244",
-          safe: "#51A664",
-          fast: "#F09D38",
-          card: "#FFFFFF",
-          cardAlt: "#F0F6EF",
-          cardAlt2: "#FBFDFB",
-        },
-        accent: { DEFAULT: "#F59E0B" },
+        primary: "#1e293b",
+        "primary-dark": "#0f172a",
+        accent: "#06d6a0",
+        "accent-light": "#4ade80",
+        "text-primary": "#f8fafc",
+        "text-secondary": "#94a3b8",
       },
       boxShadow: { soft: "0 8px 24px rgba(0,0,0,0.08)" },
       borderRadius: { xl2: "1.25rem" },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: { fadeIn: "fadeIn 400ms ease-in" },
     },
   },
   plugins: [],
