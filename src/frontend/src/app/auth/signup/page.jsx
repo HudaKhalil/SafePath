@@ -19,7 +19,6 @@ export default function SignUp() {
   const [isLoading, setIsLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
 
-  // Check if user is already logged in
   useEffect(() => {
     if (authService.isLoggedIn()) {
       router.push('/');
