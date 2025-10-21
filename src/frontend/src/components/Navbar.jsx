@@ -34,7 +34,7 @@ export default function Navbar() {
           <div className="text-white font-bold text-lg">SafePath</div>
         </Link>
 
-        <nav className="hidden md:flex gap-8 items-center">
+        <nav className="hidden md:flex gap-8 items-center font-bold">
           <Link href="/" className="text-text-secondary hover:text-accent transition-colors duration-200">Home</Link>
           <Link href="/suggested-routes" className="text-text-secondary hover:text-accent transition-colors duration-200">Suggested Routes</Link>
           <Link href="/report-hazards" className="text-text-secondary hover:text-accent transition-colors duration-200">Report Hazards</Link>
