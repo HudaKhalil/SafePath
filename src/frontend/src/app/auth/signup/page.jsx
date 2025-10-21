@@ -158,7 +158,7 @@ export default function SignUp() {
           <div className="flex justify-center">
             <div className="w-16 h-16 flex items-center justify-center">
               <img 
-                src="/img/logo.png" 
+               src="/logo.png" 
                 alt="London Safety Routing Logo" 
                 className="w-16 h-16 object-contain"
               />
@@ -168,7 +168,6 @@ export default function SignUp() {
             Create your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-300">
-            Join the London Safety Routing community
           </p>
         </div>
 
