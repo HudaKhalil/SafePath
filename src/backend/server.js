@@ -4,6 +4,9 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
+// Import database connection
+const db = require('./config/database');
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const routesRoutes = require('./routes/routes');
@@ -18,9 +21,11 @@ app.use(helmet());
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Logging middleware
@@ -33,12 +38,34 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    success: true,
+app.get('/health', async (req, res) => {
+  const healthCheck = {
+    status: 'ok',
     message: 'London Safety Routing API is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV,
+    database: 'unknown'
+  };
+
+  // Test database connection
+  try {
+    const connectionTest = await db.testConnection();
+    if (connectionTest.success) {
+      healthCheck.database = `connected (${connectionTest.database})`;
+    } else {
+      throw new Error(connectionTest.error);
+    }
+  } catch (error) {
+    console.error('Health check - Database connection failed:', error.message);
+    healthCheck.database = 'disconnected';
+    healthCheck.status = 'degraded';
+    healthCheck.error = error.message;
+  }
+
+  const statusCode = healthCheck.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json({
+    success: healthCheck.status === 'ok',
+    ...healthCheck
   });
 });
 
