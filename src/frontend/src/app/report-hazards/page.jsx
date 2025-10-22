@@ -12,7 +12,7 @@ export default function HazardReporting() {
   const [hazards, setHazards] = useState([])
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState(null)
-  const [showReportForm, setShowReportForm] = useState(true) // Start with form open
+  const [showReportForm, setShowReportForm] = useState(true) 
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -175,7 +175,7 @@ export default function HazardReporting() {
               Report <span className="text-accent">Hazard</span>
             </h1>
             <p className="text-xl text-text-secondary mb-12">
-              Help keep London safe by reporting hazards and incidents in your area
+              Help keep the community safe by reporting hazards and incidents in your area
             </p>
 
             {/* Quick Start Guide */}
