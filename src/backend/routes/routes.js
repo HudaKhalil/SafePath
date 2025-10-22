@@ -189,4 +189,80 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
   }
 });
 
+// Find routes between two points
+router.post('/find', authenticateToken, async (req, res) => {
+  try {
+    const { fromLat, fromLon, toLat, toLon, mode = 'walking' } = req.body;
+
+    if (!fromLat || !fromLon || !toLat || !toLon) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required coordinates'
+      });
+    }
+
+    // For now, return mock routes with different safety ratings
+    // In production, this would integrate with real crime data and routing algorithms
+    const mockRoutes = [
+      {
+        id: 'route_safest',
+        name: 'Safest Route',
+        type: 'safest',
+        description: 'Prioritizes well-lit streets and areas with good safety records',
+        distance: '2.3',
+        estimatedTime: 28,
+        safetyRating: 8.7,
+        path: [
+          [parseFloat(fromLat), parseFloat(fromLon)],
+          // Add some intermediate points for a realistic path
+          [parseFloat(fromLat) + 0.001, parseFloat(fromLon) + 0.002],
+          [parseFloat(fromLat) + 0.003, parseFloat(fromLon) + 0.004],
+          [parseFloat(toLat), parseFloat(toLon)]
+        ]
+      },
+      {
+        id: 'route_fastest',
+        name: 'Fastest Route', 
+        type: 'fastest',
+        description: 'Shortest time route with standard safety considerations',
+        distance: '1.8',
+        estimatedTime: 22,
+        safetyRating: 7.2,
+        path: [
+          [parseFloat(fromLat), parseFloat(fromLon)],
+          [parseFloat(fromLat) + 0.002, parseFloat(fromLon) + 0.001],
+          [parseFloat(toLat), parseFloat(toLon)]
+        ]
+      },
+      {
+        id: 'route_balanced',
+        name: 'Balanced Route',
+        type: 'balanced', 
+        description: 'Good balance between safety and efficiency',
+        distance: '2.0',
+        estimatedTime: 25,
+        safetyRating: 7.8,
+        path: [
+          [parseFloat(fromLat), parseFloat(fromLon)],
+          [parseFloat(fromLat) + 0.0015, parseFloat(fromLon) + 0.0015],
+          [parseFloat(fromLat) + 0.0025, parseFloat(fromLon) + 0.003],
+          [parseFloat(toLat), parseFloat(toLon)]
+        ]
+      }
+    ];
+
+    res.json({
+      success: true,
+      data: mockRoutes,
+      message: `Found ${mockRoutes.length} route options`
+    });
+  } catch (error) {
+    console.error('Error finding routes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to find routes'
+    });
+  }
+});
+
 module.exports = router;
