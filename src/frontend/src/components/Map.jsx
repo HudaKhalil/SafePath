@@ -315,10 +315,10 @@ export default function Map({
           >
             <Popup>
               <div className="text-sm">
-                <h3 className="font-semibold">{hazard.type}</h3>
+                <h3 className="font-semibold">{hazard.type?.replace('_', ' ') || 'Unknown Hazard'}</h3>
                 <p>{hazard.description}</p>
                 <p className="text-xs text-gray-500">
-                  Reported: {new Date(hazard.reportedAt).toLocaleDateString()}
+                  Reported: {new Date(hazard.created_at || hazard.reportedAt).toLocaleDateString()}
                 </p>
               </div>
             </Popup>
