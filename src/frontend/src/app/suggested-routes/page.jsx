@@ -6,7 +6,7 @@ import { routesService } from '../../lib/services'
 import ProtectedRoute from '../../components/auth/ProtectedRoute'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 
-// Dynamically import Map component to avoid SSR issues with Leaflet
+
 const Map = dynamic(() => import('../../components/Map'), { ssr: false })
 
 export default function SuggestedRoutes() {
@@ -39,7 +39,7 @@ export default function SuggestedRoutes() {
         },
         (error) => {
           console.error('Error getting location:', error)
-          // Default to London center if location access denied
+          // Default to center if location access denied
           setUserLocation([51.5074, -0.1278])
         }
       )
@@ -174,9 +174,7 @@ export default function SuggestedRoutes() {
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-2">
               Find the <span className="text-accent">Safest Route</span>
             </h1>
-            <p className="text-2xl text-text-secondary mb-12">
-              Across London
-            </p>
+           
 
             <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-2xl">
               <form onSubmit={handleFindRoutes} className="space-y-6">
@@ -449,7 +447,7 @@ export default function SuggestedRoutes() {
                   <div className="w-20 h-20 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <span className="text-4xl text-accent">🛡️</span>
                   </div>
-                  <h4 className="text-2xl font-bold text-white mb-2">Stay Safe, London!</h4>
+                  <h4 className="text-2xl font-bold text-white mb-2">Stay Safe!</h4>
                   <p className="text-white/80">Your safety is our priority</p>
                 </div>
               </div>
