@@ -28,6 +28,10 @@
     @apply bg-transparent border-2 border-accent text-accent hover:bg-accent hover:text-primary-dark font-semibold px-6 py-3 rounded-lg transition-all duration-200;
   }
   
+  .btn-danger {
+    @apply bg-danger hover:bg-danger-light text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl;
+  }
+  
   .card {
     @apply bg-white/95 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl;
   }
@@ -39,11 +43,20 @@
   .hero-subtitle {
     @apply text-xl md:text-2xl font-medium text-accent mb-8;
   }
+  
   .btn-hazard {
-  @apply bg-hazard-softest text-primary-dark hover:bg-hazard-soft
-         font-semibold px-6 py-3 rounded-lg transition-all duration-200
-         shadow-lg hover:shadow-xl;
-}
+    @apply bg-hazard-softest text-primary-dark hover:bg-hazard-soft
+           font-semibold px-6 py-3 rounded-lg transition-all duration-200
+           shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-success {
+    @apply bg-success hover:bg-accent-light text-primary-dark font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl;
+  }
+  
+  .border-accent-glow {
+    @apply border-accent shadow-lg shadow-accent/20;
+  }
 }
 
 body {
