@@ -16,6 +16,44 @@ export default function ReportHazardPage() {
  const [selectedLocation, setSelectedLocation] = useState(null)
  const [success, setSuccess] = useState('')
 
+  const handleMapClick = (latlng) => {
+    setSelectedLocation([latlng.lat, latlng.lng])
+    setFormData((p) => ({ ...p, latitude: latlng.lat, longitude: latlng.lng }))
+    setShowReportForm(true)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!formData.type || !formData.description || !formData.latitude || !formData.longitude) {
+      setError('Please fill in all required fields and select a location on the map')
+      return
+    }
+    try {
+      const res = await hazardsService.reportHazard(formData)
+      if (res?.success) {
+        setSuccess('Hazard reported successfully!')
+        setFormData({ type: '', severity: 'medium', description: '', latitude: '', longitude: '' })
+        setSelectedLocation(null)
+        setShowReportForm(false)
+        loadHazards()
+      } else {
+        setError(res?.message || 'Failed to report hazard')
+      }
+    } catch (e) {
+      console.error('Error reporting hazard:', e)
+      setError(e?.message || 'Failed to report hazard')
+    }
+  }
+
+  const getSeverityBadgeColor = (severity) => {
+    switch (severity) {
+      case 'high': return 'bg-red-100 text-red-800'
+      case 'medium': return 'bg-yellow-100 text-yellow-800'
+      case 'low': return 'bg-green-100 text-green-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
   const [formData, setFormData] = useState({
     type: '',
     severity: 'medium',
