@@ -10,8 +10,8 @@ const db = require('./config/database');
 // Import routes
 const authRoutes = require('./routes/auth');
 const routesRoutes = require('./routes/routes');
-const hazardsRoutes = require('./routes/hazards');
-const buddiesRoutes = require('./routes/buddies');
+//const hazardsRoutes = require('./routes/hazards');
+//const buddiesRoutes = require('./routes/buddies');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -72,8 +72,8 @@ app.get('/health', async (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/routes', routesRoutes);
-app.use('/api/hazards', hazardsRoutes);
-app.use('/api/buddies', buddiesRoutes);
+//app.use('/api/hazards', hazardsRoutes);
+//app.use('/api/buddies', buddiesRoutes);
 
 // 404 handler for unknown routes
 app.use('*', (req, res) => {
