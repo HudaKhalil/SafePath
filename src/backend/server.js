@@ -7,11 +7,11 @@ require('dotenv').config();
 // Import routes
 const authRoutes = require('./routes/auth');
 const routesRoutes = require('./routes/routes');
-const hazardsRoutes = require('./routes/hazards');
-const buddiesRoutes = require('./routes/buddies');
+//const hazardsRoutes = require('./routes/hazards');
+//const buddiesRoutes = require('./routes/buddies');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Security middleware
 app.use(helmet());
@@ -45,8 +45,8 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/routes', routesRoutes);
-app.use('/api/hazards', hazardsRoutes);
-app.use('/api/buddies', buddiesRoutes);
+//app.use('/api/hazards', hazardsRoutes);
+//app.use('/api/buddies', buddiesRoutes);
 
 // 404 handler for unknown routes
 app.use('*', (req, res) => {
