@@ -91,6 +91,7 @@ export const routesService = {
       const response = await api.get(`/routes/near/${latitude}/${longitude}`, { params });
       return response.data;
     } catch (error) {
+      console.error('getNearbyRoutes error:', error);
       throw error.response?.data || { success: false, message: 'Network error' };
     }
   },
@@ -137,9 +138,10 @@ export const hazardsService = {
   // Get hazards near location
   async getNearbyHazards(latitude, longitude, params = {}) {
     try {
-      const response = await api.get(`/hazards/near/${latitude}/${longitude}`, { params });
+      const response = await api.get(`/hazards/nearby/${latitude}/${longitude}`, { params });
       return response.data;
     } catch (error) {
+      console.error('getNearbyHazards error:', error);
       throw error.response?.data || { success: false, message: 'Network error' };
     }
   },

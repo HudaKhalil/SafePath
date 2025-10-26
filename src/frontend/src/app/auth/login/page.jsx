@@ -69,15 +69,42 @@ export default function Login() {
         password: formData.password
       };
 
+      console.log('Attempting login with:', { email: loginData.email });
       const result = await authService.login(loginData);
+      console.log('Login result:', result);
 
       if (result.success) {
-        router.push('/');
+        console.log('Login successful, redirecting...');
+        // Add a small delay to see any console messages
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
       } else {
+        console.log('Login failed:', result.message);
         setErrors({ general: result.message || 'Login failed' });
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login error caught:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config?.url,
+        stack: error.stack
+      });
+      
+      // Temporary debugging alert - remove this after fixing
+      alert(`Login Error Debug:\nMessage: ${error.message}\nStatus: ${error.response?.status}\nData: ${JSON.stringify(error.response?.data)}`);
+      
+      // Show error in UI as well as console
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       if (error.errors) {
         const fieldErrors = {};
         error.errors.forEach(err => {
@@ -85,7 +112,7 @@ export default function Login() {
         });
         setErrors(fieldErrors);
       } else {
-        setErrors({ general: error.message || 'Login failed. Please check your credentials.' });
+        setErrors({ general: errorMessage });
       }
     } finally {
       setIsLoading(false);

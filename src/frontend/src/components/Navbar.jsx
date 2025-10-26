@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { authService } from '../lib/services'
 
 
 export default function Navbar() {
@@ -10,6 +11,38 @@ export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    checkAuthStatus()
+  }, [])
+
+  const checkAuthStatus = async () => {
+    try {
+      if (authService.isLoggedIn()) {
+        const profileResponse = await authService.getProfile()
+        if (profileResponse.success) {
+          setIsLoggedIn(true)
+          setUser(profileResponse.data.user)
+        } else {
+          // Token might be invalid
+          authService.logout()
+          setIsLoggedIn(false)
+          setUser(null)
+        }
+      } else {
+        setIsLoggedIn(false)
+        setUser(null)
+      }
+    } catch (error) {
+      // Only log unexpected errors, not normal "unauthorized" responses
+      if (error.message !== 'Access token required' && !error.message?.includes('401')) {
+        console.error('Auth check failed:', error)
+      }
+      authService.logout()
+      setIsLoggedIn(false)
+      setUser(null)
+    }
+  }
 
 
 

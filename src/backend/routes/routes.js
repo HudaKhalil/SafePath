@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const pool = require('../config/database');
+const db = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 
 const router = express.Router();
@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
     query += whereClause + ` ORDER BY safety_rating DESC, created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(parseInt(limit), parseInt(offset));
 
-    const result = await pool.query(query, params);
+    const result = await db.query(query, params);
 
     const routes = result.rows.map(route => ({
       id: route.id,
@@ -75,7 +75,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(`
+    const result = await db.query(`
       SELECT 
         id, 
         name, 
@@ -132,7 +132,7 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
     const { latitude, longitude } = req.params;
     const { radius = 5000, limit = 10 } = req.query; // radius in meters
 
-    const result = await pool.query(`
+    const result = await db.query(`
       SELECT 
         id, 
         name, 
