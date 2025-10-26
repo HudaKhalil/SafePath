@@ -193,7 +193,7 @@ router.post('/login', [
 // Get user profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await db.query(`
       SELECT 
         id, 
         name, 
@@ -204,8 +204,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
         preferred_transport,
         safety_priority,
         notifications,
-        ST_X(location) as longitude,
-        ST_Y(location) as latitude,
+        latitude,
+        longitude,
         created_at, 
         updated_at 
       FROM users 
@@ -352,10 +352,10 @@ router.put('/profile', authenticateToken, [
       UPDATE users 
       SET ${updates.join(', ')} 
       WHERE id = $${paramCount}
-      RETURNING id, name, email, phone, address, emergency_contact, preferred_transport, safety_priority, notifications, ST_X(location) as longitude, ST_Y(location) as latitude, updated_at
+      RETURNING id, name, email, phone, address, emergency_contact, preferred_transport, safety_priority, notifications, latitude, longitude, updated_at
     `;
 
-    const result = await pool.query(query, values);
+    const result = await db.query(query, values);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
