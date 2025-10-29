@@ -5,7 +5,7 @@ export const authService = {
   // Sign up
   async signup(userData) {
     try {
-      const response = await api.post('/auth/signup', userData);
+      const response = await api.post('/api/auth/signup', userData);
       if (response.data.success && response.data.data.token) {
         Cookies.set('auth_token', response.data.data.token, { expires: 1 }); // 1 day
       }
@@ -18,7 +18,7 @@ export const authService = {
   // Log in
   async login(credentials) {
     try {
-      const response = await api.post('/auth/login', credentials);
+      const response = await api.post('/api/auth/login', credentials);
       if (response.data.success && response.data.data.token) {
         Cookies.set('auth_token', response.data.data.token, { expires: 1 }); // 1 day
       }
