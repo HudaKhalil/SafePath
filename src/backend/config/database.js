@@ -1,49 +1,50 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Initialize with SQLite as default
-let pool = require('./database-sqlite');
-let usingSQLite = true;
+// SQLite fallback commented out - using PostgreSQL only
+// let pool = require('./database-sqlite');
+// let usingSQLite = true;
 
-// Try to connect to PostgreSQL
+// PostgreSQL configuration - primary database
+let pool;
+let usingSQLite = false;
+
+// Initialize PostgreSQL connection
 const initializeDatabase = async () => {
-  if (process.env.DB_PASSWORD && process.env.DB_PASSWORD.trim() !== '') {
-    try {
-      const pgPool = new Pool({
-        host: process.env.DB_HOST || 'localhost',
-        port: process.env.DB_PORT || 5432,
-        database: process.env.DB_NAME || 'postgres',
-        user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
-      });
+  try {
+    const pgPool = new Pool({
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME || 'safety_routing',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || 'password',
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
 
-      // Test connection
-      const client = await pgPool.connect();
-      console.log('✅ Connected to PostgreSQL database');
-      client.release();
-      
-      pool = pgPool;
-      usingSQLite = false;
-      return true;
-    } catch (error) {
-      console.log('⚠️  PostgreSQL connection failed, using SQLite');
-      console.log('PostgreSQL error:', error.message);
-    }
-  } else {
-    console.log('⚠️  No PostgreSQL password configured, using SQLite');
+    // Test connection
+    const client = await pgPool.connect();
+    console.log('✅ Connected to PostgreSQL database');
+    client.release();
+    
+    pool = pgPool;
+    usingSQLite = false;
+    return true;
+  } catch (error) {
+    console.error('❌ PostgreSQL connection failed:', error.message);
+    console.error('Please ensure PostgreSQL is running and credentials are correct');
+    throw error; // Don't fall back to SQLite, fail fast
   }
-  
-  return false;
 };
 
 // Initialize on startup
 initializeDatabase();
 
-// Unified query interface
+// Unified query interface - PostgreSQL only
 const query = async (text, params) => {
+  // SQLite conversion logic commented out - using PostgreSQL directly
+  /*
   if (usingSQLite) {
     // Convert PostgreSQL-style queries to SQLite
     let sqliteQuery = text;
@@ -82,11 +83,17 @@ const query = async (text, params) => {
     // PostgreSQL
     return await pool.query(text, params);
   }
+  */
+  
+  // PostgreSQL only
+  return await pool.query(text, params);
 };
 
-// Add a method to test the connection
+// Test connection method - PostgreSQL only
 const testConnection = async () => {
   try {
+    // SQLite test commented out
+    /*
     if (usingSQLite) {
       await pool.get('SELECT 1');
       return { success: true, database: 'SQLite', time: new Date() };
@@ -94,6 +101,11 @@ const testConnection = async () => {
       const result = await pool.query('SELECT NOW()');
       return { success: true, database: 'PostgreSQL', time: result.rows[0].now };
     }
+    */
+    
+    // PostgreSQL only
+    const result = await pool.query('SELECT NOW()');
+    return { success: true, database: 'PostgreSQL', time: result.rows[0].now };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -102,5 +114,6 @@ const testConnection = async () => {
 module.exports = {
   query,
   testConnection,
+  initializeDatabase,
   usingSQLite: () => usingSQLite
 };

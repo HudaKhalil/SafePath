@@ -20,6 +20,9 @@ module.exports = {
         "hazard-light": "#fbbf24", // a bit lighter (amber 400)
         "hazard-soft": "#fde68a", // much lighter (amber 200)
         "hazard-softest": "#fffbeb", // ultra light (amber 50)
+        danger: "#ef4444", // red for destinations/stops
+        "danger-light": "#f87171", // lighter red
+        success: "#06d6a0", // same as accent for consistency
       },
       boxShadow: { soft: "0 8px 24px rgba(0,0,0,0.08)" },
       borderRadius: { xl2: "1.25rem" },

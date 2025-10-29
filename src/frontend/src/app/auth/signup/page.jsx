@@ -130,7 +130,8 @@ export default function SignUp() {
 
       if (result.success) {
         alert('Account created successfully! You are now logged in.');
-        router.push('/');
+        // Force page refresh to update navbar state
+        window.location.href = '/';
       } else {
         setErrors({ general: result.message || 'Sign up failed' });
       }

@@ -10,11 +10,11 @@ const db = require('./config/database');
 // Import routes
 const authRoutes = require('./routes/auth');
 const routesRoutes = require('./routes/routes');
-const hazardsRoutes = require('./routes/hazards');
-const buddiesRoutes = require('./routes/buddies');
+//const hazardsRoutes = require('./routes/hazards');
+//const buddiesRoutes = require('./routes/buddies');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Security middleware
 app.use(helmet());
@@ -72,8 +72,8 @@ app.get('/health', async (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/routes', routesRoutes);
-app.use('/api/hazards', hazardsRoutes);
-app.use('/api/buddies', buddiesRoutes);
+//app.use('/api/hazards', hazardsRoutes);
+//app.use('/api/buddies', buddiesRoutes);
 
 // 404 handler for unknown routes
 app.use('*', (req, res) => {
@@ -96,12 +96,26 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 London Safety Routing API server running on port ${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL}`);
-});
+// Start server with database initialization
+const startServer = async () => {
+  try {
+    // Initialize database connection
+    await db.initializeDatabase();
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 London Safety Routing API server running on port ${PORT}`);
+      console.log(`📍 Health check: http://localhost:${PORT}/health`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+      console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL}`);
+      console.log(`🗄️  Database: PostgreSQL`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    console.error('Please ensure PostgreSQL is running and accessible');
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app;

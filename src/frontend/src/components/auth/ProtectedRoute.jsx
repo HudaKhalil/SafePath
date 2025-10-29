@@ -21,9 +21,12 @@ export default function ProtectedRoute({ children }) {
         await authService.getProfile();
         setIsAuthenticated(true);
       } catch (error) {
-        console.error('Auth check failed:', error);
-        authService.logout();
-        router.push('/auth/login');
+        // Only log unexpected errors, not normal "unauthorized" responses
+        if (error.message !== 'Access token required' && !error.message?.includes('401')) {
+          console.error('Auth check failed:', error)
+        }
+        authService.logout()
+        router.push('/auth/login')
       } finally {
         setIsLoading(false);
       }
