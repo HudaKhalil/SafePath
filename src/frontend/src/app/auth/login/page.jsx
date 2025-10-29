@@ -70,6 +70,8 @@ export default function Login() {
       };
 
       console.log('Attempting login with:', { email: loginData.email });
+      console.log('API Base URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api');
+      
       const result = await authService.login(loginData);
       console.log('Login result:', result);
 
@@ -85,30 +87,34 @@ export default function Login() {
       }
     } catch (error) {
       console.error('Login error caught:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error.constructor.name);
       console.error('Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
         config: error.config?.url,
-        stack: error.stack
+        stack: error.stack,
+        code: error.code,
+        errno: error.errno
       });
-      
-      // Temporary debugging alert - remove this after fixing
-      alert(`Login Error Debug:\nMessage: ${error.message}\nStatus: ${error.response?.status}\nData: ${JSON.stringify(error.response?.data)}`);
       
       // Show error in UI as well as console
       let errorMessage = 'Login failed. Please try again.';
       
-      if (error.response?.data?.message) {
+      // Check for network errors
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error') || !error.response) {
+        errorMessage = 'Cannot connect to server. Please ensure the backend is running on port 5001.';
+      } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
       
-      if (error.errors) {
+      if (error.response?.data?.errors) {
         const fieldErrors = {};
-        error.errors.forEach(err => {
-          fieldErrors[err.path] = err.msg;
+        error.response.data.errors.forEach(err => {
+          fieldErrors[err.path || err.param] = err.msg || err.message;
         });
         setErrors(fieldErrors);
       } else {
