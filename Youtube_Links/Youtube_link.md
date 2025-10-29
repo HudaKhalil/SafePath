@@ -5,3 +5,4 @@
 + Week #4 https://www.youtube.com/watch?v=RpgymK03-yk
 + Week #5 https://youtu.be/yeHV8uiifLk
 + Week #6 https://www.youtube.com/watch?v=gBeRnUEo5S8
++ Week #7 https://youtu.be/bcDdGyWeJiA?si=r9FOqPPMCQndYyrh
