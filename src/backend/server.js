@@ -21,8 +21,9 @@ app.use(helmet());
 
 // CORS configuration
 const allowedOrigins = [
-  'http://localhost:3000',
-  'https://safe-path-ten.vercel.app'
+  "http://localhost:3000",
+  "https://safe-path-b8tjsn7yz-huda-ibrahims-projects.vercel.app",
+  "https://safe-path-ten.vercel.app"
 ];
 /* app.use(cors({
   origin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000',
