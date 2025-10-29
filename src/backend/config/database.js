@@ -10,7 +10,7 @@ let pool;
 let usingSQLite = false;
 
 // Initialize PostgreSQL connection
-const initializeDatabase = async () => {
+/* const initializeDatabase = async () => {
   try {
     const pgPool = new Pool({
       host: process.env.DB_HOST || 'localhost',
@@ -36,8 +36,16 @@ const initializeDatabase = async () => {
     console.error('Please ensure PostgreSQL is running and credentials are correct');
     throw error; // Don't fall back to SQLite, fail fast
   }
-};
+}; */
+import pkg from 'pg';
+const { Pool } = pkg;
 
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+export default pool;
 // Initialize on startup
 initializeDatabase();
 
