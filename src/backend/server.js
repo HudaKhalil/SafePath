@@ -38,13 +38,17 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      corsOptions = { origin: '*' };   // Allow all origins for other routes
+    }
+  } else {
+
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
-}));
+));
 
 // Logging middleware
 if (process.env.NODE_ENV === 'development') {
