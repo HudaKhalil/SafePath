@@ -10,8 +10,8 @@ const db = require('./config/database');
 // Import routes
 const authRoutes = require('./routes/auth');
 const routesRoutes = require('./routes/routes');
-//const hazardsRoutes = require('./routes/hazards');
-//const buddiesRoutes = require('./routes/buddies');
+// const hazardsRoutes = require('./routes/hazards');
+// const buddiesRoutes = require('./routes/buddies');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -47,7 +47,6 @@ app.get('/health', async (req, res) => {
     database: 'unknown'
   };
 
-  // Test database connection
   try {
     const connectionTest = await db.testConnection();
     if (connectionTest.success) {
@@ -72,10 +71,10 @@ app.get('/health', async (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/routes', routesRoutes);
-//app.use('/api/hazards', hazardsRoutes);
-//app.use('/api/buddies', buddiesRoutes);
+// app.use('/api/hazards', hazardsRoutes);
+// app.use('/api/buddies', buddiesRoutes);
 
-// 404 handler for unknown routes
+// 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -96,12 +95,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server with database initialization
+// ✅ Start server (no initializeDatabase, just test connection)
 const startServer = async () => {
   try {
-    // Initialize database connection
-    await db.initializeDatabase();
-    
+    const connectionTest = await db.testConnection();
+    if (!connectionTest.success) throw new Error(connectionTest.error);
+
     app.listen(PORT, () => {
       console.log(`🚀 London Safety Routing API server running on port ${PORT}`);
       console.log(`📍 Health check: http://localhost:${PORT}/health`);
