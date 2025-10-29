@@ -107,7 +107,7 @@ export default function Navbar() {
           <nav className="flex flex-col gap-4 p-4">
             <Link href="/" className="text-text-secondary hover:text-accent transition-colors">Home</Link>
             <Link href="/suggested-routes" className="text-text-secondary hover:text-accent transition-colors">Suggested Routes</Link>
-            <Link href="/hazard-reporting" className="text-text-secondary hover:text-accent transition-colors">Hazard Reporting</Link>
+            <Link href="/report-hazards" className="text-text-secondary hover:text-accent transition-colors">Hazard Reporting</Link>
             <Link href="/find-buddy" className="text-text-secondary hover:text-accent transition-colors">Find Buddy</Link>
             
             {isLoggedIn ? (
