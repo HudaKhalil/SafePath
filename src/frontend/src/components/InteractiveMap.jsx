@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { LOCATION_CONFIG } from "../lib/locationConfig";
 
 // ---- default markers fix (production) ----
 delete L.Icon.Default.prototype._getIconUrl;
@@ -79,7 +80,7 @@ const getRouteColor = (s) => {
 };
 
 export default function InteractiveMap({
-  center = [53.3498, -6.2603], // Dublin default
+  center = LOCATION_CONFIG.DEFAULT_CENTER, // London default
   routes = [],
   selectedRoute = null,
   onLocationSelect,
