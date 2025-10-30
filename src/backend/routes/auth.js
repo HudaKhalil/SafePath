@@ -2,10 +2,16 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+require('dotenv').config(); // Ensure environment variables are loaded
 const db = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 
 const router = express.Router();
+
+// Debug environment variables on startup
+console.log('Auth router loaded - JWT_SECRET exists:', !!process.env.JWT_SECRET);
+console.log('Current working directory:', process.cwd());
+console.log('NODE_ENV:', process.env.NODE_ENV);
 
 // Signup endpoint
 router.post('/signup', [
@@ -63,9 +69,17 @@ router.post('/signup', [
     const newUser = result.rows[0];
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only';
+    
+    // Debug: Check if JWT_SECRET is loaded
+    if (!process.env.JWT_SECRET) {
+      console.warn('JWT_SECRET not found in environment, using fallback');
+      console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('JWT') || key.includes('SECRET')));
+    }
+    
     const token = jwt.sign(
       { userId: newUser.id, email: newUser.email },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: '24h' }
     );
 
@@ -163,9 +177,17 @@ router.post('/login', [
     }
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only';
+    
+    // Debug: Check if JWT_SECRET is loaded
+    if (!process.env.JWT_SECRET) {
+      console.warn('JWT_SECRET not found in environment, using fallback');
+      console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('JWT') || key.includes('SECRET')));
+    }
+    
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: '24h' }
     );
 
