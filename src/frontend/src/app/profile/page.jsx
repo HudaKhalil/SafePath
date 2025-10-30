@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -49,11 +50,26 @@ export default function Profile() {
           }
         })
       } else {
-        // setError('Failed to load profile')
+        const errorMessage = response?.message || 'Failed to load profile'
+        console.error('Profile load failed:', {
+          success: response?.success,
+          message: response?.message,
+          response: response
+        })
+        setError(errorMessage)
       }
     } catch (error) {
-      console.error('Profile load error:', error)
-      // setError('Failed to load profile')
+      console.error('Profile load error:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+        status: error.response?.status,
+        fullError: error
+      })
+      const errorMessage = error.message || 
+                          error.response?.data?.message || 
+                          `Failed to load profile${error.response?.status ? ` (${error.response.status})` : ''}`
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -105,8 +121,25 @@ export default function Profile() {
         setError(response.message || 'Failed to update profile')
       }
     } catch (error) {
-      console.error('Profile update error:', error)
-      setError('Failed to update profile')
+      console.error('Profile update error:', {
+        message: error.message || 'Unknown error',
+        response: error.response?.data,
+        status: error.response?.status,
+        error: error
+      })
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to update profile'
+      
+      if (error.message && error.message !== 'Network error') {
+        errorMessage = error.message
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error.response?.status) {
+        errorMessage = `Server error (${error.response.status}). Please try again.`
+      }
+      
+      setError(errorMessage)
     }
   }
 
