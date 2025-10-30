@@ -10,6 +10,7 @@ const db = require('./config/database');
 // Import routes
 const authRoutes = require('./routes/auth');
 const routesRoutes = require('./routes/routes');
+const geocodingRoutes = require('./routes/geocoding');
 //const hazardsRoutes = require('./routes/hazards');
 //const buddiesRoutes = require('./routes/buddies');
 
@@ -72,6 +73,7 @@ app.get('/health', async (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/routes', routesRoutes);
+app.use('/api/geocoding', geocodingRoutes);
 //app.use('/api/hazards', hazardsRoutes);
 //app.use('/api/buddies', buddiesRoutes);
 

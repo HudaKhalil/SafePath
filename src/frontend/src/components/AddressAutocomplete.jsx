@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { debounce } from 'lodash'
+import { geocodingService } from '../lib/services'
+import { LOCATION_CONFIG } from '../lib/locationConfig'
 
 export default function AddressAutocomplete({ value, onChange, placeholder, icon }) {
   const [suggestions, setSuggestions] = useState([])
@@ -9,7 +11,7 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef(null)
 
-  // Nominatim geocoding service (free OpenStreetMap service)
+  // Enhanced search function that tries backend first, then fallback to direct Nominatim
   const searchAddress = async (query) => {
     if (!query || query.length < 3) {
       setSuggestions([])
@@ -18,28 +20,36 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
 
     setIsLoading(true)
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=gb&limit=5&bounded=1&viewbox=-0.510375,51.286760,0.334015,51.691874&addressdetails=1`
-      )
-      const data = await response.json()
-      
-      const formattedSuggestions = data.map((item, index) => ({
-        id: index,
-        label: item.display_name,
-        value: item.display_name,
-        lat: parseFloat(item.lat),
-        lon: parseFloat(item.lon),
-        address: {
-          house_number: item.address?.house_number,
-          road: item.address?.road,
-          suburb: item.address?.suburb,
-          postcode: item.address?.postcode,
-          city: item.address?.city || item.address?.town,
-          country: item.address?.country
-        }
-      }))
-      
-      setSuggestions(formattedSuggestions)
+      // Try backend geocoding service first
+      let result;
+      try {
+        result = await geocodingService.searchLocations(query, { 
+          limit: 5, 
+          countrycode: LOCATION_CONFIG.COUNTRY_CODE
+        });
+      } catch (backendError) {
+        console.log('Backend geocoding failed, using direct Nominatim:', backendError.message);
+        // Fallback to direct Nominatim search
+        result = await geocodingService.searchNominatim(query, { 
+          limit: 5, 
+          countrycode: LOCATION_CONFIG.COUNTRY_CODE
+        });
+      }
+
+      if (result.success && result.data.locations) {
+        const formattedSuggestions = result.data.locations.map((item, index) => ({
+          id: index,
+          label: item.display_name,
+          value: item.display_name,
+          lat: item.lat,
+          lon: item.lon,
+          address: item.address
+        }))
+        
+        setSuggestions(formattedSuggestions)
+      } else {
+        setSuggestions([])
+      }
     } catch (error) {
       console.error('Address search error:', error)
       setSuggestions([])

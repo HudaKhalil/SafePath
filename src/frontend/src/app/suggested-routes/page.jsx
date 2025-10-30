@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { routesService } from '../../lib/services'
 import ProtectedRoute from '../../components/auth/ProtectedRoute'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
+import { LOCATION_CONFIG } from '../../lib/locationConfig'
 
 // Dynamically import Map component to avoid SSR issues
 const Map = dynamic(() => import('../../components/Map'), { ssr: false })
@@ -39,13 +40,13 @@ export default function SuggestedRoutes() {
         },
         (error) => {
           console.error('Error getting location:', error)
-          const defaultLocation = [51.5074, -0.1278]
+          const defaultLocation = LOCATION_CONFIG.DEFAULT_CENTER
           setUserLocation(defaultLocation)
           loadNearbyRoutes(defaultLocation)
         }
       )
     } else {
-      const defaultLocation = [51.5074, -0.1278]
+      const defaultLocation = LOCATION_CONFIG.DEFAULT_CENTER
       setUserLocation(defaultLocation)
       loadNearbyRoutes(defaultLocation)
     }
@@ -127,10 +128,42 @@ export default function SuggestedRoutes() {
     }
   }
 
-  // Disabled Find Routes handler
-  const handleFindRoutes = (e) => {
+  // Enhanced Find Routes handler
+  const handleFindRoutes = async (e) => {
     e.preventDefault()
-    console.log('Find Routes button clicked, but routing is disabled.')
+    
+    if (!fromCoords || !toCoords) {
+      setError('Please select both starting location and destination')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    
+    try {
+      console.log('Finding routes from:', fromCoords, 'to:', toCoords)
+      
+      const result = await routesService.findRoutes(
+        fromCoords[0], // latitude
+        fromCoords[1], // longitude  
+        toCoords[0],   // latitude
+        toCoords[1],   // longitude
+        transportMode
+      )
+      
+      if (result.success) {
+        setRoutes(result.data)
+        setShowRouting(true)
+        console.log('Routes found:', result.data.length)
+      } else {
+        setError(result.message || 'Failed to find routes')
+      }
+    } catch (error) {
+      console.error('Route finding error:', error)
+      setError('Failed to find routes. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleRouteFound = (route) => {
@@ -170,7 +203,7 @@ export default function SuggestedRoutes() {
               <div className="bg-gradient-to-br from-primary-dark via-primary to-slate-700 p-4">
                 <div className="rounded-xl overflow-hidden shadow-inner">
                   <Map
-                    center={fromCoords || userLocation || [51.5074, -0.1278]}
+                    center={fromCoords || userLocation || LOCATION_CONFIG.DEFAULT_CENTER}
                     zoom={fromCoords && toCoords ? 12 : 13}
                     routes={routes}
                     height="300px" // Increased mini map height
@@ -288,7 +321,7 @@ export default function SuggestedRoutes() {
                   <div className="bg-white rounded-2xl shadow-lg p-6">
                     <h3 className="text-2xl font-bold text-primary-dark mb-4">Route Map</h3>
                     <Map
-                      center={fromCoords || userLocation || [51.5074, -0.1278]}
+                      center={fromCoords || userLocation || LOCATION_CONFIG.DEFAULT_CENTER}
                       zoom={fromCoords && toCoords ? 12 : 13}
                       routes={routes}
                       height="500px"

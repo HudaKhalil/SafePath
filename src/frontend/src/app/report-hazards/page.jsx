@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { hazardsService } from '../../lib/services'
 import ProtectedRoute from '../../components/auth/ProtectedRoute'
+import { LOCATION_CONFIG } from '../../lib/locationConfig'
 
 // Dynamically import Map component to avoid SSR issues with Leaflet
 const Map = dynamic(() => import('../../components/Map'), { ssr: false })
@@ -40,11 +41,11 @@ export default function HazardReporting() {
         },
         (error) => {
           console.error('Error getting location:', error)
-          setUserLocation([51.5074, -0.1278])
+          setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER)
         }
       )
     } else {
-      setUserLocation([51.5074, -0.1278])
+      setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER)
     }
   }
 
@@ -424,7 +425,7 @@ export default function HazardReporting() {
                   )}
                   
                   <Map
-                    center={userLocation || [51.5074, -0.1278]}
+                    center={userLocation || LOCATION_CONFIG.DEFAULT_CENTER}
                     zoom={13}
                     hazards={hazards}
                     height="400px"
