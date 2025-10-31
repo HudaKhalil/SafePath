@@ -75,15 +75,13 @@ function RoutingController({
         if (routeResult.success) {
           const { coordinates, distance, duration, provider, fallback } = routeResult;
           
-          // Create a polyline following the actual route
-          const routeColor = transportMode === 'cycling' ? "#3b82f6" : 
-                           transportMode === 'walking' ? "#10b981" : 
-                           "#6b7280";
+          // Use light blue for all search routes between two selected points
+          const routeColor = "#3b82f6"; // Light blue for search routes
           
           const routeLine = L.polyline(coordinates, {
             color: routeColor,
-            weight: fallback ? 3 : 5, // Thinner line for fallback routes
-            opacity: fallback ? 0.6 : 0.9,
+            weight: fallback ? 4 : 6, // Slightly thicker for better visibility
+            opacity: fallback ? 0.7 : 0.9,
             dashArray: fallback ? "10, 10" : null, // Dashed line for straight-line fallback
           }).addTo(map);
           
@@ -317,11 +315,15 @@ function RoadFollowingRoute({ route, onRouteClick, getRouteColor }) {
   );
 }
 
-// capture map clicks and bubble up
-function ClickCatcher({ onMapClick }) {
+// Enhanced click catcher with place detection
+function ClickCatcher({ onMapClick, onPlaceSelect }) {
   useMapEvents({
     click(e) {
       if (onMapClick) onMapClick(e.latlng);
+      if (onPlaceSelect) {
+        // Reverse geocode the clicked location
+        onPlaceSelect(e.latlng);
+      }
     },
   });
   return null;
@@ -344,6 +346,8 @@ export default function Map({
   onBuddyClick = () => {},
   onRouteFound = () => {},
   onMapClick = null,
+  onPlaceSelect = null,
+  routeColor = "#3b82f6", // Default light blue color
 }) {
   // Create improved custom icons with better fallback
   const createCustomIcon = (color, type) => {
@@ -418,15 +422,19 @@ export default function Map({
     }
   };
 
-  // Get route color based on safety rating
+  // Get route color based on safety rating or use custom color
   const getRouteColor = (safetyRating) => {
+    // If custom route color is provided, use light blue for search routes
+    if (routeColor === "#3b82f6") return "#3b82f6"; // Light blue for search routes
+    
+    // Default safety-based colors for other routes
     if (safetyRating >= 8) return "#10b981"; // green
     if (safetyRating >= 6) return "#f59e0b"; // yellow
     return "#ef4444"; // red
   };
 
   return (
-    <div style={{ height, width: "100%" }}>
+    <div style={{ height, width: "100%" }} className="relative z-10">
       <MapContainer
         center={center}
         zoom={zoom}
@@ -437,8 +445,10 @@ export default function Map({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {/* click catcher */}
-        {onMapClick && <ClickCatcher onMapClick={onMapClick} />}
+        {/* Enhanced click catcher with place selection */}
+        {(onMapClick || onPlaceSelect) && (
+          <ClickCatcher onMapClick={onMapClick} onPlaceSelect={onPlaceSelect} />
+        )}
 
         {/* Enhanced Routes with road-following capability */}
         {routes.map((route) => (
