@@ -71,6 +71,52 @@ router.get('/', async (req, res) => {
 });
 
 // Get single route by ID
+// Insert a new route
+router.post('/', async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      difficulty,
+      distance_km,
+      estimated_time_minutes,
+      safety_rating,
+      path,
+      created_at
+    } = req.body;
+
+    if (!name || !difficulty || !distance_km || !estimated_time_minutes || !safety_rating || !path) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
+
+    // Insert route into database (PostGIS geometry for path)
+    const query = `
+      INSERT INTO routes
+        (name, description, difficulty, distance_km, estimated_time_minutes, safety_rating, path, created_at)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, ST_GeomFromText($7, 4326), $8)
+      RETURNING id
+    `;
+    const params = [
+      name,
+      description || '',
+      difficulty,
+      distance_km,
+      estimated_time_minutes,
+      safety_rating,
+      path,
+      created_at || new Date()
+    ];
+    const result = await db.query(query, params);
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (error) {
+    console.error('Insert route error:', error);
+  res.status(500).json({ success: false, message: 'Failed to insert route', error: error.message });
+  }
+});
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
