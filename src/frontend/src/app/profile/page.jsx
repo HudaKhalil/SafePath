@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -275,12 +274,6 @@ export default function Profile() {
                         className="flex-1 bg-accent hover:bg-accent/90 text-primary-dark font-bold py-3 px-6 rounded-lg transition-all duration-200"
                       >
                         ✏️ Edit Profile
-                      </button>
-                      <button
-                        onClick={handleLogout}
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200"
-                      >
-                        🚪 Logout
                       </button>
                     </div>
                   </div>

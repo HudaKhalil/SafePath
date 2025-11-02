@@ -119,31 +119,59 @@ export const hazardsService = {
   // Report hazard
   async reportHazard(hazardData) {
     try {
-      const response = await api.post('/hazards', hazardData);
+      const response = await api.post("/hazards", hazardData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { success: false, message: 'Network error' };
+      throw (
+        error.response?.data || { success: false, message: "Network error" }
+      );
     }
   },
 
   // Get all hazards
   async getHazards(params = {}) {
     try {
-      const response = await api.get('/hazards', { params });
+      const response = await api.get("/hazards", { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { success: false, message: 'Network error' };
+      throw (
+        error.response?.data || { success: false, message: "Network error" }
+      );
+    }
+  },
+
+  // Get recent hazards (optimized for initial load)
+  async getRecentHazards(latitude, longitude, params = {}) {
+    try {
+      const queryParams = {
+        latitude,
+        longitude,
+        radius: params.radius || 10000,
+        limit: params.limit || 20,
+        ...params,
+      };
+      const response = await api.get("/hazards/recent", {
+        params: queryParams,
+      });
+      return response.data;
+    } catch (error) {
+      throw (
+        error.response?.data || { success: false, message: "Network error" }
+      );
     }
   },
 
   // Get hazards near location
   async getNearbyHazards(latitude, longitude, params = {}) {
     try {
-      const response = await api.get(`/hazards/nearby/${latitude}/${longitude}`, { params });
+      const response = await api.get(`/hazards/near/${latitude}/${longitude}`, {
+        params,
+      });
       return response.data;
     } catch (error) {
-      console.error('getNearbyHazards error:', error);
-      throw error.response?.data || { success: false, message: 'Network error' };
+      throw (
+        error.response?.data || { success: false, message: "Network error" }
+      );
     }
   },
 
@@ -153,9 +181,49 @@ export const hazardsService = {
       const response = await api.patch(`/hazards/${id}`, updateData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { success: false, message: 'Network error' };
+      throw (
+        error.response?.data || { success: false, message: "Network error" }
+      );
     }
-  }
+  },
+
+  // Connect to real-time hazard stream (SSE)
+  connectToHazardStream(latitude, longitude, onMessage, onError) {
+    const token = authService.getToken();
+    if (!token) {
+      onError("Authentication required");
+      return null;
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const params = new URLSearchParams({
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+      radius: "5000", // 5km radius
+      token: token, // Include token in URL since EventSource doesn't support headers
+    });
+
+    const eventSource = new EventSource(
+      `${baseUrl}/api/hazards/stream?${params}`
+    );
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage(data);
+      } catch (error) {
+        console.error("Error parsing SSE data:", error);
+        onError("Data parsing error");
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("SSE connection error:", error);
+      onError("Connection error");
+    };
+
+    return eventSource;
+  },
 };
 
 export const buddiesService = {

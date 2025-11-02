@@ -276,10 +276,32 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
 // Update user profile
 router.put('/profile', authenticateToken, [
-  body('name').optional().trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
-  body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),
-  body('address').optional().trim().isLength({ min: 5 }).withMessage('Address must be at least 5 characters'),
-  body('emergency_contact').optional().isMobilePhone().withMessage('Invalid emergency contact number'),
+  body('name').optional().trim().isLength({ min: 1 }).withMessage('Name cannot be empty'),
+  body('phone').optional().custom((value) => {
+    if (value === '' || value === null || value === undefined) return true;
+    // More lenient phone validation - just check for digits and common phone characters
+    const phoneRegex = /^[\+]?[\d\s\-\(\)\.]{7,}$/;
+    if (!phoneRegex.test(value)) {
+      throw new Error('Phone number must contain at least 7 digits and only valid phone characters');
+    }
+    return true;
+  }),
+  body('address').optional().custom((value) => {
+    if (value === '' || value === null || value === undefined) return true;
+    if (value.trim().length < 3) {
+      throw new Error('Address must be at least 3 characters');
+    }
+    return true;
+  }),
+  body('emergency_contact').optional().custom((value) => {
+    if (value === '' || value === null || value === undefined) return true;
+    // More lenient phone validation - just check for digits and common phone characters
+    const phoneRegex = /^[\+]?[\d\s\-\(\)\.]{7,}$/;
+    if (!phoneRegex.test(value)) {
+      throw new Error('Emergency contact must contain at least 7 digits and only valid phone characters');
+    }
+    return true;
+  }),
   body('preferred_transport').optional().isIn(['walking', 'cycling', 'driving']).withMessage('Invalid transport preference'),
   body('safety_priority').optional().isIn(['high', 'medium', 'low']).withMessage('Invalid safety priority'),
   body('notifications').optional().isBoolean().withMessage('Notifications must be true or false'),
@@ -287,8 +309,11 @@ router.put('/profile', authenticateToken, [
   body('longitude').optional().isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude')
 ], async (req, res) => {
   try {
+    console.log('Profile update request body:', JSON.stringify(req.body, null, 2));
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', JSON.stringify(errors.array(), null, 2));
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
