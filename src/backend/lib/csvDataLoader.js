@@ -173,6 +173,115 @@ class CsvDataLoader {
     const lonKey = Math.round(longitude / this.gridSize);
     return `${latKey},${lonKey}`;
   }
+
+  getSafetyScoreForLocation(latitude, longitude) {
+    const gridKey = this.getGridKey(latitude, longitude);
+    const cell = this.safetyGrid.get(gridKey);
+    
+    if (cell) {
+      return cell.safetyScore;
+    }
+    
+    // If no data for this cell, check neighboring cells
+    const neighbors = this.getNeighboringCells(latitude, longitude);
+    if (neighbors.length > 0) {
+      const avgScore = neighbors.reduce((sum, n) => sum + n.safetyScore, 0) / neighbors.length;
+      return avgScore;
+    }
+    
+    // Default to moderate safety if no data
+    return 0.5;
+  }
+
+  getNeighboringCells(latitude, longitude, radius = 1) {
+    const neighbors = [];
+    const centerLatKey = Math.round(latitude / this.gridSize);
+    const centerLonKey = Math.round(longitude / this.gridSize);
+    
+    for (let latOffset = -radius; latOffset <= radius; latOffset++) {
+      for (let lonOffset = -radius; lonOffset <= radius; lonOffset++) {
+        if (latOffset === 0 && lonOffset === 0) continue;
+        
+        const key = `${centerLatKey + latOffset},${centerLonKey + lonOffset}`;
+        const cell = this.safetyGrid.get(key);
+        if (cell) {
+          neighbors.push(cell);
+        }
+      }
+    }
+    
+    return neighbors;
+  }
+
+  getSafetyMetrics(latitude, longitude) {
+    const gridKey = this.getGridKey(latitude, longitude);
+    const cell = this.safetyGrid.get(gridKey);
+    
+    if (cell) {
+      return {
+        crimeRate: cell.crimeRate,
+        lightingIndex: cell.lightingIndex,
+        collisionDensity: cell.collisionDensity,
+        hazardDensity: cell.hazardDensity,
+        safetyScore: cell.safetyScore,
+        crimeCount: cell.crimeCount
+      };
+    }
+    
+    // Return default values if no data
+    return {
+      crimeRate: 0.5,
+      lightingIndex: 0.5,
+      collisionDensity: 0.5,
+      hazardDensity: 0.5,
+      safetyScore: 0.5,
+      crimeCount: 0
+    };
+  }
+
+  getCrimesNearLocation(latitude, longitude, radiusKm = 1) {
+    const crimes = [];
+    const radiusDegrees = radiusKm / 111; // Rough conversion
+    
+    for (const crime of this.crimeData) {
+      const distance = this.calculateDistance(
+        latitude, longitude,
+        crime.latitude, crime.longitude
+      );
+      
+      if (distance <= radiusKm) {
+        crimes.push({
+          ...crime,
+          distance
+        });
+      }
+    }
+    
+    return crimes;
+  }
+
+  calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  isLoaded() {
+    return this.loaded;
+  }
+
+  getStats() {
+    return {
+      totalRecords: this.crimeData.length,
+      gridCells: this.safetyGrid.size,
+      loaded: this.loaded
+    };
+  }
 }
 
 const csvDataLoader = new CsvDataLoader();
