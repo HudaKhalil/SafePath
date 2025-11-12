@@ -180,8 +180,105 @@ class RouteCalculator {
       modified: true
     };
   }
+
+  async getOSRMRoute(fromLat, fromLon, toLat, toLon, mode, alternative = false) {
+    const profileMap = {
+      'walking': 'foot',
+      'cycling': 'bike',
+      'driving': 'driving'
+    };
+    
+    const profile = profileMap[mode] || 'foot';
+    const alternativeParam = alternative ? '&alternatives=true' : '';
+    const url = `https://router.project-osrm.org/route/v1/${profile}/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=true${alternativeParam}`;
+    
+    try {
+      const fetch = (await import('node-fetch')).default;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.routes && data.routes.length > 0) {
+        // If alternative requested and available, use it
+        const route = alternative && data.routes.length > 1 ? data.routes[1] : data.routes[0];
+        
+        return {
+          success: true,
+          coordinates: route.geometry.coordinates.map(coord => [coord[1], coord[0]]),
+          distance: route.distance,
+          duration: route.duration,
+          instructions: route.legs[0]?.steps?.map(step => ({
+            instruction: step.maneuver?.instruction || 'Continue',
+            distance: step.distance,
+            duration: step.duration
+          })) || []
+        };
+      }
+      
+      throw new Error('No route found');
+    } catch (error) {
+      console.error('OSRM routing error:', error.message);
+      return { success: false };
+    }
+  }
+
+  calculateStraightLineRoutes(fromLat, fromLon, toLat, toLon, mode) {
+    const distance = csvDataLoader.calculateDistance(fromLat, fromLon, toLat, toLon);
+    const speed = this.getSpeedForMode(mode);
+    const duration = (distance / speed) * 60; // minutes
+    
+    // Get safety scores for start, middle, and end
+    const midLat = (fromLat + toLat) / 2;
+    const midLon = (fromLon + toLon) / 2;
+    
+    const startSafety = csvDataLoader.getSafetyScoreForLocation(fromLat, fromLon);
+    const midSafety = csvDataLoader.getSafetyScoreForLocation(midLat, midLon);
+    const endSafety = csvDataLoader.getSafetyScoreForLocation(toLat, toLon);
+    const avgSafety = (startSafety + midSafety + endSafety) / 3;
+    
+    const coordinates = [[fromLat, fromLon], [toLat, toLon]];
+    
+    return {
+      success: true,
+      fastest: {
+        coordinates,
+        distance: parseFloat(distance.toFixed(2)),
+        time: parseFloat(duration.toFixed(1)),
+        safetyScore: parseFloat(avgSafety.toFixed(2)),
+        instructions: [{
+          instruction: `Head straight to destination (${distance.toFixed(1)}km)`,
+          distance: distance * 1000,
+          duration: duration * 60
+        }],
+        type: 'fastest',
+        fallback: true
+      },
+      safest: {
+        coordinates,
+        distance: parseFloat(distance.toFixed(2)),
+        time: parseFloat(duration.toFixed(1)),
+        safetyScore: parseFloat(avgSafety.toFixed(2)),
+        instructions: [{
+          instruction: `Head straight to destination (${distance.toFixed(1)}km)`,
+          distance: distance * 1000,
+          duration: duration * 60
+        }],
+        type: 'safest',
+        fallback: true
+      },
+      provider: 'straight-line'
+    };
+  }
+
+  getSpeedForMode(mode) {
+    const speeds = {
+      'walking': this.walkingSpeed,
+      'cycling': this.cyclingSpeed,
+      'driving': this.drivingSpeed
+    };
+    return speeds[mode] || this.walkingSpeed;
+  }
 }
- 
+
 const routeCalculator = new RouteCalculator();
 
 module.exports = routeCalculator;
