@@ -81,7 +81,11 @@ router.post('/signup', [
     }
     
     const token = jwt.sign(
+<<<<<<< HEAD
       { userId: newUser.user_id, email: newUser.email },
+=======
+      { userId: newUser.id, email: newUser.email },
+>>>>>>> main
       jwtSecret,
       { expiresIn: '24h' }
     );
@@ -179,7 +183,11 @@ router.post('/login', [
       });
     }
 
+<<<<<<< HEAD
     // Generate JWT token - use user_id
+=======
+    // Generate JWT token
+>>>>>>> main
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only';
     
     // Debug: Check if JWT_SECRET is loaded
@@ -189,7 +197,11 @@ router.post('/login', [
     }
     
     const token = jwt.sign(
+<<<<<<< HEAD
       { userId: user.user_id, email: user.email },
+=======
+      { userId: user.id, email: user.email },
+>>>>>>> main
       jwtSecret,
       { expiresIn: '24h' }
     );

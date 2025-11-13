@@ -54,7 +54,7 @@ export default function Navbar() {
   }
 
   return (
-    <header className="bg-primary-dark/95 backdrop-blur-md text-white sticky top-0 shadow-lg z-40 border-b border-white/10">
+    <header className="bg-primary-dark/95 backdrop-blur-md text-white sticky top-0 shadow-lg z-[1001] border-b border-white/10">
       <div className="container mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center">
