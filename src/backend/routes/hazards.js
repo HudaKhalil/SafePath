@@ -107,5 +107,70 @@ router.post('/', authenticateToken, [
     });
   }
 });
+// Get hazards near a location
+router.get('/near/:latitude/:longitude', async (req, res) => {
+  try {
+    const { latitude, longitude } = req.params;
+    const { radius = 2000, limit = 20 } = req.query; // radius in meters
+
+    const result = await query(`
+      SELECT 
+        h.id, 
+        h.description, 
+        h.hazard_type, 
+        h.severity,
+        h.latitude,
+        h.longitude,
+        h.reported_at,
+        h.status,
+        ST_Distance(
+          h.location::geography, 
+          ST_SetSRID(ST_Point($2, $1), 4326)::geography
+        ) as distance_meters
+      FROM hazards h
+      WHERE ST_DWithin(
+        h.location::geography, 
+        ST_SetSRID(ST_Point($2, $1), 4326)::geography, 
+        $3
+      )
+      AND (h.status IS NULL OR h.status != 'resolved')
+      ORDER BY distance_meters ASC, h.reported_at DESC
+      LIMIT $4
+    `, [latitude, longitude, radius, limit]);
+
+    const hazards = result.rows.map(hazard => ({
+      id: hazard.id,
+      description: hazard.description,
+      location: {
+        latitude: hazard.latitude,
+        longitude: hazard.longitude
+      },
+      hazardType: hazard.hazard_type,
+      severity: hazard.severity,
+      status: hazard.status,
+      reportedAt: hazard.reported_at,
+      distanceMeters: Math.round(hazard.distance_meters)
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        hazards,
+        searchLocation: {
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude)
+        },
+        radiusMeters: parseInt(radius)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get nearby hazards error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
 
 module.exports = router;
