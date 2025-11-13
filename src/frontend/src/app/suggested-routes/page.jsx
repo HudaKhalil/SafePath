@@ -1,363 +1,521 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import dynamic from 'next/dynamic'
-import { routesService } from '../../lib/services'
-import ProtectedRoute from '../../components/auth/ProtectedRoute'
-import AddressAutocomplete from '../../components/AddressAutocomplete'
+import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { geocodingService, routingService } from "../../lib/services";
+import ProtectedRoute from "../../components/auth/ProtectedRoute";
+import AddressAutocomplete from "../../components/AddressAutocomplete";
+import { LOCATION_CONFIG } from "../../lib/locationConfig";
 
-// Dynamically import Map component to avoid SSR issues
-const Map = dynamic(() => import('../../components/Map'), { ssr: false })
+// Dynamically import Map component (avoid SSR issues)
+const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
 export default function SuggestedRoutes() {
-  const [routes, setRoutes] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [selectedRoute, setSelectedRoute] = useState(null)
-  const [userLocation, setUserLocation] = useState(null)
-  const [error, setError] = useState('')
-  const [fromLocation, setFromLocation] = useState('')
-  const [toLocation, setToLocation] = useState('')
-  const [fromCoords, setFromCoords] = useState(null)
-  const [toCoords, setToCoords] = useState(null)
-  const [fromLocationData, setFromLocationData] = useState(null)
-  const [toLocationData, setToLocationData] = useState(null)
-  const [transportMode, setTransportMode] = useState('walking')
-  const [showRouting, setShowRouting] = useState(false)
-  const [foundRoute, setFoundRoute] = useState(null)
+  // Used to force remount of Map for full reset
+  const [mapKey, setMapKey] = useState(0);
+  // Clear backend suggested routes
+  const clearBackendRoutes = () => {
+    setBackendRoutes([]);
+    setSelectedRoute(null);
+  };
+  // Start navigation for backend route
+  const startBackendNavigation = (route) => {
+    const url =
+      `/navigation` +
+      `?routeId=${encodeURIComponent(route.id)}` +
+      `&name=${encodeURIComponent(route.name)}` +
+      `&type=${encodeURIComponent(route.difficulty)}` +
+      `&distance=${encodeURIComponent(route.distanceKm)}` +
+      `&time=${encodeURIComponent(route.estimatedTimeMinutes)}` +
+      `&safety=${encodeURIComponent(route.safetyRating)}`;
+    router.push(url);
+  };
+  const router = useRouter();
+  const [routes, setRoutes] = useState([]); // External API routes
+  const [loading, setLoading] = useState(false);
+  const [selectedRoute, setSelectedRoute] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [error, setError] = useState("");
+  const [fromLocation, setFromLocation] = useState("");
+  const [toLocation, setToLocation] = useState("");
+  const [fromCoords, setFromCoords] = useState(null);
+  const [toCoords, setToCoords] = useState(null);
+  const [transportMode, setTransportMode] = useState("cycling");
+  const [showRouting, setShowRouting] = useState(false);
+  const [backendRoutes, setBackendRoutes] = useState([]); // Backend suggested routes
+  const [backendLoading, setBackendLoading] = useState(false);
+  const resultsRef = useRef(null);
+  // Fetch suggested routes from backend
+  const fetchBackendRoutes = async () => {
+    setBackendLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/routes");
+      const data = await res.json();
+      if (data.success && data.data?.routes) {
+        setBackendRoutes(data.data.routes);
+        console.log("Fetched backendRoutes:", data.data.routes);
+      } else {
+        setError(data.message || "Failed to fetch suggested routes");
+      }
+    } catch (err) {
+      setError("Failed to fetch suggested routes");
+    } finally {
+      setBackendLoading(false);
+    }
+  };
 
   useEffect(() => {
-    getUserLocation()
-  }, [])
+    getUserLocation();
+  }, []);
 
+  // ======== GET USER LOCATION =========
   const getUserLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location = [position.coords.latitude, position.coords.longitude]
-          setUserLocation(location)
-          loadNearbyRoutes(location)
-        },
-        (error) => {
-          console.error('Error getting location:', error)
-          const defaultLocation = [51.5074, -0.1278]
-          setUserLocation(defaultLocation)
-          loadNearbyRoutes(defaultLocation)
-        }
-      )
-    } else {
-      const defaultLocation = [51.5074, -0.1278]
-      setUserLocation(defaultLocation)
-      loadNearbyRoutes(defaultLocation)
-    }
-  }
+        (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+        () => setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER)
+      );
+    } else setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER);
+  };
 
-  const loadRoutes = async () => {
-    try {
-      setLoading(true)
-      const response = await routesService.getRoutes()
-      if (response.success && Array.isArray(response.data)) {
-        setRoutes(response.data)
-      } else {
-        setRoutes([])
-        setError('Failed to load routes')
-      }
-    } catch (error) {
-      console.error('Error loading routes:', error)
-      setRoutes([])
-      setError('Failed to load routes')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadNearbyRoutes = async (location) => {
-    try {
-      setLoading(true)
-      setError('')
-
-      const response = await routesService.getNearbyRoutes(location[0], location[1])
-
-      if (response.success) {
-        if (Array.isArray(response.data) && response.data.length > 0) {
-          setRoutes(response.data)
-        } else {
-          setRoutes([])
-          console.log('No nearby routes found for location:', location)
-        }
-      } else {
-        setRoutes([])
-        console.warn('Failed to get nearby routes:', response.message)
-        if (response.message && !response.message.includes('No routes found')) {
-          setError('Unable to load nearby routes. Please try searching for a specific route.')
-        }
-      }
-    } catch (error) {
-      console.error('Error loading nearby routes:', error)
-      setRoutes([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const getSafetyColor = (rating) => {
-    if (rating >= 8) return 'text-green-600'
-    if (rating >= 6) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const getSafetyBadgeColor = (rating) => {
-    if (rating >= 8) return 'bg-green-100 text-green-800'
-    if (rating >= 6) return 'bg-yellow-100 text-yellow-800'
-    return 'bg-red-100 text-red-800'
-  }
-
+  // ======== HANDLE LOCATION INPUTS =========
   const handleFromLocationChange = (value, locationData) => {
-    setFromLocation(value)
-    if (locationData) {
-      setFromLocationData(locationData)
-      setFromCoords([locationData.lat, locationData.lon])
-    }
-  }
+    setFromLocation(value);
+    if (locationData) setFromCoords([locationData.lat, locationData.lon]);
+  };
 
   const handleToLocationChange = (value, locationData) => {
-    setToLocation(value)
-    if (locationData) {
-      setToLocationData(locationData)
-      setToCoords([locationData.lat, locationData.lon])
+    setToLocation(value);
+    if (locationData) setToCoords([locationData.lat, locationData.lon]);
+  };
+
+  // ======== FIND ROUTES (BUTTON CLICK) =========
+ const handleFindRoutes = async (e) => {
+   e.preventDefault();
+   if (!fromCoords || !toCoords) {
+     setError("Please select both starting location and destination");
+     return;
+   }
+
+   setLoading(true);
+   setError("");
+
+   try {
+     const routeResult = await routingService.getRoute(
+       fromCoords[0],
+       fromCoords[1],
+       toCoords[0],
+       toCoords[1],
+       transportMode
+     );
+
+     if (routeResult.success) {
+       console.log('Routing provider:', routeResult.provider, 'Fallback:', !!routeResult.fallback);
+       const formattedRoute = {
+         id: Date.now(),
+         name: transportMode === "cycling" ? "Cycling Route" : "Walking Route",
+         type: "balanced",
+         color: "#3b82f6",
+         coordinates: routeResult.coordinates,
+         distance: (routeResult.distance / 1000).toFixed(2),
+         estimatedTime: Math.round(routeResult.duration / 60),
+         safetyRating: 8,
+         instructions: routeResult.instructions || [],
+         fallback: !!routeResult.fallback,
+         provider: routeResult.provider
+       };
+
+       setRoutes([formattedRoute]);
+       setShowRouting(true);
+
+       setTimeout(() => {
+         resultsRef.current?.scrollIntoView({
+           behavior: "smooth",
+           block: "start",
+         });
+       }, 100);
+     } else {
+       setError(routeResult.message || "Failed to find route");
+     }
+   } catch (error) {
+     console.error("Route finding error:", error);
+     setError("Failed to find route. Please try again.");
+   } finally {
+     setLoading(false);
+   }
+ };
+
+  // ======== AUTO FIND ROUTES (MAP CLICK) =========
+ const handleAutoFindRoutes = async () => {
+  if (!fromCoords || !toCoords) return
+
+  setLoading(true)
+  setError('')
+
+  try {
+    const routeResult = await routingService.getRoute(
+      fromCoords[0],
+      fromCoords[1],
+      toCoords[0],
+      toCoords[1],
+      transportMode
+    )
+
+    if (routeResult.success) {
+      const formattedRoute = {
+        id: Date.now(),
+        name: transportMode === 'cycling' ? 'Cycling Route' : 'Walking Route',
+        type: 'balanced',
+        color: '#3b82f6',
+        coordinates: routeResult.coordinates,
+        distance: (routeResult.distance / 1000).toFixed(2),
+        estimatedTime: Math.round(routeResult.duration / 60),
+        safetyRating: 8,
+        instructions: routeResult.instructions || [],
+      }
+
+      setRoutes([formattedRoute])
+      setShowRouting(true)
+
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 200)
+    } else {
+      setError(routeResult.message || 'Failed to find route')
     }
+  } catch (error) {
+    console.error('Auto route finding error:', error)
+    setError('Failed to find route automatically.')
+  } finally {
+    setLoading(false)
   }
+};
 
-  // Disabled Find Routes handler
-  const handleFindRoutes = (e) => {
-    e.preventDefault()
-    console.log('Find Routes button clicked, but routing is disabled.')
-  }
+  // ======== SELECT POINTS ON MAP =========
+  const handleMapPlaceSelect = async (latlng) => {
+    try {
+      const response = await geocodingService.getAddressFromCoords(
+        latlng.lat,
+        latlng.lng
+      );
 
-  const handleRouteFound = (route) => {
-    setFoundRoute(route)
-  }
+      let addressText = `${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`;
+      if (response.success && response.data?.display_name) {
+        addressText = response.data.display_name;
+      }
 
+      const coords = [latlng.lat, latlng.lng];
+
+      if (!fromCoords) {
+        setFromLocation(addressText);
+        setFromCoords(coords);
+      } else if (!toCoords) {
+        setToLocation(addressText);
+        setToCoords(coords);
+        setTimeout(() => handleAutoFindRoutes(), 500);
+      } else {
+        // Replace destination if both already set
+        setToLocation(addressText);
+        setToCoords(coords);
+        setTimeout(() => handleAutoFindRoutes(), 500);
+      }
+    } catch (error) {
+      console.error("Error getting address from coordinates:", error);
+    }
+  };
+
+  // ======== START NAVIGATION (NEW PAGE) =========
+  const startNavigation = (route) => {
+    const url =
+      `/navigation` +
+      `?routeId=${encodeURIComponent(route.id)}` +
+      `&name=${encodeURIComponent(route.name)}` +
+      `&type=${encodeURIComponent(route.type)}` +
+      `&distance=${encodeURIComponent(route.distance)}` +
+      `&time=${encodeURIComponent(route.estimatedTime)}` +
+      `&safety=${encodeURIComponent(route.safetyRating)}`;
+
+    router.push(url);
+  };
+
+  // ======== HELPER COLORS =========
+  const getSafetyColor = (rating) => {
+    if (rating >= 8) return "text-green-600";
+    if (rating >= 6) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  const getSafetyBadgeColor = (rating) => {
+    if (rating >= 8) return "bg-green-100 text-green-800";
+    if (rating >= 6) return "bg-yellow-100 text-yellow-800";
+    return "bg-red-100 text-red-800";
+  };
+
+  // ======== RENDER =========
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gradient-to-br from-primary-dark via-primary-light to-secondary pt-20">
-          <div className="container mx-auto px-6 py-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-accent mx-auto"></div>
-              <p className="text-white mt-4">Loading suggested routes...</p>
-            </div>
+        <div className="min-h-screen flex items-center justify-center bg-slate-800 text-white">
+          <div>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto"></div>
+            <p className="mt-4 text-center">Loading suggested routes...</p>
           </div>
         </div>
       </ProtectedRoute>
-    )
+    );
   }
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-primary-dark via-primary to-slate-700">
-        <div className="container mx-auto px-6 pt-12 pb-24">
-          {/* Top heading */}
-          <div className="text-center mb-6">
-            <h1 className="text-4xl md:text-5xl font-bold text-white">
-              Find the <span className="text-accent">Safest Route</span>
-            </h1>
-            <p className="text-lg text-text-secondary mt-2">Quickly preview the map and search routes</p>
-          </div>
+        {/* Page Heading */}
+        <div className="text-center pt-12 pb-8">
+          <h1 className="text-4xl font-bold text-white">
+            Find the <span className="text-accent">Safest Route</span>
+          </h1>
+          <p className="text-white/80 mt-2">
+            Click on map or use the search form to plan your route
+          </p>
+        </div>
 
-          {/* Mini Map Card (same width as form card) */}
-          <div className="max-w-4xl mx-auto mb-6">
-            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/5">
-              <div className="bg-gradient-to-br from-primary-dark via-primary to-slate-700 p-4">
-                <div className="rounded-xl overflow-hidden shadow-inner">
-                  <Map
-                    center={fromCoords || userLocation || [51.5074, -0.1278]}
-                    zoom={fromCoords && toCoords ? 12 : 13}
-                    routes={routes}
-                    height="300px" // Increased mini map height
-                    fromCoords={fromCoords}
-                    toCoords={toCoords}
-                    showRouting={showRouting && routes.length === 0}
-                    onRouteFound={handleRouteFound}
-                    markers={userLocation ? [{
-                      position: userLocation,
-                      color: '#10b981',
-                      type: 'marker',
-                      popup: <div className="text-sm"><strong>Your Location</strong></div>
-                    }] : []}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* From/To — Search Card */}
-          <div className="max-w-4xl mx-auto mb-12">
-            <div className="bg-white p-8 rounded-2xl shadow-2xl">
+        <div className="max-w-7xl mx-auto px-6 pb-20 grid lg:grid-cols-5 gap-8">
+          {/* Left: Form */}
+          <div className="lg:col-span-2">
+            <div className="bg-white p-6 rounded-2xl shadow-xl h-fit sticky top-24">
               <form onSubmit={handleFindRoutes} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <AddressAutocomplete
-                    value={fromLocation}
-                    onChange={handleFromLocationChange}
-                    placeholder="Enter starting location"
-                    icon="from"
-                  />
-                  <AddressAutocomplete
-                    value={toLocation}
-                    onChange={handleToLocationChange}
-                    placeholder="Enter destination"
-                    icon="to"
-                  />
-                </div>
+                <AddressAutocomplete
+                  value={fromLocation}
+                  onChange={handleFromLocationChange}
+                  placeholder="Enter starting location"
+                  icon="from"
+                />
+                <AddressAutocomplete
+                  value={toLocation}
+                  onChange={handleToLocationChange}
+                  placeholder="Enter destination"
+                  icon="to"
+                />
 
-                <div className="flex justify-center gap-8 py-4">
+                {/* Mode selection */}
+                <div className="flex justify-center gap-6 py-2">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="mode" 
-                      value="walking" 
-                      className="text-accent" 
-                      checked={transportMode === 'walking'}
+                    <input
+                      type="radio"
+                      name="mode"
+                      value="walking"
+                      checked={transportMode === "walking"}
                       onChange={(e) => setTransportMode(e.target.value)}
                     />
-                    <span className="text-blue-600">🚶</span>
-                    <span className="text-gray-700 font-medium">Walking</span>
+                    🚶 Walking
                   </label>
-
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="mode" 
-                      value="cycling" 
-                      className="text-accent"
-                      checked={transportMode === 'cycling'}
+                    <input
+                      type="radio"
+                      name="mode"
+                      value="cycling"
+                      checked={transportMode === "cycling"}
                       onChange={(e) => setTransportMode(e.target.value)}
                     />
-                    <span className="text-blue-600">🚴</span>
-                    <span className="text-gray-700 font-medium">Cycling</span>
+                    🚴 Cycling
                   </label>
-
-                  
                 </div>
 
- <button 
-  type="submit"
-  disabled={!fromLocation || !toLocation || loading}
-  className={`w-full bg-accent hover:bg-accent/90 text-primary-dark font-bold py-4 px-8 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 ${(!fromLocation || !toLocation || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}
->
-  {loading ? (
-    <>
-      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-dark"></div>
-      Finding Routes...
-    </>
-  ) : (
-    <>🔍 Find Routes</>
-  )}
-</button>
-
+                <button
+                  type="submit"
+                  className="w-full bg-accent text-primary-dark font-bold py-3 rounded-lg hover:bg-accent/90 transition shadow-md"
+                >
+                  🔍 Find Routes
+                </button>
+                <button
+                  onClick={fetchBackendRoutes}
+                  className={`w-full mb-4 font-bold py-3 rounded-lg transition shadow-md ${routes.length > 0 ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                  disabled={backendLoading || routes.length === 0}
+                >
+                  {backendLoading ? "Loading..." : "Show Suggested Routes"}
+                </button>
               </form>
             </div>
           </div>
 
-          {/* Error Display */}
-          {error && (
-            <div className="max-w-4xl mx-auto mb-6">
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                {error}
+          {/* Right: Map */}
+          <div className="lg:col-span-3">
+            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-white">
+              <div className="bg-gradient-to-br from-primary-dark via-primary to-slate-700 p-4">
+                <div className="text-center mb-3">
+                  <p className="text-white text-sm font-medium">
+                    {!fromCoords
+                      ? "📍 Click on map to set starting point"
+                      : !toCoords
+                      ? "🎯 Click on map to set destination"
+                      : "✓ Both points selected - click again to change destination"}
+                  </p>
+                  {(backendRoutes.length > 0 || routes.length > 0) && (
+                    <div className="flex justify-center mb-4">
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          // Clear all backend and external routes
+                          setBackendRoutes([]);
+                          setRoutes([]);
+                          // Clear all location fields and coordinates
+                          setFromLocation("");
+                          setToLocation("");
+                          setFromCoords(null);
+                          setToCoords(null);
+                          // Hide all routing lines
+                          setShowRouting(false);
+                          // Remove selected route highlight
+                          setSelectedRoute(null);
+                          // Force Map to remount for full reset
+                          setMapKey((prev) => prev + 1);
+                        }}
+                        className="text-white underline hover:text-red-800 transition cursor-pointer text-lg"
+                      >
+                        Clear Selection
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-xl overflow-hidden">
+                  <Map
+                    key={mapKey}
+                    center={
+                      selectedRoute?.coordinates?.[0] ||
+                      fromCoords ||
+                      userLocation ||
+                      LOCATION_CONFIG.DEFAULT_CENTER
+                    }
+                    zoom={fromCoords && toCoords ? 15 : 14}
+                    routes={[
+                      ...routes.map((r) => ({
+                        id: r.id,
+                        color: r.color || "#3b82f6",
+                        coordinates: r.coordinates,
+                      })),
+                      ...backendRoutes.map((r) => ({
+                        id: r.id,
+                        color: "#10b981", // green for backend suggested routes
+                        coordinates: r.path?.coordinates || [],
+                      })),
+                    ]}
+                    height="600px"
+                    fromCoords={fromCoords}
+                    toCoords={toCoords}
+                    showRouting={showRouting}
+                    onPlaceSelect={
+                      routes.length === 0 ? handleMapPlaceSelect : null
+                    }
+                  />
+                </div>
               </div>
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Route Results Section */}
-          {(routes.length > 0 || showRouting) && (
-            <section className="max-w-6xl mx-auto bg-white py-12 rounded-2xl shadow-lg">
-              <div className="container px-6">
-                <div className="text-center mb-8">
-                  <h2 className="text-3xl font-bold text-primary-dark mb-2">
-                    {routes.length > 0 ? 'Available Routes' : 'Finding Your Route'}
-                  </h2>
-                  <p className="text-lg text-gray-600">
-                    {routes.length > 0 
-                      ? 'Choose the route that best fits your safety preferences' 
-                      : 'Please wait while we calculate the best routes for you'
-                    }
-                  </p>
-                </div>
+        {/* Error */}
+        {error && (
+          <div className="max-w-4xl mx-auto bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mt-6">
+            {error}
+          </div>
+        )}
+        {/* Fallback route warning */}
+        {routes.length > 0 && routes[0].fallback && (
+          <div className="max-w-4xl mx-auto bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mt-6">
+            Warning: Route is a straight line (fallback). Real road routing is unavailable. Distance may not be accurate.
+          </div>
+        )}
 
-                <div className="grid lg:grid-cols-2 gap-8 px-6 pb-8">
-                  {/* Large Map (secondary) */}
-                  <div className="bg-white rounded-2xl shadow-lg p-6">
-                    <h3 className="text-2xl font-bold text-primary-dark mb-4">Route Map</h3>
-                    <Map
-                      center={fromCoords || userLocation || [51.5074, -0.1278]}
-                      zoom={fromCoords && toCoords ? 12 : 13}
-                      routes={routes}
-                      height="500px"
-                      fromCoords={fromCoords}
-                      toCoords={toCoords}
-                      showRouting={showRouting && routes.length === 0}
-                      onRouteFound={handleRouteFound}
-                      markers={userLocation && !fromCoords ? [{
-                        position: userLocation,
-                        color: '#10b981',
-                        type: 'marker',
-                        popup: <div className="text-sm"><strong>Your Location</strong></div>
-                      }] : []}
-                    />
-                  </div>
-
-                  {/* Routes List */}
-                  <div className="space-y-6">
-                    {routes.map((route) => (
-                      <div
-                        key={route.id}
-                        className={`bg-white rounded-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 ${selectedRoute?.id === route.id ? 'ring-2 ring-accent' : 'hover:shadow-xl'}`}
-                        onClick={() => setSelectedRoute(selectedRoute?.id === route.id ? null : route)}
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-2xl">
-                              {route.type === 'safest' ? '🛡️' : route.type === 'fastest' ? '⚡' : '⚖️'}
-                            </span>
-                            <div>
-                              <h3 className="text-xl font-bold text-primary-dark">{route.name}</h3>
-                              <p className="text-sm text-gray-500">
-                                {route.type === 'safest' ? 'Recommended for safety' : 
-                                 route.type === 'fastest' ? 'Quickest route' : 'Good balance'}
-                              </p>
-                            </div>
-                          </div>
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getSafetyBadgeColor(route.safetyRating)}`}>
-                            Safety: {route.safetyRating}/10
-                          </span>
-                        </div>
-
-                        <p className="text-gray-600 mb-4">{route.description}</p>
-
-                        <div className="grid grid-cols-3 gap-4 mb-4">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">{route.distance} km</div>
-                            <div className="text-sm text-gray-600">Distance</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">{route.estimatedTime} min</div>
-                            <div className="text-sm text-gray-600">Duration</div>
-                          </div>
-                          <div className="text-center">
-                            <div className={`text-2xl font-bold ${getSafetyColor(route.safetyRating)}`}>
-                              {route.safetyRating}
-                            </div>
-                            <div className="text-sm text-gray-600">Safety</div>
-                          </div>
+        {/* Backend Suggested Routes Section */}
+        {backendRoutes.length > 0 && (
+          <section className="max-w-6xl mx-auto bg-white py-8 rounded-2xl shadow-lg mt-8">
+            <h2 className="text-2xl font-bold text-center text-primary-dark mb-6">
+              🛡️ Suggested Routes
+            </h2>
+            <div className="space-y-4 px-6">
+              {[...backendRoutes]
+                .sort((a, b) => b.safetyRating - a.safetyRating)
+                .map((route) => (
+                  <div
+                    key={route.id}
+                    className={`bg-gray-50 rounded-xl p-6 shadow-md cursor-pointer ${selectedRoute?.id === route.id ? 'ring-2 ring-blue-500' : ''}`}
+                    onClick={() => setSelectedRoute(route)}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">🛡️</span>
+                        <div>
+                          <h3 className="text-lg font-bold text-primary-dark">
+                            {route.name}
+                          </h3>
+                          <p className="text-sm text-gray-500 capitalize">
+                            {route.difficulty} route
+                          </p>
                         </div>
                       </div>
-                    ))}
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${getSafetyBadgeColor(
+                          route.safetyRating
+                        )}`}
+                      >
+                        Safety: {route.safetyRating}/10
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 text-center mb-4">
+                      <div>
+                        <p className="text-xl font-semibold text-blue-600">
+                          {route.distanceKm} km
+                        </p>
+                        <p className="text-sm text-gray-500">Distance</p>
+                      </div>
+                      <div>
+                        <p className="text-xl font-semibold text-blue-600">
+                          {route.estimatedTimeMinutes} min
+                        </p>
+                        <p className="text-sm text-gray-500">Duration</p>
+                      </div>
+                      <div>
+                        <p
+                          className={`text-xl font-semibold ${getSafetyColor(
+                            route.safetyRating
+                          )}`}
+                        >
+                          {route.safetyRating}
+                        </p>
+                        <p className="text-sm text-gray-500">Safety</p>
+                      </div>
+                    </div>
+                    {/* Optionally show description */}
+                    {route.description && (
+                      <div className="mb-2 text-gray-700 text-sm">
+                        {route.description}
+                      </div>
+                    )}
+                    <div className="pt-4 border-t border-gray-200 flex flex-col items-center gap-2">
+                      {selectedRoute?.id === route.id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startBackendNavigation(route);
+                          }}
+                          className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition shadow-md"
+                        >
+                          Start Navigation
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
-            </section>
-          )}
-        </div>
+                ))}
+            </div>
+          </section>
+        )}
+        {/* ...existing code for external API routes... */}
       </div>
     </ProtectedRoute>
-  )
+  );
 }

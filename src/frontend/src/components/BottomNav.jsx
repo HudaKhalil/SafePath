@@ -35,7 +35,7 @@ export default function BottomNav() {
   return (
     <nav
       className={[
-        "fixed bottom-0 left-0 right-0 z-40",
+        "fixed bottom-0 left-0 right-0 z-[1001]",
         "bg-white/95 backdrop-blur border-t border-slate-200"
       ].join(" ")}
       role="navigation"
