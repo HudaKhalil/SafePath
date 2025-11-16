@@ -1,5 +1,20 @@
+/*
+ * SafePath Global Styles with Tailwind CSS
+ * 
+ * This file contains Tailwind CSS directives and custom styles.
+ * The @tailwind and @apply directives are processed by PostCSS during build.
+ * CSS linting warnings for these directives can be safely ignored.
+ */
+
+/* Tailwind CSS directives - these are processed by the build system */
+/* stylelint-disable-next-line at-rule-no-unknown */
+/* postcss-disable-next-line at-rule-no-unknown */
 @tailwind base;
+/* stylelint-disable-next-line at-rule-no-unknown */
+/* postcss-disable-next-line at-rule-no-unknown */
 @tailwind components;
+/* stylelint-disable-next-line at-rule-no-unknown */
+/* postcss-disable-next-line at-rule-no-unknown */
 @tailwind utilities;
 
 /* Custom styles for address autocomplete */
@@ -17,6 +32,28 @@
 .leaflet-popup-content {
   margin: 8px 12px !important;
   font-family: inherit !important;
+}
+
+/* Ensure Leaflet controls don't interfere with navbar */
+.leaflet-control-container {
+  z-index: 999 !important;
+}
+
+.leaflet-popup {
+  z-index: 1000 !important;
+}
+
+.leaflet-tooltip {
+  z-index: 1000 !important;
+}
+
+/* Override Leaflet's high z-index values when they conflict with navbar */
+.leaflet-top {
+  z-index: 999 !important;
+}
+
+.leaflet-bottom {
+  z-index: 999 !important;
 }
 
 @layer components {
@@ -41,7 +78,16 @@
   }
   
   .hero-subtitle {
-    @apply text-xl md:text-2xl font-medium text-accent mb-8;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--accent);
+    margin-bottom: 2rem;
+  }
+  
+  @media (min-width: 768px) {
+    .hero-subtitle {
+      font-size: 1.5rem;
+    }
   }
   
   .btn-hazard {
@@ -55,19 +101,30 @@
   }
   
   .border-accent-glow {
-    @apply border-accent shadow-lg shadow-accent/20;
+    border-color: var(--accent);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(var(--accent-rgb, 6, 214, 160), 0.2);
   }
 }
 
 body {
-  @apply bg-primary-dark text-text-primary antialiased;
+  background-color: var(--primary-dark, #0f172a);
+  color: var(--text-primary, #ffffff);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
   min-height: 100vh;
 }
 
 .map-placeholder {
-  @apply bg-gray-200 text-gray-600 flex items-center justify-center rounded-lg h-48 border-2 border-dashed border-gray-300;
+  background-color: #e5e7eb;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  height: 12rem;
+  border: 2px dashed #d1d5db;
 }
 
 .table-alt tr:nth-child(odd) {
@@ -75,5 +132,7 @@ body {
 }
 
 .glass-effect {
-  @apply bg-white/10 backdrop-blur-md border border-white/20;
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }

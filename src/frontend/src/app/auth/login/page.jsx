@@ -69,23 +69,56 @@ export default function Login() {
         password: formData.password
       };
 
+      console.log('Attempting login with:', { email: loginData.email });
+      console.log('API Base URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api');
+      
       const result = await authService.login(loginData);
+      console.log('Login result:', result);
 
       if (result.success) {
-        router.push('/');
+        console.log('Login successful, redirecting...');
+        // Add a small delay to see any console messages
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
       } else {
+        console.log('Login failed:', result.message);
         setErrors({ general: result.message || 'Login failed' });
       }
     } catch (error) {
-      console.error('Login error:', error);
-      if (error.errors) {
+      console.error('Login error caught:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error.constructor.name);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config?.url,
+        stack: error.stack,
+        code: error.code,
+        errno: error.errno
+      });
+      
+      // Show error in UI as well as console
+      let errorMessage = 'Login failed. Please try again.';
+      
+      // Check for network errors
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error') || !error.response) {
+        errorMessage = 'Cannot connect to server. Please ensure the backend is running on port 5001.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      if (error.response?.data?.errors) {
         const fieldErrors = {};
-        error.errors.forEach(err => {
-          fieldErrors[err.path] = err.msg;
+        error.response.data.errors.forEach(err => {
+          fieldErrors[err.path || err.param] = err.msg || err.message;
         });
         setErrors(fieldErrors);
       } else {
-        setErrors({ general: error.message || 'Login failed. Please check your credentials.' });
+        setErrors({ general: errorMessage });
       }
     } finally {
       setIsLoading(false);

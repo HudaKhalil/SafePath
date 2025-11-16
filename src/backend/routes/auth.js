@@ -2,10 +2,16 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+require('dotenv').config(); // Ensure environment variables are loaded
 const db = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 
 const router = express.Router();
+
+// Debug environment variables on startup
+console.log('Auth router loaded - JWT_SECRET exists:', !!process.env.JWT_SECRET);
+console.log('Current working directory:', process.cwd());
+console.log('NODE_ENV:', process.env.NODE_ENV);
 
 // Signup endpoint
 router.post('/signup', [
@@ -41,20 +47,23 @@ router.post('/signup', [
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Create user with simplified location handling
+    // Note: Database uses 'username' instead of 'name', 'password_hash' instead of 'password'
     let query, values;
 
     if (latitude && longitude) {
       query = `
-        INSERT INTO users (name, email, password, latitude, longitude)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, name, email, created_at
+        INSERT INTO users (username, email, password_hash, preferences)
+        VALUES ($1, $2, $3, $4)
+        RETURNING user_id, username, email, created_at
       `;
-      values = [name, email, hashedPassword, latitude, longitude];
+      // Store location in preferences JSON
+      const preferences = JSON.stringify({ latitude, longitude });
+      values = [name, email, hashedPassword, preferences];
     } else {
       query = `
-        INSERT INTO users (name, email, password)
+        INSERT INTO users (username, email, password_hash)
         VALUES ($1, $2, $3)
-        RETURNING id, name, email, created_at
+        RETURNING user_id, username, email, created_at
       `;
       values = [name, email, hashedPassword];
     }
@@ -63,9 +72,21 @@ router.post('/signup', [
     const newUser = result.rows[0];
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only';
+    
+    // Debug: Check if JWT_SECRET is loaded
+    if (!process.env.JWT_SECRET) {
+      console.warn('JWT_SECRET not found in environment, using fallback');
+      console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('JWT') || key.includes('SECRET')));
+    }
+    
     const token = jwt.sign(
+<<<<<<< HEAD
+      { userId: newUser.user_id, email: newUser.email },
+=======
       { userId: newUser.id, email: newUser.email },
-      process.env.JWT_SECRET,
+>>>>>>> main
+      jwtSecret,
       { expiresIn: '24h' }
     );
 
@@ -74,8 +95,8 @@ router.post('/signup', [
       message: 'User created successfully',
       data: {
         user: {
-          id: newUser.id,
-          name: newUser.name,
+          id: newUser.user_id,
+          name: newUser.username,
           email: newUser.email,
           createdAt: newUser.created_at
         },
@@ -138,9 +159,9 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
-    // Find user by email
+    // Find user by email - use correct column names
     const result = await db.query(
-      'SELECT id, name, email, password FROM users WHERE email = $1',
+      'SELECT user_id, username, email, password_hash FROM users WHERE email = $1',
       [email]
     );
 
@@ -153,8 +174,8 @@ router.post('/login', [
 
     const user = result.rows[0];
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    // Verify password - use password_hash column
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
@@ -162,10 +183,26 @@ router.post('/login', [
       });
     }
 
+<<<<<<< HEAD
+    // Generate JWT token - use user_id
+=======
     // Generate JWT token
+>>>>>>> main
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only';
+    
+    // Debug: Check if JWT_SECRET is loaded
+    if (!process.env.JWT_SECRET) {
+      console.warn('JWT_SECRET not found in environment, using fallback');
+      console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('JWT') || key.includes('SECRET')));
+    }
+    
     const token = jwt.sign(
+<<<<<<< HEAD
+      { userId: user.user_id, email: user.email },
+=======
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
+>>>>>>> main
+      jwtSecret,
       { expiresIn: '24h' }
     );
 
@@ -174,8 +211,8 @@ router.post('/login', [
       message: 'Login successful',
       data: {
         user: {
-          id: user.id,
-          name: user.name,
+          id: user.user_id,
+          name: user.username,
           email: user.email
         },
         token
@@ -193,23 +230,17 @@ router.post('/login', [
 // Get user profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(`
+    // Use correct column names: user_id, username, password_hash, preferences
+    const result = await db.query(`
       SELECT 
-        id, 
-        name, 
+        user_id, 
+        username, 
         email, 
-        phone,
-        address,
-        emergency_contact,
-        preferred_transport,
-        safety_priority,
-        notifications,
-        ST_X(location) as longitude,
-        ST_Y(location) as latitude,
+        preferences,
         created_at, 
         updated_at 
       FROM users 
-      WHERE id = $1
+      WHERE user_id = $1
     `, [req.user.userId]);
 
     if (result.rows.length === 0) {
@@ -220,22 +251,35 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 
     const user = result.rows[0];
+    
+    // Parse preferences JSON if it exists
+    let preferences = {};
+    if (user.preferences) {
+      try {
+        preferences = typeof user.preferences === 'string' 
+          ? JSON.parse(user.preferences) 
+          : user.preferences;
+      } catch (e) {
+        console.error('Error parsing preferences:', e);
+      }
+    }
+    
     res.json({
       success: true,
       data: {
         user: {
-          id: user.id,
-          name: user.name,
+          id: user.user_id,
+          name: user.username,
           email: user.email,
-          phone: user.phone,
-          address: user.address,
-          emergency_contact: user.emergency_contact,
-          preferred_transport: user.preferred_transport,
-          safety_priority: user.safety_priority,
-          notifications: user.notifications,
-          location: user.longitude && user.latitude ? {
-            longitude: user.longitude,
-            latitude: user.latitude
+          phone: preferences.phone || null,
+          address: preferences.address || null,
+          emergency_contact: preferences.emergency_contact || null,
+          preferred_transport: preferences.preferred_transport || null,
+          safety_priority: preferences.safety_priority || null,
+          notifications: preferences.notifications !== undefined ? preferences.notifications : true,
+          location: preferences.longitude && preferences.latitude ? {
+            longitude: preferences.longitude,
+            latitude: preferences.latitude
           } : null,
           created_at: user.created_at,
           updated_at: user.updated_at
@@ -254,10 +298,32 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
 // Update user profile
 router.put('/profile', authenticateToken, [
-  body('name').optional().trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
-  body('phone').optional().isMobilePhone().withMessage('Invalid phone number'),
-  body('address').optional().trim().isLength({ min: 5 }).withMessage('Address must be at least 5 characters'),
-  body('emergency_contact').optional().isMobilePhone().withMessage('Invalid emergency contact number'),
+  body('name').optional().trim().isLength({ min: 1 }).withMessage('Name cannot be empty'),
+  body('phone').optional().custom((value) => {
+    if (value === '' || value === null || value === undefined) return true;
+    // More lenient phone validation - just check for digits and common phone characters
+    const phoneRegex = /^[\+]?[\d\s\-\(\)\.]{7,}$/;
+    if (!phoneRegex.test(value)) {
+      throw new Error('Phone number must contain at least 7 digits and only valid phone characters');
+    }
+    return true;
+  }),
+  body('address').optional().custom((value) => {
+    if (value === '' || value === null || value === undefined) return true;
+    if (value.trim().length < 3) {
+      throw new Error('Address must be at least 3 characters');
+    }
+    return true;
+  }),
+  body('emergency_contact').optional().custom((value) => {
+    if (value === '' || value === null || value === undefined) return true;
+    // More lenient phone validation - just check for digits and common phone characters
+    const phoneRegex = /^[\+]?[\d\s\-\(\)\.]{7,}$/;
+    if (!phoneRegex.test(value)) {
+      throw new Error('Emergency contact must contain at least 7 digits and only valid phone characters');
+    }
+    return true;
+  }),
   body('preferred_transport').optional().isIn(['walking', 'cycling', 'driving']).withMessage('Invalid transport preference'),
   body('safety_priority').optional().isIn(['high', 'medium', 'low']).withMessage('Invalid safety priority'),
   body('notifications').optional().isBoolean().withMessage('Notifications must be true or false'),
@@ -265,8 +331,11 @@ router.put('/profile', authenticateToken, [
   body('longitude').optional().isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude')
 ], async (req, res) => {
   try {
+    console.log('Profile update request body:', JSON.stringify(req.body, null, 2));
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', JSON.stringify(errors.array(), null, 2));
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -286,49 +355,58 @@ router.put('/profile', authenticateToken, [
       longitude 
     } = req.body;
     
+    // First, get current user preferences
+    const currentUserResult = await db.query(
+      'SELECT preferences FROM users WHERE user_id = $1',
+      [req.user.userId]
+    );
+
+    if (currentUserResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Parse existing preferences
+    let preferences = {};
+    if (currentUserResult.rows[0].preferences) {
+      try {
+        preferences = typeof currentUserResult.rows[0].preferences === 'string'
+          ? JSON.parse(currentUserResult.rows[0].preferences)
+          : currentUserResult.rows[0].preferences;
+      } catch (e) {
+        console.error('Error parsing existing preferences:', e);
+      }
+    }
+
+    // Update preferences with new values
+    if (phone !== undefined) preferences.phone = phone;
+    if (address !== undefined) preferences.address = address;
+    if (emergency_contact !== undefined) preferences.emergency_contact = emergency_contact;
+    if (preferred_transport !== undefined) preferences.preferred_transport = preferred_transport;
+    if (safety_priority !== undefined) preferences.safety_priority = safety_priority;
+    if (notifications !== undefined) preferences.notifications = notifications;
+    if (latitude !== undefined) preferences.latitude = latitude;
+    if (longitude !== undefined) preferences.longitude = longitude;
+
     const updates = [];
     const values = [];
     let paramCount = 1;
 
+    // Update username if name is provided
     if (name !== undefined) {
-      updates.push(`name = $${paramCount}`);
+      updates.push(`username = $${paramCount}`);
       values.push(name);
       paramCount++;
     }
 
-    if (phone !== undefined) {
-      updates.push(`phone = $${paramCount}`);
-      values.push(phone);
-      paramCount++;
-    }
-
-    if (address !== undefined) {
-      updates.push(`address = $${paramCount}`);
-      values.push(address);
-      paramCount++;
-    }
-
-    if (emergency_contact !== undefined) {
-      updates.push(`emergency_contact = $${paramCount}`);
-      values.push(emergency_contact);
-      paramCount++;
-    }
-
-    if (preferred_transport !== undefined) {
-      updates.push(`preferred_transport = $${paramCount}`);
-      values.push(preferred_transport);
-      paramCount++;
-    }
-
-    if (safety_priority !== undefined) {
-      updates.push(`safety_priority = $${paramCount}`);
-      values.push(safety_priority);
-      paramCount++;
-    }
-
-    if (notifications !== undefined) {
-      updates.push(`notifications = $${paramCount}`);
-      values.push(notifications);
+    // Always update preferences if any field changed
+    if (phone !== undefined || address !== undefined || emergency_contact !== undefined ||
+        preferred_transport !== undefined || safety_priority !== undefined || 
+        notifications !== undefined || latitude !== undefined || longitude !== undefined) {
+      updates.push(`preferences = $${paramCount}`);
+      values.push(JSON.stringify(preferences));
       paramCount++;
     }
 
@@ -351,11 +429,11 @@ router.put('/profile', authenticateToken, [
     const query = `
       UPDATE users 
       SET ${updates.join(', ')} 
-      WHERE id = $${paramCount}
-      RETURNING id, name, email, phone, address, emergency_contact, preferred_transport, safety_priority, notifications, ST_X(location) as longitude, ST_Y(location) as latitude, updated_at
+      WHERE user_id = $${paramCount}
+      RETURNING user_id, username, email, preferences, updated_at
     `;
 
-    const result = await pool.query(query, values);
+    const result = await db.query(query, values);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -365,23 +443,36 @@ router.put('/profile', authenticateToken, [
     }
 
     const user = result.rows[0];
+    
+    // Parse preferences for response
+    let userPreferences = {};
+    if (user.preferences) {
+      try {
+        userPreferences = typeof user.preferences === 'string'
+          ? JSON.parse(user.preferences)
+          : user.preferences;
+      } catch (e) {
+        console.error('Error parsing preferences:', e);
+      }
+    }
+    
     res.json({
       success: true,
       message: 'Profile updated successfully',
       data: {
         user: {
-          id: user.id,
-          name: user.name,
+          id: user.user_id,
+          name: user.username,
           email: user.email,
-          phone: user.phone,
-          address: user.address,
-          emergency_contact: user.emergency_contact,
-          preferred_transport: user.preferred_transport,
-          safety_priority: user.safety_priority,
-          notifications: user.notifications,
-          location: user.longitude && user.latitude ? {
-            longitude: user.longitude,
-            latitude: user.latitude
+          phone: userPreferences.phone || null,
+          address: userPreferences.address || null,
+          emergency_contact: userPreferences.emergency_contact || null,
+          preferred_transport: userPreferences.preferred_transport || null,
+          safety_priority: userPreferences.safety_priority || null,
+          notifications: userPreferences.notifications !== undefined ? userPreferences.notifications : true,
+          location: userPreferences.longitude && userPreferences.latitude ? {
+            longitude: userPreferences.longitude,
+            latitude: userPreferences.latitude
           } : null,
           updated_at: user.updated_at
         }

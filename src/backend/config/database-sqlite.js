@@ -1,3 +1,5 @@
+// SQLite configuration - COMMENTED OUT - Using PostgreSQL instead
+/*
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 require('dotenv').config();
@@ -115,4 +117,8 @@ const dbAsync = {
   }
 };
 
-module.exports = dbAsync;
+// module.exports = dbAsync;
+*/
+
+// SQLite module disabled - using PostgreSQL
+module.exports = null;

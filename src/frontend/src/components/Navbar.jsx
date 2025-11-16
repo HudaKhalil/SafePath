@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { authService } from '../lib/services'
 
 
 export default function Navbar() {
@@ -10,6 +11,38 @@ export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    checkAuthStatus()
+  }, [])
+
+  const checkAuthStatus = async () => {
+    try {
+      if (authService.isLoggedIn()) {
+        const profileResponse = await authService.getProfile()
+        if (profileResponse.success) {
+          setIsLoggedIn(true)
+          setUser(profileResponse.data.user)
+        } else {
+          // Token might be invalid
+          authService.logout()
+          setIsLoggedIn(false)
+          setUser(null)
+        }
+      } else {
+        setIsLoggedIn(false)
+        setUser(null)
+      }
+    } catch (error) {
+      // Only log unexpected errors, not normal "unauthorized" responses
+      if (error.message !== 'Access token required' && !error.message?.includes('401')) {
+        console.error('Auth check failed:', error)
+      }
+      authService.logout()
+      setIsLoggedIn(false)
+      setUser(null)
+    }
+  }
 
 
 
@@ -21,7 +54,7 @@ export default function Navbar() {
   }
 
   return (
-    <header className="bg-primary-dark/95 backdrop-blur-md text-white sticky top-0 shadow-lg z-40 border-b border-white/10">
+    <header className="bg-primary-dark/95 backdrop-blur-md text-white sticky top-0 shadow-lg z-[1001] border-b border-white/10">
       <div className="container mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center">

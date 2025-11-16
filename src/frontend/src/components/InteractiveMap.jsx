@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { LOCATION_CONFIG } from "../lib/locationConfig";
 
 // ---- default markers fix (production) ----
 delete L.Icon.Default.prototype._getIconUrl;
@@ -79,7 +80,7 @@ const getRouteColor = (s) => {
 };
 
 export default function InteractiveMap({
-  center = [53.3498, -6.2603], // Dublin default
+  center = LOCATION_CONFIG.DEFAULT_CENTER, // London default
   routes = [],
   selectedRoute = null,
   onLocationSelect,
@@ -121,7 +122,7 @@ export default function InteractiveMap({
   }, [selectedRoute, center]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative z-10">
       <MapContainer
         center={center}
         zoom={13}
@@ -232,7 +233,7 @@ export default function InteractiveMap({
       </MapContainer>
 
       {/* legend */}
-      <div className="absolute top-4 right-4 z-[1000]">
+      <div className="absolute top-4 right-4 z-[999]">
         <div className="bg-white rounded-lg shadow-md p-2">
           <div className="text-xs text-gray-600 mb-2">Legend</div>
           <div className="space-y-1 text-xs">
@@ -254,7 +255,7 @@ export default function InteractiveMap({
 
       {/* loading overlay */}
       {routes.length === 0 && (
-        <div className="absolute inset-0 bg-gray-50/80 flex items-center justify-center z-[1000]">
+        <div className="absolute inset-0 bg-gray-50/80 flex items-center justify-center z-[999]">
           <div className="text-center">
             <div className="text-gray-500 mb-2">🗺️</div>
             <p className="text-gray-600 text-sm">

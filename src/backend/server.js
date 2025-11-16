@@ -6,10 +6,12 @@ require('dotenv').config();
 
 // Import database connection
 const db = require('./config/database');
+const csvDataLoader = require('./lib/csvDataLoader');
 
 // Import routes
 const authRoutes = require('./routes/auth');
 const routesRoutes = require('./routes/routes');
+const geocodingRoutes = require('./routes/geocoding');
 //const hazardsRoutes = require('./routes/hazards');
 //const buddiesRoutes = require('./routes/buddies');
 
@@ -72,6 +74,7 @@ app.get('/health', async (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/routes', routesRoutes);
+app.use('/api/geocoding', geocodingRoutes);
 //app.use('/api/hazards', hazardsRoutes);
 //app.use('/api/buddies', buddiesRoutes);
 
@@ -96,12 +99,36 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 London Safety Routing API server running on port ${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL}`);
-});
+// Start server with database initialization
+const startServer = async () => {
+  try {
+    // Initialize database connection
+    await db.initializeDatabase();
+    
+    // Load crime data from CSV files for safety scoring
+    console.log('🔄 Loading crime data for safety scoring...');
+    await csvDataLoader.loadCrimeData();
+    const stats = csvDataLoader.getStats();
+    console.log(`✅ Crime data loaded: ${stats.totalRecords} records, ${stats.gridCells} grid cells`);
+    
+    // Create HTTP server
+    const server = http.createServer(app);
+    
+    server.listen(PORT, () => {
+      console.log(`🚀 London Safety Routing API server running on port ${PORT}`);
+      console.log(`📍 Health check: http://localhost:${PORT}/health`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+      console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL}`);
+      console.log(`🗄️  Database: PostgreSQL`);
+      console.log(`🛡️  Safety scoring: Rule-based (CSV data)`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    console.error('Please ensure PostgreSQL is running and accessible');
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app;
