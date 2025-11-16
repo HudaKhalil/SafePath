@@ -21,6 +21,18 @@ export default function SuggestedRoutes() {
   };
   // Start navigation for backend route
   const startBackendNavigation = (route) => {
+    // Store route data in sessionStorage for navigation page
+    const routeData = {
+      coordinates: route.path || [],
+      instructions: route.instructions || [],
+      type: route.difficulty,
+      distance: route.distanceKm,
+      time: route.estimatedTimeMinutes,
+      safety: route.safetyRating
+    };
+    
+    sessionStorage.setItem(`route_${route.id}`, JSON.stringify(routeData));
+    
     const url =
       `/navigation` +
       `?routeId=${encodeURIComponent(route.id)}` +
@@ -103,31 +115,81 @@ export default function SuggestedRoutes() {
    setError("");
 
    try {
-     const routeResult = await routingService.getRoute(
-       fromCoords[0],
-       fromCoords[1],
-       toCoords[0],
-       toCoords[1],
-       transportMode
-     );
+     // Call backend API to get both fastest and safest routes
+     // Get the auth token from cookies
+     const getAuthToken = () => {
+       const cookies = document.cookie.split(';');
+       const authCookie = cookies.find(c => c.trim().startsWith('auth_token='));
+       return authCookie ? authCookie.split('=')[1] : null;
+     };
 
-     if (routeResult.success) {
-       console.log('Routing provider:', routeResult.provider, 'Fallback:', !!routeResult.fallback);
-       const formattedRoute = {
-         id: Date.now(),
-         name: transportMode === "cycling" ? "Cycling Route" : "Walking Route",
-         type: "balanced",
-         color: "#3b82f6",
-         coordinates: routeResult.coordinates,
-         distance: (routeResult.distance / 1000).toFixed(2),
-         estimatedTime: Math.round(routeResult.duration / 60),
-         safetyRating: 8,
-         instructions: routeResult.instructions || [],
-         fallback: !!routeResult.fallback,
-         provider: routeResult.provider
-       };
+     const token = getAuthToken();
+     if (!token) {
+       setError("Authentication required. Please log in.");
+       setLoading(false);
+       return;
+     }
 
-       setRoutes([formattedRoute]);
+     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+     // Remove /api suffix if it exists in the env variable, we'll add it below
+     const baseUrl = apiUrl.replace(/\/api$/, '');
+     console.log('Calling API:', `${baseUrl}/api/routes/find`);
+     
+     const response = await fetch(`${baseUrl}/api/routes/find`, {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         'Authorization': `Bearer ${token}`
+       },
+       credentials: 'include',
+       body: JSON.stringify({
+         fromLat: fromCoords[0],
+         fromLon: fromCoords[1],
+         toLat: toCoords[0],
+         toLon: toCoords[1],
+         mode: transportMode
+       })
+     });
+
+     if (!response.ok) {
+       throw new Error(`API returned ${response.status}: ${response.statusText}`);
+     }
+
+     const result = await response.json();
+
+     if (result.success && result.data) {
+       const { fastest, safest } = result.data;
+       
+       const formattedRoutes = [
+         {
+           id: 'fastest',
+           name: 'Fastest Route',
+           type: 'fastest',
+           color: '#3b82f6', // Blue
+           coordinates: fastest.coordinates,
+           distance: fastest.distance,
+           estimatedTime: fastest.time,
+           safetyRating: (1 - fastest.safetyScore) * 10, // Convert 0-1 to 10-0 scale
+           safetyScore: fastest.safetyScore,
+           instructions: fastest.instructions || [],
+           provider: result.provider
+         },
+         {
+           id: 'safest',
+           name: 'Safest Route',
+           type: 'safest',
+           color: '#10b981', // Green
+           coordinates: safest.coordinates,
+           distance: safest.distance,
+           estimatedTime: safest.time,
+           safetyRating: (1 - safest.safetyScore) * 10, // Convert 0-1 to 10-0 scale
+           safetyScore: safest.safetyScore,
+           instructions: safest.instructions || [],
+           provider: result.provider
+         }
+       ];
+
+       setRoutes(formattedRoutes);
        setShowRouting(true);
 
        setTimeout(() => {
@@ -137,11 +199,11 @@ export default function SuggestedRoutes() {
          });
        }, 100);
      } else {
-       setError(routeResult.message || "Failed to find route");
+       setError(result.message || "Failed to find routes");
      }
    } catch (error) {
      console.error("Route finding error:", error);
-     setError("Failed to find route. Please try again.");
+     setError("Failed to find routes. Please try again.");
    } finally {
      setLoading(false);
    }
@@ -231,6 +293,18 @@ export default function SuggestedRoutes() {
 
   // ======== START NAVIGATION (NEW PAGE) =========
   const startNavigation = (route) => {
+    // Store route data in sessionStorage for navigation page
+    const routeData = {
+      coordinates: route.coordinates || [],
+      instructions: route.instructions || [],
+      type: route.type,
+      distance: route.distance,
+      time: route.estimatedTime,
+      safety: route.safetyRating
+    };
+    
+    sessionStorage.setItem(`route_${route.id}`, JSON.stringify(routeData));
+    
     const url =
       `/navigation` +
       `?routeId=${encodeURIComponent(route.id)}` +
@@ -424,6 +498,111 @@ export default function SuggestedRoutes() {
             {error}
           </div>
         )}
+
+        {/* Route Comparison Panel */}
+        {routes.length > 0 && (
+          <section ref={resultsRef} className="max-w-6xl mx-auto bg-white py-8 rounded-2xl shadow-lg mt-8">
+            <h2 className="text-2xl font-bold text-center text-primary-dark mb-6">
+              Route Comparison
+            </h2>
+            <div className="grid md:grid-cols-2 gap-6 px-6">
+              {routes.map((route) => (
+                <div
+                  key={route.id}
+                  className={`bg-gray-50 rounded-xl p-6 shadow-md border-2 ${
+                    route.type === 'fastest' ? 'border-blue-500' : 'border-green-500'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">
+                        {route.type === 'fastest' ? '⚡' : '🛡️'}
+                      </span>
+                      <div>
+                        <h3 className="text-xl font-bold text-primary-dark">
+                          {route.name}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {route.type === 'fastest' ? 'Quickest path' : 'Safest path'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mb-4">
+                    <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                      <span className="text-gray-600 font-medium">Distance</span>
+                      <span className="text-xl font-bold text-blue-600">
+                        {route.distance} km
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                      <span className="text-gray-600 font-medium">Time</span>
+                      <span className="text-xl font-bold text-blue-600">
+                        {route.estimatedTime} min
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-white rounded-lg">
+                      <span className="text-gray-600 font-medium">Safety Score</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-32 h-3 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${
+                              route.safetyRating >= 7 ? 'bg-green-500' : 
+                              route.safetyRating >= 5 ? 'bg-yellow-500' : 
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${route.safetyRating * 10}%` }}
+                          />
+                        </div>
+                        <span className={`text-xl font-bold ${
+                          route.safetyRating >= 7 ? 'text-green-600' : 
+                          route.safetyRating >= 5 ? 'text-yellow-600' : 
+                          'text-red-600'
+                        }`}>
+                          {route.safetyRating.toFixed(1)}/10
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => startNavigation(route)}
+                    className={`w-full font-bold py-3 rounded-lg transition shadow-md ${
+                      route.type === 'fastest' 
+                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    Start {route.type === 'fastest' ? 'Fastest' : 'Safest'} Route
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Safety Insights */}
+            {routes.length === 2 && (
+              <div className="mt-6 px-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-bold text-blue-900 mb-2">Route Analysis</h4>
+                  <div className="text-sm text-blue-800 space-y-1">
+                    <p>
+                      • The safest route is {((routes[1].distance / routes[0].distance - 1) * 100).toFixed(0)}% longer 
+                      but {((routes[0].safetyRating / routes[1].safetyRating - 1) * 100).toFixed(0)}% safer
+                    </p>
+                    <p>
+                      • Time difference: {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime)} minutes
+                    </p>
+                    <p>
+                      • Safety scores are based on crime data, lighting conditions, and historical hazard reports
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Fallback route warning */}
         {routes.length > 0 && routes[0].fallback && (
           <div className="max-w-4xl mx-auto bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mt-6">
