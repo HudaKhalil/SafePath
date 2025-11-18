@@ -472,11 +472,11 @@ export default function Map({
         {fromCoords && (
           <Marker
             position={fromCoords}
-            icon={createCustomIcon("#10b981", "from")}
+            icon={createCustomIcon("#ef4444", "from")}
           >
             <Popup>
               <div className="text-sm">
-                <strong>Starting Point</strong>
+                <strong>You</strong>
               </div>
             </Popup>
           </Marker>
