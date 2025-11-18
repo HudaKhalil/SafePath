@@ -162,6 +162,7 @@ router.post('/login', [
     );
 
     if (result.rows.length === 0) {
+      console.warn('Login attempt - no user found for email:', email);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -173,6 +174,7 @@ router.post('/login', [
     // Verify password - use password_hash column
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
+      console.warn('Login attempt - invalid password for user_id:', user.user_id, 'email:', user.email);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -218,6 +220,11 @@ router.post('/login', [
 // Get user profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
+    console.log('Profile route called. req.user:', req.user);
+    if (!req.user || !req.user.userId) {
+      console.warn('Profile route: req.user or userId missing - rejecting as unauthorized', req.user);
+      return res.status(401).json({ success: false, message: 'Access token required' });
+    }
     // Use correct column names: user_id, username, password_hash, preferences
     const result = await db.query(`
       SELECT 
@@ -276,7 +283,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error('Get profile error:', error && error.message);
+    console.error(error && error.stack);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
