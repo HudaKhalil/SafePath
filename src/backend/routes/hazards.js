@@ -173,4 +173,74 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
   }
 });
 
+// Update hazard status (protected route)
+router.patch('/:id', authenticateToken, [
+  body('isResolved').optional().isBoolean().withMessage('isResolved must be a boolean')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { isResolved } = req.body;
+
+    // Check if hazard exists and belongs to user
+    const checkResult = await query(
+      'SELECT user_id FROM hazards WHERE id = $1',
+      [id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hazard not found'
+      });
+    }
+
+    if (checkResult.rows[0].user_id !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only update your own hazard reports'
+      });
+    }
+
+    const result = await query(`
+      UPDATE hazards 
+      SET is_resolved = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING id, description, hazard_type, severity, is_resolved, updated_at
+    `, [isResolved, id]);
+
+    const hazard = result.rows[0];
+
+    res.json({
+      success: true,
+      message: 'Hazard status updated successfully',
+      data: {
+        hazard: {
+          id: hazard.id,
+          description: hazard.description,
+          hazardType: hazard.hazard_type,
+          severity: hazard.severity,
+          isResolved: hazard.is_resolved,
+          updatedAt: hazard.updated_at
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Update hazard error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;
