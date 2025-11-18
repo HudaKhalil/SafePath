@@ -472,11 +472,11 @@ export default function Map({
         {fromCoords && (
           <Marker
             position={fromCoords}
-            icon={createCustomIcon("#10b981", "from")}
+            icon={createCustomIcon("#ef4444", "from")}
           >
             <Popup>
               <div className="text-sm">
-                <strong>Starting Point</strong>
+                <strong>You</strong>
               </div>
             </Popup>
           </Marker>
@@ -518,7 +518,10 @@ export default function Map({
           <Marker
             key={buddy.id}
             position={[buddy.latitude, buddy.longitude]}
-            icon={createCustomIcon("#3b82f6", "buddy")}
+            icon={createCustomIcon(
+              buddy.mode === 'cycling' ? '#10b981' : '#3b82f6', 
+              "buddy"
+            )}
             eventHandlers={{
               click: () => onBuddyClick(buddy),
             }}
@@ -526,10 +529,13 @@ export default function Map({
             <Popup>
               <div className="text-sm">
                 <h3 className="font-semibold">{buddy.name}</h3>
-                <p>Available for: {buddy.availableFor}</p>
+                <p className="text-xs">{buddy.mode === 'cycling' ? '🚴 Cycling' : '🚶 Walking'} • {buddy.pace || 'Medium pace'}</p>
                 <p className="text-xs text-gray-500">
-                  Distance: {buddy.distance?.toFixed(1)} km away
+                  {buddy.distance ? `${(buddy.distance / 1000).toFixed(1)} km away` : 'Nearby'}
                 </p>
+                {buddy.rating && (
+                  <p className="text-xs text-gray-500">⭐ {buddy.rating}</p>
+                )}
               </div>
             </Popup>
           </Marker>
