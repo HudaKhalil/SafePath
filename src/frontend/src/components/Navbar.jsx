@@ -36,7 +36,7 @@ export default function Navbar() {
     } catch (error) {
       // Only log unexpected errors, not normal "unauthorized" responses
       if (error.message !== 'Access token required' && !error.message?.includes('401')) {
-        console.error('Auth check failed:', error)
+        console.error('Auth check failed:', error?.message ?? error, error?.data ?? error)
       }
       authService.logout()
       setIsLoggedIn(false)
@@ -107,8 +107,8 @@ export default function Navbar() {
           <nav className="flex flex-col gap-4 p-4">
             <Link href="/" className="text-text-secondary hover:text-accent transition-colors">Home</Link>
             <Link href="/suggested-routes" className="text-text-secondary hover:text-accent transition-colors">Suggested Routes</Link>
-            <Link href="/hazard-reporting" className="text-text-secondary hover:text-accent transition-colors">Hazard Reporting</Link>
-            <Link href="/find-buddy" className="text-text-secondary hover:text-accent transition-colors">Find Buddy</Link>
+            <Link href="/report-hazards" className="text-text-secondary hover:text-accent transition-colors">Report Hazards</Link>
+            <Link href="/findBuddy" className="text-text-secondary hover:text-accent transition-colors">Find Buddy</Link>
             
             {isLoggedIn ? (
               <div className="border-t border-white/20 pt-4 space-y-2">
