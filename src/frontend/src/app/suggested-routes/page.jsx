@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { geocodingService, routingService } from "../../lib/services";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
+import RouteLoadingProgress from "../../components/RouteLoadingProgress";
+import SkeletonLoader from "../../components/SkeletonLoader";
 import { LOCATION_CONFIG } from "../../lib/locationConfig";
 
 // Dynamically import Map component (avoid SSR issues)
@@ -46,6 +48,8 @@ export default function SuggestedRoutes() {
   const router = useRouter();
   const [routes, setRoutes] = useState([]); // External API routes
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(1);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [error, setError] = useState("");
@@ -57,6 +61,7 @@ export default function SuggestedRoutes() {
   const [showRouting, setShowRouting] = useState(false);
   const [backendRoutes, setBackendRoutes] = useState([]); // Backend suggested routes
   const [backendLoading, setBackendLoading] = useState(false);
+  const [mapZoom, setMapZoom] = useState(14); // Track map zoom independently
   const resultsRef = useRef(null);
   // Fetch suggested routes from backend
   const fetchBackendRoutes = async () => {
@@ -113,6 +118,8 @@ export default function SuggestedRoutes() {
 
    setLoading(true);
    setError("");
+   setLoadingStep(1);
+   setLoadingMessage('Analyzing locations...');
 
    try {
      // Call backend API to get both fastest and safest routes
@@ -130,10 +137,17 @@ export default function SuggestedRoutes() {
        return;
      }
 
+     setLoadingStep(2);
+     setLoadingMessage('Loading safety data...');
+     await new Promise(resolve => setTimeout(resolve, 300));
+
      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
      // Remove /api suffix if it exists in the env variable, we'll add it below
      const baseUrl = apiUrl.replace(/\/api$/, '');
      console.log('Calling API:', `${baseUrl}/api/routes/find`);
+     
+     setLoadingStep(3);
+     setLoadingMessage('Calculating fastest route...');
      
      const response = await fetch(`${baseUrl}/api/routes/find`, {
        method: 'POST',
@@ -155,10 +169,19 @@ export default function SuggestedRoutes() {
        throw new Error(`API returned ${response.status}: ${response.statusText}`);
      }
 
+     setLoadingStep(4);
+     setLoadingMessage('Calculating safest route...');
+
      const result = await response.json();
 
      if (result.success && result.data) {
        const { fastest, safest } = result.data;
+       
+       console.log('🚀 Route data received from API:');
+       console.log('Fastest route coordinates:', fastest.coordinates?.length, 'points');
+       console.log('Safest route coordinates:', safest.coordinates?.length, 'points');
+       console.log('Sample fastest coords:', fastest.coordinates?.slice(0, 3));
+       console.log('Sample safest coords:', safest.coordinates?.slice(0, 3));
        
        const formattedRoutes = [
          {
@@ -166,7 +189,7 @@ export default function SuggestedRoutes() {
            name: 'Fastest Route',
            type: 'fastest',
            color: '#3b82f6', // Blue
-           coordinates: fastest.coordinates,
+           coordinates: fastest.coordinates || [],
            distance: fastest.distance,
            estimatedTime: fastest.time,
            safetyRating: (1 - fastest.safetyScore) * 10, // Convert 0-1 to 10-0 scale
@@ -179,7 +202,7 @@ export default function SuggestedRoutes() {
            name: 'Safest Route',
            type: 'safest',
            color: '#10b981', // Green
-           coordinates: safest.coordinates,
+           coordinates: safest.coordinates || [],
            distance: safest.distance,
            estimatedTime: safest.time,
            safetyRating: (1 - safest.safetyScore) * 10, // Convert 0-1 to 10-0 scale
@@ -189,8 +212,18 @@ export default function SuggestedRoutes() {
          }
        ];
 
+       console.log('📍 Formatted routes:', formattedRoutes.map(r => ({
+         id: r.id,
+         coordinatesCount: r.coordinates.length,
+         firstCoord: r.coordinates[0],
+         lastCoord: r.coordinates[r.coordinates.length - 1]
+       })));
+
        setRoutes(formattedRoutes);
-       setShowRouting(true);
+       setShowRouting(false); // Disable RoutingController since we have direct coordinates
+
+       // Don't change zoom - let user control it
+       // Removed: setMapZoom(13);
 
        setTimeout(() => {
          resultsRef.current?.scrollIntoView({
@@ -260,30 +293,68 @@ export default function SuggestedRoutes() {
 
   // ======== SELECT POINTS ON MAP =========
   const handleMapPlaceSelect = async (latlng) => {
+    console.log('🗺️ Map clicked at:', latlng);
+    
     try {
-      const response = await geocodingService.getAddressFromCoords(
-        latlng.lat,
-        latlng.lng
-      );
-
+      // Try backend reverse geocoding first
       let addressText = `${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`;
-      if (response.success && response.data?.display_name) {
-        addressText = response.data.display_name;
+      console.log('📍 Initial coords:', addressText);
+      
+      try {
+        console.log('🔄 Trying backend reverse geocoding...');
+        const response = await geocodingService.getAddressFromCoords(
+          latlng.lat,
+          latlng.lng
+        );
+
+        console.log('✓ Backend response:', response);
+        console.log('✓ Backend response.data:', response.data);
+        console.log('✓ Backend response.data.location:', response.data?.location);
+        console.log('✓ Backend response.data.location.display_name:', response.data?.location?.display_name);
+        
+        if (response.success && response.data?.location?.display_name) {
+          addressText = response.data.location.display_name;
+          console.log('✓ Got address from backend:', addressText);
+        } else {
+          console.log('❌ No display_name in backend response, trying Nominatim...');
+        }
+      } catch (error) {
+        console.log('❌ Backend reverse geocoding failed:', error);
+        console.log('🔄 Trying direct Nominatim...');
+        
+        // Fallback to direct Nominatim reverse geocoding
+        try {
+          const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&addressdetails=1`;
+          const nominatimResponse = await fetch(nominatimUrl);
+          const nominatimData = await nominatimResponse.json();
+          
+          console.log('✓ Nominatim response:', nominatimData);
+          if (nominatimData.display_name) {
+            addressText = nominatimData.display_name;
+            console.log('✓ Got address from Nominatim:', addressText);
+          }
+        } catch (nominatimError) {
+          console.warn('❌ Direct Nominatim also failed:', nominatimError);
+        }
       }
 
       const coords = [latlng.lat, latlng.lng];
+      console.log('📌 Setting location to:', addressText);
 
       if (!fromCoords) {
         setFromLocation(addressText);
         setFromCoords(coords);
+        console.log('✓ Set FROM location');
       } else if (!toCoords) {
         setToLocation(addressText);
         setToCoords(coords);
+        console.log('✓ Set TO location');
         setTimeout(() => handleAutoFindRoutes(), 500);
       } else {
         // Replace destination if both already set
         setToLocation(addressText);
         setToCoords(coords);
+        console.log('✓ Updated TO location');
         setTimeout(() => handleAutoFindRoutes(), 500);
       }
     } catch (error) {
@@ -331,22 +402,18 @@ export default function SuggestedRoutes() {
   };
 
   // ======== RENDER =========
-  if (loading) {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen flex items-center justify-center bg-slate-800 text-white">
-          <div>
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto"></div>
-            <p className="mt-4 text-center">Loading suggested routes...</p>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-primary-dark via-primary to-slate-700">
+      {/* Loading Progress Overlay */}
+      {loading && (
+        <RouteLoadingProgress 
+          step={loadingStep} 
+          total={4} 
+          message={loadingMessage}
+        />
+      )}
+      
+      <div className="min-h-screen bg-gradient-to-br from-primary-dark via-slate-800 to-slate-900 text-white">
         {/* Page Heading */}
         <div className="text-center pt-12 pb-8">
           <h1 className="text-4xl font-bold text-white">
@@ -421,13 +488,38 @@ export default function SuggestedRoutes() {
             <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-white">
               <div className="bg-gradient-to-br from-primary-dark via-primary to-slate-700 p-4">
                 <div className="text-center mb-3">
-                  <p className="text-white text-sm font-medium">
-                    {!fromCoords
-                      ? "📍 Click on map to set starting point"
-                      : !toCoords
-                      ? "🎯 Click on map to set destination"
-                      : "✓ Both points selected - click again to change destination"}
-                  </p>
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <p className="text-white text-sm font-medium">
+                      {!fromCoords
+                        ? "📍 Click on map to set starting point"
+                        : !toCoords
+                        ? "🎯 Click on map to set destination"
+                        : "✓ Both points selected - click again to change destination"}
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        // Set user location to London center
+                        const londonCenter = [51.5074, -0.1278]; // Westminster, London
+                        setUserLocation(londonCenter);
+                        // Force map to re-render with new center
+                        setMapKey((prev) => prev + 1);
+                        // Show success message briefly
+                        const originalText = e.target.textContent;
+                        e.target.textContent = '✓ Set to London';
+                        e.target.classList.add('bg-green-500');
+                        setTimeout(() => {
+                          e.target.textContent = originalText;
+                          e.target.classList.remove('bg-green-500');
+                        }, 1500);
+                      }}
+                      className="text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 backdrop-blur-sm border border-white/30 shadow-lg"
+                      title="Set current location to London for testing"
+                    >
+                      <span className="text-base">🇬🇧</span>
+                      <span className="font-medium">Set to London</span>
+                    </button>
+                  </div>
                   {(backendRoutes.length > 0 || routes.length > 0) && (
                     <div className="flex justify-center mb-4">
                       <a
@@ -457,35 +549,59 @@ export default function SuggestedRoutes() {
                   )}
                 </div>
                 <div className="rounded-xl overflow-hidden">
-                  <Map
-                    key={mapKey}
-                    center={
-                      selectedRoute?.coordinates?.[0] ||
-                      fromCoords ||
-                      userLocation ||
-                      LOCATION_CONFIG.DEFAULT_CENTER
-                    }
-                    zoom={fromCoords && toCoords ? 15 : 14}
-                    routes={[
-                      ...routes.map((r) => ({
-                        id: r.id,
-                        color: r.color || "#3b82f6",
-                        coordinates: r.coordinates,
-                      })),
-                      ...backendRoutes.map((r) => ({
-                        id: r.id,
-                        color: "#10b981", // green for backend suggested routes
-                        coordinates: r.path?.coordinates || [],
-                      })),
-                    ]}
-                    height="600px"
-                    fromCoords={fromCoords}
-                    toCoords={toCoords}
-                    showRouting={showRouting}
-                    onPlaceSelect={
-                      routes.length === 0 ? handleMapPlaceSelect : null
-                    }
-                  />
+                  {!loading && (
+                    <Map
+                      key={mapKey}
+                      center={
+                        selectedRoute?.coordinates?.[0] ||
+                        fromCoords ||
+                        userLocation ||
+                        LOCATION_CONFIG.DEFAULT_CENTER
+                      }
+                      zoom={mapZoom}
+                      routes={[
+                        ...routes.map((r) => ({
+                          id: r.id,
+                          name: r.name,
+                          type: r.type,
+                          color: r.color || "#3b82f6",
+                          coordinates: r.coordinates || [],
+                          safetyRating: r.safetyRating,
+                          distance: r.distance,
+                          estimatedTime: r.estimatedTime,
+                          path: r.coordinates || [], // Ensure path is set for Map component
+                        })),
+                        ...backendRoutes.map((r) => ({
+                          id: r.id,
+                          name: r.name,
+                          type: 'backend',
+                          color: "#10b981", // green for backend suggested routes
+                          coordinates: r.path?.coordinates || [],
+                          safetyRating: r.safetyRating,
+                          distance: r.distanceKm,
+                          estimatedTime: r.estimatedTimeMinutes,
+                          path: r.path?.coordinates || [], // Ensure path is set for Map component
+                        })),
+                      ]}
+                      height="600px"
+                      fromCoords={fromCoords}
+                      toCoords={toCoords}
+                      showRouting={false}
+                      transportMode={transportMode}
+                      autoFitBounds={false}
+                      onPlaceSelect={
+                        routes.length === 0 ? handleMapPlaceSelect : null
+                      }
+                    />
+                  )}
+                  {loading && (
+                    <div className="bg-gray-100 rounded-lg h-[600px] flex items-center justify-center">
+                      <div className="text-center text-gray-500">
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-accent mx-auto mb-3"></div>
+                        <p>Loading map...</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -591,7 +707,7 @@ export default function SuggestedRoutes() {
                       but {((routes[0].safetyRating / routes[1].safetyRating - 1) * 100).toFixed(0)}% safer
                     </p>
                     <p>
-                      • Time difference: {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime)} minutes
+                      • Time difference: {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime).toFixed(1)} minutes
                     </p>
                     <p>
                       • Safety scores are based on crime data, lighting conditions, and historical hazard reports
