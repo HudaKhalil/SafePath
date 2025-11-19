@@ -66,8 +66,9 @@ router.post('/', authenticateToken, [
 
     const hazard = result.rows[0];
     
+    console.log(`✅ New hazard reported: ID ${hazard.id}, Type: ${hazard.hazard_type}, Severity: ${hazard.severity}`);
 
-    // Broadcast to WebSocket clients in real-time (replaces PostgreSQL trigger)
+    // Broadcast to WebSocket clients in real-time 
     websocketService.broadcastNewHazard({
       id: hazard.id,
       hazard_type: hazard.hazard_type,
@@ -107,6 +108,160 @@ router.post('/', authenticateToken, [
     });
   }
 });
+
+// Get all hazards with optional filtering
+router.get('/', async (req, res) => {
+  try {
+    const { 
+      hazardType, 
+      severity, 
+      resolved,
+      limit = 50, 
+      offset = 0 
+    } = req.query;
+    
+    let queryText = `
+      SELECT 
+        h.id, 
+        h.description, 
+        h.hazard_type, 
+        h.severity,
+        h.latitude,
+        h.longitude,
+        h.reported_at,
+        h.status
+      FROM hazards h
+    `;
+    
+    const params = [];
+    const conditions = [];
+
+    if (hazardType) {
+      conditions.push(`h.hazard_type = $${params.length + 1}`);
+      params.push(hazardType);
+    }
+
+    if (severity) {
+      conditions.push(`h.severity = $${params.length + 1}`);
+      params.push(severity);
+    }
+
+    if (resolved !== undefined) {
+      const status = resolved === 'true' ? 'resolved' : 'active';
+      conditions.push(`h.status = $${params.length + 1}`);
+      params.push(status);
+    }
+
+    if (conditions.length > 0) {
+      queryText += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    queryText += ` ORDER BY h.reported_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const result = await query(queryText, params);
+
+    const hazards = result.rows.map(hazard => ({
+      id: hazard.id,
+      description: hazard.description,
+      location: {
+        latitude: hazard.latitude,
+        longitude: hazard.longitude
+      },
+      hazardType: hazard.hazard_type,
+      severity: hazard.severity,
+      status: hazard.status,
+      reportedAt: hazard.reported_at
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        hazards,
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          total: hazards.length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get hazards error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Get hazards near a location
+router.get('/near/:latitude/:longitude', async (req, res) => {
+  try {
+    const { latitude, longitude } = req.params;
+    const { radius = 2000, limit = 20 } = req.query; // radius in meters
+
+    const result = await query(`
+      SELECT 
+        h.id, 
+        h.description, 
+        h.hazard_type, 
+        h.severity,
+        h.latitude,
+        h.longitude,
+        h.reported_at,
+        h.status,
+        ST_Distance(
+          h.location::geography, 
+          ST_SetSRID(ST_Point($2, $1), 4326)::geography
+        ) as distance_meters
+      FROM hazards h
+      WHERE ST_DWithin(
+        h.location::geography, 
+        ST_SetSRID(ST_Point($2, $1), 4326)::geography, 
+        $3
+      )
+      AND (h.status IS NULL OR h.status != 'resolved')
+      ORDER BY distance_meters ASC, h.reported_at DESC
+      LIMIT $4
+    `, [latitude, longitude, radius, limit]);
+
+    const hazards = result.rows.map(hazard => ({
+      id: hazard.id,
+      description: hazard.description,
+      location: {
+        latitude: hazard.latitude,
+        longitude: hazard.longitude
+      },
+      hazardType: hazard.hazard_type,
+      severity: hazard.severity,
+      status: hazard.status,
+      reportedAt: hazard.reported_at,
+      distanceMeters: Math.round(hazard.distance_meters)
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        hazards,
+        searchLocation: {
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude)
+        },
+        radiusMeters: parseInt(radius)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get nearby hazards error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+
 // Get hazards near a location
 router.get('/near/:latitude/:longitude', async (req, res) => {
   try {
@@ -236,6 +391,25 @@ router.patch('/:id', authenticateToken, [
 
   } catch (error) {
     console.error('Update hazard error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+router.get('/websocket-status', authenticateToken, async (req, res) => {
+  try {
+    const status = websocketService.getStatus();
+    res.json({
+      success: true,
+      data: {
+        ...status,
+        message: 'WebSocket service is active. Connect using Socket.IO client.'
+      }
+    });
+  } catch (error) {
+    console.error('WebSocket status error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
