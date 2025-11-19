@@ -42,3 +42,62 @@ export default function NavigationPage() {
   const lastPositionRef = useRef(null);
   const lastAnnouncementRef = useRef(0); // Prevent announcement spam
   const hazardCheckRef = useRef(0); // Last hazard check timestamp
+
+  // Get route data from sessionStorage (stored when route was selected)
+  useEffect(() => {
+	try {
+	  const storedRoute = sessionStorage.getItem(`route_${routeId}`);
+	  if (storedRoute) {
+		const route = JSON.parse(storedRoute);
+		setRouteCoordinates(route.coordinates || []);
+		setInstructions(route.instructions || []);
+	  }
+	} catch (error) {
+	  console.error("Error loading route data:", error);
+	}
+  }, [routeId]);
+
+  // Start GPS tracking
+  useEffect(() => {
+	if ("geolocation" in navigator) {
+	  const options = {
+		enableHighAccuracy: true,
+		timeout: 5000,
+		maximumAge: 0
+	  };
+
+	  watchIdRef.current = navigator.geolocation.watchPosition(
+		(position) => {
+		  const { latitude, longitude, heading: deviceHeading } = position.coords;
+		  const rawPosition = [latitude, longitude];
+		  setCurrentPosition(rawPosition);
+
+		  // Snap position to route
+		  if (routeCoordinates.length > 0) {
+			const snapped = snapToRoute(latitude, longitude);
+			
+			if (snapped && snapped.distance < 0.1) { // Within 100 meters
+			  setSnappedPosition(snapped.position);
+			  setIsOffRoute(false);
+			  
+			  // Calculate heading based on route direction
+			  if (snapped.segmentIndex < routeCoordinates.length - 1) {
+				const nextPoint = routeCoordinates[snapped.segmentIndex + 1];
+				const calculatedHeading = calculateBearing(
+				  snapped.position[0],
+				  snapped.position[1],
+				  nextPoint[0],
+				  nextPoint[1]
+				);
+				setHeading(calculatedHeading);
+			  } else if (deviceHeading !== null) {
+				setHeading(deviceHeading);
+			  }
+
+			  // Update navigation progress
+			  updateNavigationProgress(snapped.position[0], snapped.position[1], snapped.segmentIndex);
+			} else {
+			  // Too far from route - warn user
+			  setSnappedPosition(rawPosition);
+			  setIsOffRoute(true);
+			
