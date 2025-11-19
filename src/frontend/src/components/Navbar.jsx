@@ -105,7 +105,7 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden glass-effect mx-4 mb-4 rounded-lg">
           <nav className="flex flex-col gap-4 p-4">
-            <Link href="/" className="text-text-secondary hover:text-accent transition-colors">Home</Link>
+            <Link href="/" onClick={() => setOpen(false)} className="text-text-secondary hover:text-accent transition-colors">Home</Link>
             <Link href="/suggested-routes" className="text-text-secondary hover:text-accent transition-colors">Suggested Routes</Link>
             <Link href="/report-hazards" className="text-text-secondary hover:text-accent transition-colors">Report Hazards</Link>
             <Link href="/findBuddy" className="text-text-secondary hover:text-accent transition-colors">Find Buddy</Link>
@@ -115,7 +115,10 @@ export default function Navbar() {
                 <div className="text-text-secondary">Welcome, {user?.name || 'User'}</div>
                 <Link href="/profile" className="block text-text-secondary hover:text-accent transition-colors">Profile</Link>
                 <button 
-                  onClick={handleLogout}
+                  onClick={() => {
+                    setOpen(false);
+                    handleLogout();
+                  }}
                   className="block w-full text-left bg-red-600 hover:bg-red-700 px-3 py-2 rounded text-sm transition-colors"
                 >
                   Logout

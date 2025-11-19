@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import { geocodingService, routingService } from "../../lib/services";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
-import RouteLoadingProgress from "../../components/RouteLoadingProgress";
-import SkeletonLoader from "../../components/SkeletonLoader";
 import { LOCATION_CONFIG } from "../../lib/locationConfig";
 
 // Dynamically import Map component (avoid SSR issues)
@@ -48,8 +46,6 @@ export default function SuggestedRoutes() {
   const router = useRouter();
   const [routes, setRoutes] = useState([]); // External API routes
   const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(1);
-  const [loadingMessage, setLoadingMessage] = useState('');
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [error, setError] = useState("");
@@ -118,8 +114,6 @@ export default function SuggestedRoutes() {
 
    setLoading(true);
    setError("");
-   setLoadingStep(1);
-   setLoadingMessage('Analyzing locations...');
 
    try {
      // Call backend API to get both fastest and safest routes
@@ -137,17 +131,10 @@ export default function SuggestedRoutes() {
        return;
      }
 
-     setLoadingStep(2);
-     setLoadingMessage('Loading safety data...');
-     await new Promise(resolve => setTimeout(resolve, 300));
-
      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
      // Remove /api suffix if it exists in the env variable, we'll add it below
      const baseUrl = apiUrl.replace(/\/api$/, '');
      console.log('Calling API:', `${baseUrl}/api/routes/find`);
-     
-     setLoadingStep(3);
-     setLoadingMessage('Calculating fastest route...');
      
      const response = await fetch(`${baseUrl}/api/routes/find`, {
        method: 'POST',
@@ -168,9 +155,6 @@ export default function SuggestedRoutes() {
      if (!response.ok) {
        throw new Error(`API returned ${response.status}: ${response.statusText}`);
      }
-
-     setLoadingStep(4);
-     setLoadingMessage('Calculating safest route...');
 
      const result = await response.json();
 
@@ -224,13 +208,6 @@ export default function SuggestedRoutes() {
 
        // Don't change zoom - let user control it
        // Removed: setMapZoom(13);
-
-       setTimeout(() => {
-         resultsRef.current?.scrollIntoView({
-           behavior: "smooth",
-           block: "start",
-         });
-       }, 100);
      } else {
        setError(result.message || "Failed to find routes");
      }
@@ -273,13 +250,6 @@ export default function SuggestedRoutes() {
 
       setRoutes([formattedRoute])
       setShowRouting(true)
-
-      setTimeout(() => {
-        resultsRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        })
-      }, 200)
     } else {
       setError(routeResult.message || 'Failed to find route')
     }
@@ -404,15 +374,6 @@ export default function SuggestedRoutes() {
   // ======== RENDER =========
   return (
     <ProtectedRoute>
-      {/* Loading Progress Overlay */}
-      {loading && (
-        <RouteLoadingProgress 
-          step={loadingStep} 
-          total={4} 
-          message={loadingMessage}
-        />
-      )}
-      
       <div className="min-h-screen bg-gradient-to-br from-primary-dark via-slate-800 to-slate-900 text-white">
         {/* Page Heading */}
         <div className="text-center pt-12 pb-8">
@@ -472,6 +433,7 @@ export default function SuggestedRoutes() {
                 >
                   🔍 Find Routes
                 </button>
+                {/* Temporarily hidden - Show Suggested Routes button
                 <button
                   onClick={fetchBackendRoutes}
                   className={`w-full mb-4 font-bold py-3 rounded-lg transition shadow-md ${routes.length > 0 ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
@@ -479,6 +441,7 @@ export default function SuggestedRoutes() {
                 >
                   {backendLoading ? "Loading..." : "Show Suggested Routes"}
                 </button>
+                */}
               </form>
             </div>
           </div>
@@ -520,7 +483,7 @@ export default function SuggestedRoutes() {
                       <span className="font-medium">Set to London</span>
                     </button>
                   </div>
-                  {(backendRoutes.length > 0 || routes.length > 0) && (
+                  {(backendRoutes.length > 0 || routes.length > 0 || (fromCoords && toCoords)) && (
                     <div className="flex justify-center mb-4">
                       <a
                         href="#"
@@ -588,7 +551,7 @@ export default function SuggestedRoutes() {
                       toCoords={toCoords}
                       showRouting={false}
                       transportMode={transportMode}
-                      autoFitBounds={false}
+                      autoFitBounds={true}
                       onPlaceSelect={
                         routes.length === 0 ? handleMapPlaceSelect : null
                       }
