@@ -417,4 +417,78 @@ router.get('/websocket-status', authenticateToken, async (req, res) => {
   }
 });
 
+// Health check endpoint for real‑time system
+router.get('/health', async (req, res) => {
+  try {
+    const websocketStatus = websocketService.getStatus();
+    
+    const healthStatus = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      database: {
+        connected: true,
+        message: 'PostgreSQL connected'
+      },
+      realtime: {
+        type: 'WebSocket (Socket.IO)',
+        initialized: websocketStatus.initialized,
+        activeConnections: websocketStatus.activeConnections
+      },
+      performance: {
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        cpuUsage: process.cpuUsage()
+      }
+    };
+
+    // Test database query performance
+    const queryStart = Date.now();
+    await query('SELECT COUNT(*) FROM hazards WHERE status = $1', ['active']);
+    const queryTime = Date.now() - queryStart;
+    
+    healthStatus.performance.lastQueryMs = queryTime;
+    
+    if (queryTime > 1000) {
+      healthStatus.status = 'degraded';
+      healthStatus.warnings = ['Database query performance degraded'];
+    }
+
+    res.json(healthStatus);
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
+// Performance stats endpoint
+router.get('/stats', async (req, res) => {
+  try {
+    const websocketStatus = websocketService.getStatus();
+    
+    res.json({
+      success: true,
+      data: {
+        realtime: {
+          type: 'WebSocket (Socket.IO)',
+          activeConnections: websocketStatus.activeConnections,
+          initialized: websocketStatus.initialized
+        },
+        server: {
+          uptime: process.uptime(),
+          memory: process.memoryUsage()
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;
