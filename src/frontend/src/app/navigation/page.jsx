@@ -1,37 +1,44 @@
 "use client";
-import { useSearchParams } from "next/navigation";
+
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { LOCATION_CONFIG } from "../../lib/locationConfig";
+import websocketClient from "../../lib/websocketClient";
+
+const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
 export default function NavigationPage() {
-	const searchParams = useSearchParams();
-	const routeName = searchParams.get("name");
-	const routeType = searchParams.get("type");
-	const routeDistance = searchParams.get("distance");
-	const routeTime = searchParams.get("time");
-	const routeSafety = searchParams.get("safety");
-
-	return (
-		<main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-primary-dark via-primary to-slate-700">
-			<div className="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full mt-12">
-				<h1 className="text-3xl font-bold text-primary-dark mb-4">Navigation</h1>
-				<div className="space-y-2">
-					<div className="text-lg font-semibold">{routeName}</div>
-					<div className="text-sm text-gray-500 capitalize">Type: {routeType}</div>
-					<div className="flex gap-6 mt-4">
-						<div>
-							<span className="text-blue-600 font-bold text-xl">{routeDistance} km</span>
-							<div className="text-xs text-gray-500">Distance</div>
-						</div>
-						<div>
-							<span className="text-blue-600 font-bold text-xl">{routeTime} min</span>
-							<div className="text-xs text-gray-500">Duration</div>
-						</div>
-						<div>
-							<span className={`font-bold text-xl ${routeSafety >= 4 ? "text-green-600" : "text-yellow-600"}`}>{routeSafety}</span>
-							<div className="text-xs text-gray-500">Safety</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</main>
-	);
-}
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  // Route info from URL params
+  const routeId = searchParams.get("routeId");
+  const routeName = searchParams.get("name");
+  const routeType = searchParams.get("type");
+  const routeDistance = searchParams.get("distance");
+  const routeTime = searchParams.get("time");
+  const routeSafety = searchParams.get("safety");
+  
+  // Navigation state
+  const [currentPosition, setCurrentPosition] = useState(null);
+  const [snappedPosition, setSnappedPosition] = useState(null); // Position snapped to route
+  const [isTracking, setIsTracking] = useState(false);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [instructions, setInstructions] = useState([]);
+  const [currentInstructionIndex, setCurrentInstructionIndex] = useState(0);
+  const [distanceToNextTurn, setDistanceToNextTurn] = useState(0);
+  const [heading, setHeading] = useState(0);
+  const [hasArrived, setHasArrived] = useState(false);
+  const [totalDistanceRemaining, setTotalDistanceRemaining] = useState(parseFloat(routeDistance) || 0);
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(parseInt(routeTime) || 0);
+  const [routeProgress, setRouteProgress] = useState(0); // Percentage completed
+  const [isOffRoute, setIsOffRoute] = useState(false); // User too far from route
+  const [nearbyHazards, setNearbyHazards] = useState([]); // Hazards along route
+  const [hazardAlerts, setHazardAlerts] = useState([]); // Active hazard warnings
+  
+  const watchIdRef = useRef(null);
+  const synthesisRef = useRef(null);
+  const lastPositionRef = useRef(null);
+  const lastAnnouncementRef = useRef(0); // Prevent announcement spam
+  const hazardCheckRef = useRef(0); // Last hazard check timestamp
