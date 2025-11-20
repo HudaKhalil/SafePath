@@ -8,20 +8,15 @@ import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
 import { LOCATION_CONFIG } from "../../lib/locationConfig";
 
-// Dynamically import Map component (avoid SSR issues)
 const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
 export default function SuggestedRoutes() {
-  // Used to force remount of Map for full reset
   const [mapKey, setMapKey] = useState(0);
-  // Clear backend suggested routes
   const clearBackendRoutes = () => {
     setBackendRoutes([]);
     setSelectedRoute(null);
   };
-  // Start navigation for backend route
   const startBackendNavigation = (route) => {
-    // Store route data in sessionStorage for navigation page
     const routeData = {
       coordinates: route.path || [],
       instructions: route.instructions || [],
@@ -44,7 +39,7 @@ export default function SuggestedRoutes() {
     router.push(url);
   };
   const router = useRouter();
-  const [routes, setRoutes] = useState([]); // External API routes
+  const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
@@ -55,11 +50,11 @@ export default function SuggestedRoutes() {
   const [toCoords, setToCoords] = useState(null);
   const [transportMode, setTransportMode] = useState("cycling");
   const [showRouting, setShowRouting] = useState(false);
-  const [backendRoutes, setBackendRoutes] = useState([]); // Backend suggested routes
+  const [backendRoutes, setBackendRoutes] = useState([]);
   const [backendLoading, setBackendLoading] = useState(false);
-  const [mapZoom, setMapZoom] = useState(14); // Track map zoom independently
+  const [mapZoom, setMapZoom] = useState(14);
   const resultsRef = useRef(null);
-  // Fetch suggested routes from backend
+
   const fetchBackendRoutes = async () => {
     setBackendLoading(true);
     setError("");
@@ -83,7 +78,6 @@ export default function SuggestedRoutes() {
     getUserLocation();
   }, []);
 
-  // ======== GET USER LOCATION =========
   const getUserLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -93,7 +87,6 @@ export default function SuggestedRoutes() {
     } else setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER);
   };
 
-  // ======== HANDLE LOCATION INPUTS =========
   const handleFromLocationChange = (value, locationData) => {
     setFromLocation(value);
     if (locationData) setFromCoords([locationData.lat, locationData.lon]);
@@ -104,7 +97,6 @@ export default function SuggestedRoutes() {
     if (locationData) setToCoords([locationData.lat, locationData.lon]);
   };
 
-  // ======== FIND ROUTES (BUTTON CLICK) =========
  const handleFindRoutes = async (e) => {
    e.preventDefault();
    if (!fromCoords || !toCoords) {
@@ -116,8 +108,6 @@ export default function SuggestedRoutes() {
    setError("");
 
    try {
-     // Call backend API to get both fastest and safest routes
-     // Get the auth token from cookies
      const getAuthToken = () => {
        const cookies = document.cookie.split(';');
        const authCookie = cookies.find(c => c.trim().startsWith('auth_token='));
@@ -132,7 +122,6 @@ export default function SuggestedRoutes() {
      }
 
      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
-     // Remove /api suffix if it exists in the env variable, we'll add it below
      const baseUrl = apiUrl.replace(/\/api$/, '');
      console.log('Calling API:', `${baseUrl}/api/routes/find`);
      
@@ -172,11 +161,11 @@ export default function SuggestedRoutes() {
            id: 'fastest',
            name: 'Fastest Route',
            type: 'fastest',
-           color: '#3b82f6', // Blue
+           color: '#3b82f6',
            coordinates: fastest.coordinates || [],
            distance: fastest.distance,
            estimatedTime: fastest.time,
-           safetyRating: (1 - fastest.safetyScore) * 10, // Convert 0-1 to 10-0 scale
+           safetyRating: (1 - fastest.safetyScore) * 10,
            safetyScore: fastest.safetyScore,
            instructions: fastest.instructions || [],
            provider: result.provider
@@ -185,11 +174,11 @@ export default function SuggestedRoutes() {
            id: 'safest',
            name: 'Safest Route',
            type: 'safest',
-           color: '#10b981', // Green
+           color: '#10b981',
            coordinates: safest.coordinates || [],
            distance: safest.distance,
            estimatedTime: safest.time,
-           safetyRating: (1 - safest.safetyScore) * 10, // Convert 0-1 to 10-0 scale
+           safetyRating: (1 - safest.safetyScore) * 10,
            safetyScore: safest.safetyScore,
            instructions: safest.instructions || [],
            provider: result.provider
@@ -204,10 +193,7 @@ export default function SuggestedRoutes() {
        })));
 
        setRoutes(formattedRoutes);
-       setShowRouting(false); // Disable RoutingController since we have direct coordinates
-
-       // Don't change zoom - let user control it
-       // Removed: setMapZoom(13);
+       setShowRouting(false);
      } else {
        setError(result.message || "Failed to find routes");
      }
@@ -219,7 +205,6 @@ export default function SuggestedRoutes() {
    }
  };
 
-  // ======== AUTO FIND ROUTES (MAP CLICK) =========
  const handleAutoFindRoutes = async () => {
   if (!fromCoords || !toCoords) return
 
@@ -261,12 +246,10 @@ export default function SuggestedRoutes() {
   }
 };
 
-  // ======== SELECT POINTS ON MAP =========
   const handleMapPlaceSelect = async (latlng) => {
     console.log('🗺️ Map clicked at:', latlng);
     
     try {
-      // Try backend reverse geocoding first
       let addressText = `${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`;
       console.log('📍 Initial coords:', addressText);
       
@@ -278,9 +261,6 @@ export default function SuggestedRoutes() {
         );
 
         console.log('✓ Backend response:', response);
-        console.log('✓ Backend response.data:', response.data);
-        console.log('✓ Backend response.data.location:', response.data?.location);
-        console.log('✓ Backend response.data.location.display_name:', response.data?.location?.display_name);
         
         if (response.success && response.data?.location?.display_name) {
           addressText = response.data.location.display_name;
@@ -292,7 +272,6 @@ export default function SuggestedRoutes() {
         console.log('❌ Backend reverse geocoding failed:', error);
         console.log('🔄 Trying direct Nominatim...');
         
-        // Fallback to direct Nominatim reverse geocoding
         try {
           const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&addressdetails=1`;
           const nominatimResponse = await fetch(nominatimUrl);
@@ -321,7 +300,6 @@ export default function SuggestedRoutes() {
         console.log('✓ Set TO location');
         setTimeout(() => handleAutoFindRoutes(), 500);
       } else {
-        // Replace destination if both already set
         setToLocation(addressText);
         setToCoords(coords);
         console.log('✓ Updated TO location');
@@ -332,9 +310,7 @@ export default function SuggestedRoutes() {
     }
   };
 
-  // ======== START NAVIGATION (NEW PAGE) =========
   const startNavigation = (route) => {
-    // Store route data in sessionStorage for navigation page
     const routeData = {
       coordinates: route.coordinates || [],
       instructions: route.instructions || [],
@@ -358,7 +334,6 @@ export default function SuggestedRoutes() {
     router.push(url);
   };
 
-  // ======== HELPER COLORS =========
   const getSafetyColor = (rating) => {
     if (rating >= 8) return "text-green-600";
     if (rating >= 6) return "text-yellow-600";
@@ -371,24 +346,26 @@ export default function SuggestedRoutes() {
     return "bg-red-100 text-red-800";
   };
 
-  // ======== RENDER =========
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-primary-dark via-slate-800 to-slate-900 text-white">
-        {/* Page Heading */}
+    
+      <div className="min-h-screen" style={{ background: 'var(--bg-body)' }}>
+      
         <div className="text-center pt-12 pb-8">
-          <h1 className="text-4xl font-bold text-white">
-            Find the <span className="text-accent">Safest Route</span>
+       
+          <h1 className="text-4xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+            Find the <span style={{ color: '#06d6a0' }}>Safest Route</span>
           </h1>
-          <p className="text-white/80 mt-2">
+         
+          <p className="mt-2" style={{ color: 'var(--color-text-primary)', opacity: 0.8 }}>
             Click on map or use the search form to plan your route
           </p>
         </div>
 
         <div className="max-w-7xl mx-auto px-6 pb-20 grid lg:grid-cols-5 gap-8">
-          {/* Left: Form */}
+       
           <div className="lg:col-span-2">
-            <div className="bg-white p-6 rounded-2xl shadow-xl h-fit sticky top-24">
+            <div className="p-6 rounded-2xl shadow-xl h-fit sticky top-24" style={{ backgroundColor: '#ffffff' }}>
               <form onSubmit={handleFindRoutes} className="space-y-6">
                 <AddressAutocomplete
                   value={fromLocation}
@@ -403,9 +380,8 @@ export default function SuggestedRoutes() {
                   icon="to"
                 />
 
-                {/* Mode selection */}
                 <div className="flex justify-center gap-6 py-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer" style={{ color: '#0f172a' }}>
                     <input
                       type="radio"
                       name="mode"
@@ -415,7 +391,7 @@ export default function SuggestedRoutes() {
                     />
                     🚶 Walking
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer" style={{ color: '#0f172a' }}>
                     <input
                       type="radio"
                       name="mode"
@@ -427,32 +403,31 @@ export default function SuggestedRoutes() {
                   </label>
                 </div>
 
+               
                 <button
                   type="submit"
-                  className="w-full bg-accent text-primary-dark font-bold py-3 rounded-lg hover:bg-accent/90 transition shadow-md"
+                  className="w-full font-bold py-3 rounded-lg transition shadow-md"
+                  style={{
+                    backgroundColor: '#06d6a0',
+                    color: '#0f172a'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
                 >
                   🔍 Find Routes
                 </button>
-                {/* Temporarily hidden - Show Suggested Routes button
-                <button
-                  onClick={fetchBackendRoutes}
-                  className={`w-full mb-4 font-bold py-3 rounded-lg transition shadow-md ${routes.length > 0 ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-                  disabled={backendLoading || routes.length === 0}
-                >
-                  {backendLoading ? "Loading..." : "Show Suggested Routes"}
-                </button>
-                */}
               </form>
             </div>
           </div>
 
-          {/* Right: Map */}
+        
           <div className="lg:col-span-3">
-            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-white">
+            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10" style={{ backgroundColor: '#ffffff' }}>
               <div className="bg-gradient-to-br from-primary-dark via-primary to-slate-700 p-4">
                 <div className="text-center mb-3">
                   <div className="flex items-center justify-center gap-3 mb-2">
-                    <p className="text-white text-sm font-medium">
+           
+                    <p className="text-sm font-medium" style={{ color: '#ffffff' }}>
                       {!fromCoords
                         ? "📍 Click on map to set starting point"
                         : !toCoords
@@ -462,12 +437,9 @@ export default function SuggestedRoutes() {
                     <button
                       onClick={(e) => {
                         e.preventDefault();
-                        // Set user location to London center
-                        const londonCenter = [51.5074, -0.1278]; // Westminster, London
+                        const londonCenter = [51.5074, -0.1278];
                         setUserLocation(londonCenter);
-                        // Force map to re-render with new center
                         setMapKey((prev) => prev + 1);
-                        // Show success message briefly
                         const originalText = e.target.textContent;
                         e.target.textContent = '✓ Set to London';
                         e.target.classList.add('bg-green-500');
@@ -476,7 +448,14 @@ export default function SuggestedRoutes() {
                           e.target.classList.remove('bg-green-500');
                         }, 1500);
                       }}
-                      className="text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 backdrop-blur-sm border border-white/30 shadow-lg"
+                      className="text-xs px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 backdrop-blur-sm border shadow-lg"
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                        color: '#ffffff',
+                        borderColor: 'rgba(255, 255, 255, 0.3)'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.3)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
                       title="Set current location to London for testing"
                     >
                       <span className="text-base">🇬🇧</span>
@@ -489,22 +468,20 @@ export default function SuggestedRoutes() {
                         href="#"
                         onClick={(e) => {
                           e.preventDefault();
-                          // Clear all backend and external routes
                           setBackendRoutes([]);
                           setRoutes([]);
-                          // Clear all location fields and coordinates
                           setFromLocation("");
                           setToLocation("");
                           setFromCoords(null);
                           setToCoords(null);
-                          // Hide all routing lines
                           setShowRouting(false);
-                          // Remove selected route highlight
                           setSelectedRoute(null);
-                          // Force Map to remount for full reset
                           setMapKey((prev) => prev + 1);
                         }}
-                        className="text-white underline hover:text-red-800 transition cursor-pointer text-lg"
+                        className="underline transition cursor-pointer text-lg"
+                        style={{ color: '#ffffff' }}
+                        onMouseEnter={(e) => e.target.style.color = '#ef4444'}
+                        onMouseLeave={(e) => e.target.style.color = '#ffffff'}
                       >
                         Clear Selection
                       </a>
@@ -532,18 +509,18 @@ export default function SuggestedRoutes() {
                           safetyRating: r.safetyRating,
                           distance: r.distance,
                           estimatedTime: r.estimatedTime,
-                          path: r.coordinates || [], // Ensure path is set for Map component
+                          path: r.coordinates || [],
                         })),
                         ...backendRoutes.map((r) => ({
                           id: r.id,
                           name: r.name,
                           type: 'backend',
-                          color: "#10b981", // green for backend suggested routes
+                          color: "#10b981",
                           coordinates: r.path?.coordinates || [],
                           safetyRating: r.safetyRating,
                           distance: r.distanceKm,
                           estimatedTime: r.estimatedTimeMinutes,
-                          path: r.path?.coordinates || [], // Ensure path is set for Map component
+                          path: r.path?.coordinates || [],
                         })),
                       ]}
                       height="600px"
@@ -571,17 +548,16 @@ export default function SuggestedRoutes() {
           </div>
         </div>
 
-        {/* Error */}
+        {/* ERROR - SAME FOR BOTH MODES */}
         {error && (
           <div className="max-w-4xl mx-auto bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mt-6">
             {error}
           </div>
         )}
 
-        {/* Route Comparison Panel */}
         {routes.length > 0 && (
-          <section ref={resultsRef} className="max-w-6xl mx-auto bg-white py-8 rounded-2xl shadow-lg mt-8">
-            <h2 className="text-2xl font-bold text-center text-primary-dark mb-6">
+          <section ref={resultsRef} className="max-w-6xl mx-auto py-8 rounded-2xl shadow-lg mt-8" style={{ backgroundColor: '#ffffff' }}>
+            <h2 className="text-2xl font-bold text-center mb-6" style={{ color: '#0f172a' }}>
               Route Comparison
             </h2>
             <div className="grid md:grid-cols-2 gap-6 px-6">
@@ -598,7 +574,7 @@ export default function SuggestedRoutes() {
                         {route.type === 'fastest' ? '⚡' : '🛡️'}
                       </span>
                       <div>
-                        <h3 className="text-xl font-bold text-primary-dark">
+                        <h3 className="text-xl font-bold" style={{ color: '#0f172a' }}>
                           {route.name}
                         </h3>
                         <p className="text-sm text-gray-500">
@@ -659,7 +635,6 @@ export default function SuggestedRoutes() {
               ))}
             </div>
 
-            {/* Safety Insights */}
             {routes.length === 2 && (
               <div className="mt-6 px-6">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -682,17 +657,16 @@ export default function SuggestedRoutes() {
           </section>
         )}
 
-        {/* Fallback route warning */}
         {routes.length > 0 && routes[0].fallback && (
           <div className="max-w-4xl mx-auto bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mt-6">
             Warning: Route is a straight line (fallback). Real road routing is unavailable. Distance may not be accurate.
           </div>
         )}
 
-        {/* Backend Suggested Routes Section */}
+       
         {backendRoutes.length > 0 && (
-          <section className="max-w-6xl mx-auto bg-white py-8 rounded-2xl shadow-lg mt-8">
-            <h2 className="text-2xl font-bold text-center text-primary-dark mb-6">
+          <section className="max-w-6xl mx-auto py-8 rounded-2xl shadow-lg mt-8" style={{ backgroundColor: '#ffffff' }}>
+            <h2 className="text-2xl font-bold text-center mb-6" style={{ color: '#0f172a' }}>
               🛡️ Suggested Routes
             </h2>
             <div className="space-y-4 px-6">
@@ -708,7 +682,7 @@ export default function SuggestedRoutes() {
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">🛡️</span>
                         <div>
-                          <h3 className="text-lg font-bold text-primary-dark">
+                          <h3 className="text-lg font-bold" style={{ color: '#0f172a' }}>
                             {route.name}
                           </h3>
                           <p className="text-sm text-gray-500 capitalize">
@@ -748,7 +722,6 @@ export default function SuggestedRoutes() {
                         <p className="text-sm text-gray-500">Safety</p>
                       </div>
                     </div>
-                    {/* Optionally show description */}
                     {route.description && (
                       <div className="mb-2 text-gray-700 text-sm">
                         {route.description}
@@ -772,7 +745,6 @@ export default function SuggestedRoutes() {
             </div>
           </section>
         )}
-        {/* ...existing code for external API routes... */}
       </div>
     </ProtectedRoute>
   );
