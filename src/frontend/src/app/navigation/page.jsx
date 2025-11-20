@@ -100,4 +100,46 @@ export default function NavigationPage() {
 			  // Too far from route - warn user
 			  setSnappedPosition(rawPosition);
 			  setIsOffRoute(true);
-			
+
+			  // Announce off-route warning (but not too frequently)
+			  const now = Date.now();
+			  if (now - lastAnnouncementRef.current > 10000) { // Every 10 seconds max
+				speak("You are off the planned route. Returning to route.");
+				lastAnnouncementRef.current = now;
+			  }
+			  
+			  if (deviceHeading !== null) {
+				setHeading(deviceHeading);
+			  }
+			}
+		  } else {
+			setSnappedPosition(rawPosition);
+			if (deviceHeading !== null) {
+			  setHeading(deviceHeading);
+			}
+		  }
+
+		  setIsTracking(true);
+		},
+		(error) => {
+		  console.error("Geolocation error:", error);
+		  setIsTracking(false);
+		},
+		options
+	  );
+	}
+
+	return () => {
+	  if (watchIdRef.current) {
+		navigator.geolocation.clearWatch(watchIdRef.current);
+	  }
+	};
+  }, [routeCoordinates, instructions, currentInstructionIndex]);
+
+  // Initialize speech synthesis
+  useEffect(() => {
+	if (typeof window !== "undefined" && window.speechSynthesis) {
+	  synthesisRef.current = window.speechSynthesis;
+	}
+  }, []);
+
