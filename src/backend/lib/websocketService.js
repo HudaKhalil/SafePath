@@ -52,6 +52,11 @@ class WebSocketService {
     this.io.on('connection', (socket) => {
       console.log(`Client connected: ${socket.id}`);
 
+      // Authenticate socket connection
+      socket.on('authenticate', (data) => {
+        this.authenticateSocket(socket, data);
+      });
+
       // Handle disconnect
       socket.on('disconnect', (reason) => {
         this.handleDisconnect(socket, reason);
@@ -62,6 +67,38 @@ class WebSocketService {
         console.error(`Socket error for ${socket.id}:`, error);
       });
     });
+  }
+
+  /**
+   * Authenticate socket connection with JWT
+   */
+  authenticateSocket(socket, data) {
+    try {
+      const { token } = data;
+
+      if (!token) {
+        socket.emit('auth_error', { message: 'Token required' });
+        return;
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      // Store user info with socket
+      socket.userId = decoded.userId;
+      socket.username = decoded.username;
+      socket.authenticated = true;
+
+      socket.emit('authenticated', {
+        message: 'Authentication successful',
+        userId: decoded.userId
+      });
+
+      console.log(`Socket ${socket.id} authenticated as user ${decoded.userId}`);
+    } catch (error) {
+      console.error(`Authentication failed for socket ${socket.id}:`, error.message);
+      socket.emit('auth_error', { message: 'Invalid token' });
+      socket.disconnect();
+    }
   }
 
   /**
