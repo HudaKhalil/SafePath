@@ -8,8 +8,8 @@ export default function BottomSheet({
   buddyCount = 12,
   sortText = "Sorted by best route match",
   initialExpanded = false,
-  minHeight = 180, // collapsed height in px
-  maxHeight = 500, // expanded height in px
+  minHeight = 180,
+  maxHeight = 500,
 }) {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [isDragging, setIsDragging] = useState(false);
@@ -36,7 +36,6 @@ export default function BottomSheet({
 
   const handleTouchEnd = () => {
     setIsDragging(false);
-    // Snap to closest state
     const midPoint = (minHeight + maxHeight) / 2;
     if (currentHeight > midPoint) {
       setIsExpanded(true);
@@ -63,7 +62,6 @@ export default function BottomSheet({
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    // Snap to closest state
     const midPoint = (minHeight + maxHeight) / 2;
     if (currentHeight > midPoint) {
       setIsExpanded(true);
@@ -92,12 +90,14 @@ export default function BottomSheet({
   return (
     <div
       ref={sheetRef}
-      className="fixed bottom-0 left-0 right-0 bg-primary-dark/95 backdrop-blur-md border-t border-white/10 rounded-t-3xl shadow-2xl transition-all duration-300 ease-out z-[999]"
+      className="fixed bottom-0 left-0 right-0 backdrop-blur-md border-t rounded-t-3xl shadow-2xl transition-all duration-300 ease-out z-[999]"
       style={{
         height: `${currentHeight}px`,
+        backgroundColor: 'var(--bg-card)',
+        borderColor: 'var(--border-color)'
       }}
     >
-      {/* Drag Handle */}
+     
       <div
         className="w-full py-3 cursor-grab active:cursor-grabbing"
         onTouchStart={handleTouchStart}
@@ -106,7 +106,10 @@ export default function BottomSheet({
         onMouseDown={handleMouseDown}
       >
         {/* Handle bar */}
-        <div className="w-12 h-1 bg-white/30 rounded-full mx-auto mb-2"></div>
+        <div className="w-12 h-1 rounded-full mx-auto mb-2" style={{
+          backgroundColor: 'var(--border-color)',
+          opacity: 0.5
+        }}></div>
         
         {/* Header row */}
         <div className="px-4 flex items-center justify-between">
@@ -114,20 +117,21 @@ export default function BottomSheet({
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleSheet}
-                className="p-1 hover:bg-white/10 rounded transition-colors"
+                className="p-1 rounded transition-all hover:opacity-70"
+                style={{ backgroundColor: 'var(--bg-icon)' }}
                 aria-label={isExpanded ? 'Collapse' : 'Expand'}
               >
                 {isExpanded ? (
-                  <ChevronDown className="w-5 h-5 text-text-secondary" />
+                  <ChevronDown className="w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
                 ) : (
-                  <ChevronUp className="w-5 h-5 text-text-secondary" />
+                  <ChevronUp className="w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
                 )}
               </button>
-              <h2 className="text-base md:text-lg font-bold text-text-primary">
+              <h2 className="text-base md:text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
                 Buddies nearby ({buddyCount})
               </h2>
             </div>
-            <p className="text-xs text-text-secondary ml-8">{sortText}</p>
+            <p className="text-xs ml-8" style={{ color: 'var(--color-text-secondary)' }}>{sortText}</p>
           </div>
         </div>
       </div>
@@ -136,7 +140,7 @@ export default function BottomSheet({
       <div 
         className="px-4 overflow-y-auto"
         style={{
-          height: `calc(${currentHeight}px - 80px)`, // Subtract header height
+          height: `calc(${currentHeight}px - 80px)`,
         }}
       >
         {children}

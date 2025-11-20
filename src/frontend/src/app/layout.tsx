@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar'
 import BottonNav from '../components/BottomNav'
 import Footer from '../components/Footer'
 
+
 export const metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
   title: 'Safety Routing System',
