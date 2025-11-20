@@ -143,3 +143,57 @@ export default function NavigationPage() {
 	}
   }, []);
 
+  // Connect to WebSocket for hazard detection
+  useEffect(() => {
+	websocketClient.connect();
+	
+	websocketClient.on('nearby_hazards', (data) => {
+	  if (data.hazards && Array.isArray(data.hazards)) {
+		setNearbyHazards(data.hazards);
+		
+		// Alert on high-risk hazards within 300m
+		const criticalHazards = data.hazards.filter(
+		  h => (h.severity === 'high' || h.severity === 'critical') && 
+			   h.distance_meters < 300
+		);
+		
+		criticalHazards.forEach(hazard => {
+		  const alertMessage = `Warning: ${hazard.hazard_type.replace('_', ' ')} ahead, ${Math.round(hazard.distance_meters)} meters away`;
+		  addHazardAlert(alertMessage, hazard.severity);
+		  speak(alertMessage);
+		});
+	  }
+	});
+
+	return () => {
+	  websocketClient.disconnect();
+	};
+  }, []);
+
+  // Check for hazards along route periodically
+  useEffect(() => {
+	if (currentPosition && isTracking) {
+	  const now = Date.now();
+	  
+	  // Check for hazards every 15 seconds
+	  if (now - hazardCheckRef.current > 15000) {
+		websocketClient.sendUserPosition(
+		  currentPosition[0],
+		  currentPosition[1],
+		  500 // 500m radius for navigation
+		);
+		hazardCheckRef.current = now;
+	  }
+	}
+  }, [currentPosition, isTracking]);
+
+  const addHazardAlert = (message, severity) => {
+	const alert = {
+	  id: Date.now(),
+	  message,
+	  severity,
+	  timestamp: new Date()
+	};
+
+	setHazardAlerts(prev => [alert, ...prev.slice(0, 2)]); // Keep last 3 alerts
+
