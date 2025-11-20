@@ -126,7 +126,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ background: 'var(--bg-body)' }}>
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="flex justify-center">
@@ -138,10 +138,10 @@ export default function Login() {
               />
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+          <h2 className="mt-6 text-center text-3xl font-extrabold" style={{ color: 'var(--color-text-primary)' }}>
             Sign in to your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-300">
+          <p className="mt-2 text-center text-sm" style={{ color: 'var(--color-text-secondary)' }}>
             Welcome back to SafePath!
           </p>
         </div>
@@ -150,7 +150,7 @@ export default function Login() {
           <div className="space-y-4">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="email" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                 Email Address
               </label>
               <input
@@ -161,7 +161,12 @@ export default function Login() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                style={{
+                  borderColor: 'var(--color-text-secondary)', 
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--color-text-primary)'
+                }}
                 placeholder="Enter your email address"
               />
               {errors.email && (
@@ -171,7 +176,7 @@ export default function Login() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="password" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                 Password
               </label>
               <input
@@ -182,7 +187,12 @@ export default function Login() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                style={{
+                  borderColor: 'var(--color-text-secondary)', 
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--color-text-primary)'
+                }}
                 placeholder="Enter your password"
               />
               {errors.password && (
@@ -200,7 +210,7 @@ export default function Login() {
           {/* Submit Button */}
           <div>
             <button
-            type="submit"
+              type="submit"
               disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90"
               style={{
@@ -214,7 +224,7 @@ export default function Login() {
 
           {/* Sign Up Link */}
           <div className="text-center">
-            <p className="text-sm text-gray-300">
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
               Don't have an account?{' '}
               <Link href="/auth/signup" className="font-medium text-accent hover:text-accent/80 transition-colors">
                 Sign up here
@@ -226,3 +236,25 @@ export default function Login() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

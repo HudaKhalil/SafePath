@@ -152,7 +152,7 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ background: 'var(--bg-body)' }}>
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="flex justify-center">
@@ -164,10 +164,10 @@ export default function SignUp() {
               />
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+          <h2 className="mt-6 text-center text-3xl font-extrabold" style={{ color: 'var(--color-text-primary)' }}>
             Create your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-300">
+          <p className="mt-2 text-center text-sm" style={{ color: 'var(--color-text-secondary)' }}>
           </p>
         </div>
 
@@ -175,7 +175,7 @@ export default function SignUp() {
           <div className="space-y-4">
             {/* Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="name" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                 Full Name
               </label>
               <input
@@ -185,7 +185,12 @@ export default function SignUp() {
                 required
                 value={formData.name}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                style={{
+                  borderColor: 'var(--color-text-secondary)', 
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--color-text-primary)'
+                }}
                 placeholder="Enter your full name"
               />
               {errors.name && (
@@ -195,7 +200,7 @@ export default function SignUp() {
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="email" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                 Email Address
               </label>
               <input
@@ -205,7 +210,12 @@ export default function SignUp() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                style={{
+                  borderColor: 'var(--color-text-secondary)', // CHANGED: DARKER BORDER SAME AS LABEL TEXT
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--color-text-primary)'
+                }}
                 placeholder="Enter your email address"
               />
               {errors.email && (
@@ -215,7 +225,7 @@ export default function SignUp() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="password" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                 Password
               </label>
               <input
@@ -225,7 +235,12 @@ export default function SignUp() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                style={{
+                  borderColor: 'var(--color-text-secondary)', // CHANGED: DARKER BORDER SAME AS LABEL TEXT
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--color-text-primary)'
+                }}
                 placeholder="Enter your password"
               />
               {errors.password && (
@@ -235,7 +250,7 @@ export default function SignUp() {
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                 Confirm Password
               </label>
               <input
@@ -245,7 +260,12 @@ export default function SignUp() {
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                style={{
+                  borderColor: 'var(--color-text-secondary)', 
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--color-text-primary)'
+                }}
                 placeholder="Confirm your password"
               />
               {errors.confirmPassword && (
@@ -256,7 +276,7 @@ export default function SignUp() {
             {/* Location Section */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-300">
+                <label className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                   Location (Optional)
                 </label>
                 <button
@@ -278,7 +298,12 @@ export default function SignUp() {
                     step="any"
                     value={formData.latitude}
                     onChange={handleChange}
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                    className="appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                    style={{
+                      borderColor: 'var(--color-text-secondary)', 
+                      backgroundColor: 'var(--bg-card)',
+                      color: 'var(--color-text-primary)'
+                    }}
                     placeholder="Latitude"
                   />
                   {errors.latitude && (
@@ -293,7 +318,12 @@ export default function SignUp() {
                     step="any"
                     value={formData.longitude}
                     onChange={handleChange}
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                    className="appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                    style={{
+                      borderColor: 'var(--color-text-secondary)', 
+                      backgroundColor: 'var(--bg-card)',
+                      color: 'var(--color-text-primary)'
+                    }}
                     placeholder="Longitude"
                   />
                   {errors.longitude && (
@@ -301,7 +331,7 @@ export default function SignUp() {
                   )}
                 </div>
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                 Adding your location helps find nearby routes and buddies
               </p>
             </div>
@@ -317,7 +347,7 @@ export default function SignUp() {
           {/* Submit Button */}
           <div>
             <button
-                type="submit"
+              type="submit"
               disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90"
               style={{
@@ -331,7 +361,7 @@ export default function SignUp() {
 
           {/* Login Link */}
           <div className="text-center">
-            <p className="text-sm text-gray-300">
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
               Already have an account?{' '}
               <Link href="/auth/login" className="font-medium text-accent hover:text-accent/80 transition-colors">
                 Sign in here
@@ -343,3 +373,25 @@ export default function SignUp() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
