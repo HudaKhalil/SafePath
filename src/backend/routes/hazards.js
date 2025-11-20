@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { query } = require('../config/database');
+const { query, pool } = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const websocketService = require('../lib/websocketService');
 
@@ -414,6 +414,135 @@ router.get('/websocket-status', authenticateToken, async (req, res) => {
       success: false,
       message: 'Internal server error'
     });
+  }
+});
+
+// Get recent hazards - OPTIMIZED VERSION using function
+router.get('/recent', async (req, res) => {
+  const startTime = Date.now();
+  const client = await pool.connect();
+  
+  try {
+    const { 
+      latitude, 
+      longitude, 
+      radius = 5000, // 5km default for better performance
+      limit = 20,
+      severity,
+      hazardType 
+    } = req.query;
+
+    let query, params = [];
+
+    if (latitude && longitude) {
+      // Use optimized spatial function for <100ms performance
+      query = `
+        SELECT 
+          nh.*,
+          u.name as reporter_name,
+          EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - nh.created_at))/3600 as hours_ago
+        FROM get_nearby_hazards($1, $2, $3, $4) nh
+        LEFT JOIN users u ON u.id = (
+          SELECT user_id FROM hazards WHERE id = nh.id LIMIT 1
+        )
+      `;
+      params = [parseFloat(latitude), parseFloat(longitude), parseInt(radius), parseInt(limit)];
+      
+      // Add filtering conditions
+      let whereClause = '';
+      if (severity) {
+        whereClause += ` WHERE nh.severity = $${params.length + 1}`;
+        params.push(severity);
+      }
+      if (hazardType) {
+        whereClause += severity ? ` AND nh.hazard_type = $${params.length + 1}` : ` WHERE nh.hazard_type = $${params.length + 1}`;
+        params.push(hazardType);
+      }
+      
+      query += whereClause + ' ORDER BY nh.priority_level DESC, nh.distance_meters ASC';
+    } else {
+      // Fallback query without location
+      query = `
+        SELECT 
+          h.id,
+          h.hazard_type,
+          h.severity,
+          h.description,
+          ST_Y(h.location::geometry) as latitude,
+          ST_X(h.location::geometry) as longitude,
+          h.priority_level,
+          h.affects_traffic,
+          h.weather_related,
+          h.status,
+          h.created_at,
+          NULL as distance_meters,
+          u.name as reporter_name,
+          EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - h.created_at))/3600 as hours_ago
+        FROM hazards h
+        LEFT JOIN users u ON h.user_id = u.id
+        WHERE h.status = 'active' 
+          AND h.created_at > CURRENT_TIMESTAMP - INTERVAL '48 hours'
+      `;
+      
+      if (severity) {
+        query += ` AND h.severity = $${params.length + 1}`;
+        params.push(severity);
+      }
+      if (hazardType) {
+        query += ` AND h.hazard_type = $${params.length + 1}`;
+        params.push(hazardType);
+      }
+      
+      query += ` ORDER BY h.priority_level DESC, h.created_at DESC LIMIT $${params.length + 1}`;
+      params.push(parseInt(limit));
+    }
+
+    const result = await client.query(query, params);
+    const queryTime = Date.now() - startTime;
+
+    const hazards = result.rows.map(hazard => ({
+      id: hazard.id,
+      description: hazard.description,
+      location: {
+        latitude: parseFloat(hazard.latitude),
+        longitude: parseFloat(hazard.longitude)
+      },
+      hazardType: hazard.hazard_type,
+      severity: hazard.severity,
+      priorityLevel: hazard.priority_level,
+      affectsTraffic: hazard.affects_traffic,
+      weatherRelated: hazard.weather_related,
+      status: hazard.status,
+      reporterName: hazard.reporter_name,
+      createdAt: hazard.created_at,
+      hoursAgo: Math.round(hazard.hours_ago * 10) / 10,
+      ...(hazard.distance_meters && { distanceMeters: Math.round(hazard.distance_meters) })
+    }));
+
+    console.log(`⚡ Recent hazards query completed in ${queryTime}ms (${hazards.length} results)`);
+
+    res.json({
+      success: true,
+      data: {
+        hazards,
+        searchLocation: latitude && longitude ? {
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude)
+        } : null,
+        radiusMeters: parseInt(radius),
+        totalFound: hazards.length,
+        queryTimeMs: queryTime
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get recent hazards error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  } finally {
+    client.release();
   }
 });
 
