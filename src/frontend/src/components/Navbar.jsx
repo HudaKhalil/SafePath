@@ -80,6 +80,7 @@ export default function Navbar() {
           <Link href="/report-hazards" className="nav-link">Report Hazards</Link>
           <Link href="/findBuddy" className="nav-link">Find Buddy</Link>
           
+          
           {isLoggedIn ? (
             <div className="flex items-center gap-4">
               <span style={{ color: '#94a3b8' }}>Welcome, {user?.name || 'User'}</span>
