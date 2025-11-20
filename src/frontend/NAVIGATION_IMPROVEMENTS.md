@@ -100,3 +100,48 @@ calculateBearing(currentPoint, nextRoutePoint)
 - Recalculates with every position update
 - Factors in actual progress
 - Shows realistic arrival time
+
+### 6. Turn-by-Turn Instruction Logic
+
+**Intelligent Instruction Advancement:**
+- Tracks current segment index
+- Calculates distance to instruction points
+- Pre-announces at 100-50 meters
+- Advances instruction at <50 meters
+- Prevents duplicate announcements (5-second cooldown)
+
+**Instruction Display:**
+- Large current instruction at top
+- Distance countdown in real-time
+- Visual direction arrows
+- Next 5 upcoming instructions
+- Scrollable instruction panel
+
+## Technical Implementation
+
+### Core Functions
+
+**1. snapToRoute()**
+```javascript
+Purpose: Find closest point on route and snap to it
+Input: Current GPS coordinates
+Output: {
+  position: [lat, lon],    // Snapped position
+  segmentIndex: number,    // Which route segment
+  distance: number         // Distance from route (km)
+}
+```
+
+**2. closestPointOnSegment()**
+```javascript
+Purpose: Calculate perpendicular projection onto line segment
+Uses: Vector mathematics and dot product
+Returns: Exact [lat, lon] on the route line
+```
+
+**3. calculateBearing()**
+```javascript
+Purpose: Calculate direction between two points
+Formula: atan2(Δlon, Δlat) converted to degrees
+Returns: 0-360 degrees for arrow rotation
+```
