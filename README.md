@@ -10,6 +10,7 @@
 ## About SafePath
 
 With SafePath, you can discover safer walking and cycling routes across urban environments. Our mission is simple: help users travel confidently by reducing risks like low lighting, crime hotspots, blocked lanes, and unsafe road conditions.
+Hosted version: https://safepath-deploy.vercel.app
 
 Unlike standard navigation apps that focus only on the fastest route, SafePath intelligently blends safety, comfort, and community awareness using open data and user-reported insights.
 
