@@ -5,10 +5,11 @@ import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { LOCATION_CONFIG } from "../../lib/locationConfig";
 import websocketClient from "../../lib/websocketClient";
+import ProtectedRoute from "../../components/auth/ProtectedRoute";
 
 const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
-export default function NavigationPage() {
+function NavigationPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   

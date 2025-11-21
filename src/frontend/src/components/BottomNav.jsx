@@ -8,16 +8,17 @@ function Item({ icon: Icon, label, href, active }) {
   return (
     <Link
       href={href}
-      className={[
+      className={[ 
         "flex flex-col items-center justify-center gap-1 px-2 py-1",
         "text-[11px] md:text-sm leading-none",
-        active ? "text-sp-title" : "text-slate-500 hover:text-sp-title/80",
+        active ? "text-[#06d6a0]" : "text-slate-500 hover:text-[#06d6a0]",
         "transition-colors"
       ].join(" ")}
       aria-current={active ? "page" : undefined}
       aria-label={label}
+      style={{ textAlign: 'center' }}
     >
-      <Icon className="h-5 w-5 md:h-6 md:w-6" />
+      <Icon className="h-6 w-6 mb-1" style={{ display: 'block', margin: '0 auto' }} />
       <span className="mt-0.5">{label}</span>
     </Link>
   );
@@ -34,20 +35,24 @@ export default function BottomNav() {
 
   return (
     <nav
-      className={[
-        "fixed bottom-0 left-0 right-0 z-[1001]",
-        "bg-white/95 backdrop-blur border-t border-slate-200"
-      ].join(" ")}
+      className="md:hidden fixed bottom-0 left-0 right-0 z-1001 bg-white/95 backdrop-blur border-t border-slate-200"
       role="navigation"
       aria-label="Primary"
     >
       <div className="mx-auto w-full max-w-7xl">
-        <div className="px-5 md:px-8 py-2.5 md:py-3 grid grid-cols-5 place-items-center">
-          <Item icon={Home} label="Home" href="/" active={isActive("/")} />
-          <Item icon={Map} label="Routes" href="/suggested-routes" active={isActive("/suggested-routes")} />
-          <Item icon={AlertTriangle} label="Report" href="/report-hazards" active={isActive("/report-hazards")} />
-        
-          <Item icon={Users2} label="Find Buddy" href="/findBuddy" active={isActive("/findbuddy")} />
+        <div className="flex px-5 md:px-8 py-2.5 md:py-3">
+          <div className="flex-1 flex flex-col items-center">
+            <Item icon={Home} label="Home" href="/" active={isActive("/")} />
+          </div>
+          <div className="flex-1 flex flex-col items-center">
+            <Item icon={Map} label="Routes" href="/suggested-routes" active={isActive("/suggested-routes")} />
+          </div>
+          <div className="flex-1 flex flex-col items-center">
+            <Item icon={AlertTriangle} label="Report" href="/report-hazards" active={isActive("/report-hazards")} />
+          </div>
+          <div className="flex-1 flex flex-col items-center">
+            <Item icon={Users2} label="Find Buddy" href="/findBuddy" active={isActive("/findBuddy")} />
+          </div>
         </div>
       </div>
     </nav>
