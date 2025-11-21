@@ -57,6 +57,11 @@ class WebSocketService {
         this.authenticateSocket(socket, data);
       });
 
+      // Subscribe to hazard updates with location
+      socket.on('subscribe_hazard_updates', (data) => {
+        this.subscribeToHazards(socket, data);
+      });
+
       // Handle disconnect
       socket.on('disconnect', (reason) => {
         this.handleDisconnect(socket, reason);
@@ -99,6 +104,45 @@ class WebSocketService {
       socket.emit('auth_error', { message: 'Invalid token' });
       socket.disconnect();
     }
+  }
+
+  /**
+   * Subscribe socket to hazard updates
+   */
+  subscribeToHazards(socket, data) {
+    if (!socket.authenticated) {
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    const { latitude, longitude, radius = 5000 } = data;
+
+    if (!latitude || !longitude) {
+      socket.emit('error', { message: 'Location required' });
+      return;
+    }
+
+    // Store connection metadata
+    const connectionData = {
+      socketId: socket.id,
+      userId: socket.userId,
+      location: {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude)
+      },
+      radius: parseInt(radius),
+      subscribedAt: new Date()
+    };
+
+    this.connections.set(socket.id, connectionData);
+
+    socket.emit('subscribed', {
+      message: 'Subscribed to hazard updates',
+      location: connectionData.location,
+      radius: connectionData.radius
+    });
+
+    console.log(`User ${socket.userId} subscribed to hazards within ${radius}m of (${latitude}, ${longitude})`);
   }
 
   /**
@@ -164,3 +208,5 @@ process.on('SIGTERM', async () => {
 });
 
 module.exports = websocketService;
+
+
