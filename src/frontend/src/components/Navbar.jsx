@@ -63,22 +63,22 @@ export default function Navbar() {
         color: '#f8fafc' // FIXED: White text
       }}
     >
-      <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+      <div className="container mx-auto px-8 py-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center">
+          <div className="w-12 h-12 flex items-center justify-center">
             <img 
               src="/logo.png" 
               alt="SafePath Logo" 
-              className="w-10 h-10 object-contain"
+              className="w-12 h-12 object-contain"
             />
           </div>
- <div style={{ color: '#f8fafc' }} className="font-bold text-lg">SafePath</div>        </Link>
+ <div style={{ color: '#f8fafc' }} className="font-bold text-2xl">SafePath</div>        </Link>
 
         <nav className="hidden md:flex gap-8 items-center font-bold">
-          <Link href="/" className="nav-link">Home</Link>
-          <Link href="/suggested-routes" className="nav-link">Suggested Routes</Link>
-          <Link href="/report-hazards" className="nav-link">Report Hazards</Link>
-          <Link href="/findBuddy" className="nav-link">Find Buddy</Link>
+          <Link href="/" className="nav-link text-lg">Home</Link>
+          <Link href="/suggested-routes" className="nav-link text-lg">Suggested Routes</Link>
+          <Link href="/report-hazards" className="nav-link text-lg">Report Hazards</Link>
+          <Link href="/findBuddy" className="nav-link text-lg">Find Buddy</Link>
           
           
           {isLoggedIn ? (
