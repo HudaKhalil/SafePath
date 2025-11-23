@@ -69,7 +69,12 @@ class CsvDataLoader {
           }
         })
         .on('end', () => {
-          this.crimeData.push(...records);
+          // Push records in batches to avoid stack overflow
+          const batchSize = 1000;
+          for (let i = 0; i < records.length; i += batchSize) {
+            const batch = records.slice(i, i + batchSize);
+            this.crimeData.push(...batch);
+          }
           resolve();
         })
         .on('error', reject);
