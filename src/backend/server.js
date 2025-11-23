@@ -8,6 +8,7 @@ require('dotenv').config();
 // Import database connection
 const db = require('./config/database');
 const csvDataLoader = require('./lib/csvDataLoader');
+const websocketService = require('./lib/websocketService');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -115,6 +116,9 @@ const startServer = async () => {
     // Create HTTP server
     const server = http.createServer(app);
     
+    // Initialize WebSocket service
+    websocketService.initialize(server);
+    
     server.listen(PORT, () => {
       console.log(`🚀 London Safety Routing API server running on port ${PORT}`);
       console.log(`📍 Health check: http://localhost:${PORT}/health`);
@@ -122,6 +126,7 @@ const startServer = async () => {
       console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL}`);
       console.log(`🗄️  Database: PostgreSQL`);
       console.log(`🛡️  Safety scoring: Rule-based (CSV data)`);
+      console.log(`🔌 WebSocket service: Active`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error.message);
