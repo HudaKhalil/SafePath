@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { hazardsService } from '../../lib/services'
@@ -7,7 +6,6 @@ import ProtectedRoute from '../../components/auth/ProtectedRoute'
 import HazardAlert from '../../components/HazardAlert'
 import Toast from '../../components/Toast'
 
-// Dynamically import Map component to avoid SSR issues with Leaflet
 const Map = dynamic(() => import('../../components/Map'), { ssr: false })
 
 export default function HazardReporting() {
@@ -22,6 +20,26 @@ export default function HazardReporting() {
   const [isConnected, setIsConnected] = useState(false)
   const [toast, setToast] = useState(null)
   const eventSourceRef = useRef(null)
+  
+ 
+  const [isLightMode, setIsLightMode] = useState(false)
+  
+  useEffect(() => {
+   
+    setIsLightMode(!document.documentElement.classList.contains('dark'))
+    
+  
+    const observer = new MutationObserver(() => {
+      setIsLightMode(!document.documentElement.classList.contains('dark'))
+    })
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+    
+    return () => observer.disconnect()
+  }, [])
   
   const [formData, setFormData] = useState({
     type: '',
@@ -119,13 +137,11 @@ export default function HazardReporting() {
     if (data.type === 'connected') {
       setIsConnected(true)
     } else if (data.type === 'new_hazard') {
-      // Add alert to queue
       const alertId = Date.now()
       setRealTimeAlerts(prev => [...prev, { ...data, id: alertId }])
       
-      // Add hazard to map if within view
       if (data.hazard) {
-        setHazards(prev => [data.hazard, ...prev.slice(0, 19)]) // Keep only latest 20
+        setHazards(prev => [data.hazard, ...prev.slice(0, 19)])
       }
     }
   }
@@ -134,7 +150,6 @@ export default function HazardReporting() {
     console.error('Real-time connection error:', error)
     setIsConnected(false)
     
-    // Attempt to reconnect after 5 seconds
     setTimeout(() => {
       if (userLocation) {
         connectToRealTimeUpdates()
@@ -159,7 +174,6 @@ export default function HazardReporting() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Check if coordinates exist (either from map click or manual entry)
     const lat = selectedLocation ? selectedLocation[0] : formData.latitude
     const lng = selectedLocation ? selectedLocation[1] : formData.longitude
     
@@ -171,7 +185,6 @@ export default function HazardReporting() {
       return
     }
 
-    // Update formData with the coordinates
     const submitData = {
       ...formData,
       latitude: lat,
@@ -198,7 +211,7 @@ export default function HazardReporting() {
         })
         setSelectedLocation(null)
         setShowReportForm(false)
-        loadRecentHazards() // Reload hazards to show the new one
+        loadRecentHazards()
       } else {
         setToast({
           message: 'Failed to report hazard. Please try again.',
@@ -226,11 +239,11 @@ export default function HazardReporting() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gradient-to-br from-primary-dark via-primary-light to-secondary pt-20">
+        <div className="min-h-screen pt-20" style={{ background: 'var(--bg-body)' }}>
           <div className="container mx-auto px-6 py-12">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-accent mx-auto"></div>
-              <p className="text-white mt-4">Loading hazard reports...</p>
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 mx-auto" style={{ borderColor: '#06d6a0' }}></div>
+              <p className="mt-4" style={{ color: 'var(--color-text-primary)' }}>Loading hazard reports...</p>
             </div>
           </div>
         </div>
@@ -241,35 +254,45 @@ export default function HazardReporting() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen">
-        {/* Hero Section */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-primary-dark via-primary to-slate-700 py-20">
+        {/*WHITE IN LIGHT MODE, DARK IN DARK MODE */}
+        <section className="relative overflow-hidden py-20" style={{ 
+  background: isLightMode ? '#ffffff' : 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%)'
+}}>
           <div className="container mx-auto px-6 text-center">
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-2">
-              Report a <span className="text-accent">Hazard</span>
+            <h1 className="text-5xl md:text-6xl font-bold mb-2">
+              <span style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>Report a </span>
+              <span style={{ color: '#06d6a0' }}>Hazard</span>
             </h1>
-            <p className="text-xl text-text-secondary mb-12">
+            <p className="text-xl mb-12" style={{ 
+              color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
+            }}>
               Help keep London safe by reporting hazards and incidents in your area
             </p>
 
-            {/* Stats */}
             <div className="flex justify-center gap-12 mb-8">
               <div className="text-center">
-                <div className="text-3xl font-bold text-accent">{Array.isArray(hazards) ? hazards.length : 0}+</div>
-                <div className="text-sm text-text-secondary">Reports Filed</div>
+                <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>{Array.isArray(hazards) ? hazards.length : 0}+</div>
+                <div className="text-sm" style={{ 
+                  color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
+                }}>Reports Filed</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-accent">95%</div>
-                <div className="text-sm text-text-secondary">Response Rate</div>
+                <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>95%</div>
+                <div className="text-sm" style={{ 
+                  color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
+                }}>Response Rate</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-accent">24h</div>
-                <div className="text-sm text-text-secondary">Avg Response</div>
+                <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>24h</div>
+                <div className="text-sm" style={{ 
+                  color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
+                }}>Avg Response</div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Real-time Hazard Alerts */}
+     
         {realTimeAlerts.map((alert) => (
           <HazardAlert 
             key={alert.id} 
@@ -278,7 +301,7 @@ export default function HazardReporting() {
           />
         ))}
 
-        {/* Toast Notifications */}
+      
         {toast && (
           <Toast 
             message={toast.message} 
@@ -287,20 +310,29 @@ export default function HazardReporting() {
           />
         )}
 
-        {/* Main Content */}
-        <section className="bg-white py-16">
-          <div className="container mx-auto px-6">
+     
+<section className="py-16" style={{ backgroundColor: isLightMode ? '#ffffff' : '#0f172a' }}>          <div className="container mx-auto px-6">
             <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-              {/* Submit Hazard Report Form */}
-              <div className="bg-white border-2 border-gray-200 rounded-2xl p-8">
+              <div className="border-2 rounded-2xl p-8" style={{ 
+                backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
+                borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
+              }}>
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-2">
                     <span className="text-red-500">⚠️</span>
-                    <h3 className="text-xl font-bold text-primary-dark">Submit Hazard Report</h3>
+                    <h3 className="text-xl font-bold" style={{ 
+                      color: isLightMode ? '#0f172a' : '#ffffff' 
+                    }}>Submit Hazard Report</h3>
                   </div>
                   <button
                     onClick={() => setShowReportForm(!showReportForm)}
-                    className="bg-accent hover:bg-accent/90 text-primary-dark px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                    className="px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                    style={{
+                      backgroundColor: '#06d6a0',
+                      color: '#0f172a'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
                   >
                     {showReportForm ? 'Cancel' : 'Report'}
                   </button>
@@ -309,14 +341,21 @@ export default function HazardReporting() {
                 {showReportForm ? (
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                        <span className="text-gray-500">📋</span>
+                      <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ 
+                        color: isLightMode ? '#0f172a' : '#ffffff' 
+                      }}>
+                        <span className="text-gray-400">📋</span>
                         Hazard Type *
                       </label>
                       <select 
                         value={formData.type}
                         onChange={(e) => setFormData({...formData, type: e.target.value})}
-                        className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900"
+                        className="w-full p-3 rounded-lg border focus:outline-none focus:ring-2"
+                        style={{ 
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          borderColor: isLightMode ? '#d1d5db' : '#374151'
+                        }}
                         required
                       >
                         <option value="">Select hazard type...</option>
@@ -336,11 +375,13 @@ export default function HazardReporting() {
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                        <span className="text-gray-500">⚡</span>
+                      <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ 
+                        color: isLightMode ? '#0f172a' : '#ffffff' 
+                      }}>
+                        <span className="text-gray-400">⚡</span>
                         Severity Level *
                       </label>
-                      <div className="flex gap-4">
+                      <div className="flex gap-4 flex-wrap">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
                             type="radio" 
@@ -350,7 +391,9 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, severity: e.target.value})}
                             className="text-accent" 
                           />
-                          <span className="text-sm text-gray-700">Low Risk</span>
+                          <span className="text-sm" style={{ 
+                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          }}>Low Risk</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
@@ -361,7 +404,9 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, severity: e.target.value})}
                             className="text-accent" 
                           />
-                          <span className="text-sm text-gray-700">Medium Risk</span>
+                          <span className="text-sm" style={{ 
+                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          }}>Medium Risk</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
@@ -372,7 +417,9 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, severity: e.target.value})}
                             className="text-accent" 
                           />
-                          <span className="text-sm text-gray-700">🔴 High Risk</span>
+                          <span className="text-sm" style={{ 
+                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          }}>🔴 High Risk</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
@@ -383,15 +430,18 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, severity: e.target.value})}
                             className="text-accent" 
                           />
-                          <span className="text-sm text-gray-700">🆘 Critical</span>
+                          <span className="text-sm" style={{ 
+                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          }}>🆘 Critical</span>
                         </label>
                       </div>
                     </div>
 
-                    {/* Additional Options */}
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-                        <span className="text-gray-500">⚙️</span>
+                      <label className="flex items-center gap-2 text-sm font-medium mb-3" style={{ 
+                        color: isLightMode ? '#0f172a' : '#ffffff' 
+                      }}>
+                        <span className="text-gray-400">⚙️</span>
                         Additional Information
                       </label>
                       <div className="space-y-2">
@@ -402,7 +452,9 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, affectsTraffic: e.target.checked})}
                             className="text-accent rounded" 
                           />
-                          <span className="text-sm text-gray-700">🚦 Affects Traffic Flow</span>
+                          <span className="text-sm" style={{ 
+                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          }}>🚦 Affects Traffic Flow</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
@@ -411,25 +463,34 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, weatherRelated: e.target.checked})}
                             className="text-accent rounded" 
                           />
-                          <span className="text-sm text-gray-700">🌦️ Weather Related</span>
+                          <span className="text-sm" style={{ 
+                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          }}>🌦️ Weather Related</span>
                         </label>
                       </div>
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                        <span className="text-gray-500">📝</span>
+                      <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ 
+                        color: isLightMode ? '#0f172a' : '#ffffff' 
+                      }}>
+                        <span className="text-gray-400">📝</span>
                         Description *
                       </label>
                       <textarea 
                         value={formData.description}
                         onChange={(e) => setFormData({...formData, description: e.target.value})}
                         placeholder="Describe the hazard in detail. Include when you noticed it, any immediate dangers, and any other relevant information..."
-                        className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900" 
+                        className="w-full p-3 rounded-lg border focus:outline-none focus:ring-2" 
+                        style={{ 
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          borderColor: isLightMode ? '#d1d5db' : '#374151'
+                        }}
                         rows={4}
                         required
                       />
-                      <div className="text-xs text-gray-500 mt-1">Minimum 20 characters</div>
+                      <div className="text-xs mt-1" style={{ color: '#9ca3af' }}>Minimum 20 characters</div>
                     </div>
 
                     {selectedLocation && (
@@ -453,9 +514,23 @@ export default function HazardReporting() {
                         type="submit"
                         className={`flex-1 font-bold py-3 px-6 rounded-lg transition-all duration-200 ${
                           selectedLocation || (formData.latitude && formData.longitude)
-                            ? 'bg-accent hover:bg-accent/90 text-primary-dark' 
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            ? '' 
+                            : 'cursor-not-allowed'
                         }`}
+                        style={{
+                          backgroundColor: selectedLocation || (formData.latitude && formData.longitude) ? '#06d6a0' : '#4b5563',
+                          color: selectedLocation || (formData.latitude && formData.longitude) ? '#0f172a' : '#9ca3af'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedLocation || (formData.latitude && formData.longitude)) {
+                            e.target.style.backgroundColor = '#059669'
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedLocation || (formData.latitude && formData.longitude)) {
+                            e.target.style.backgroundColor = '#06d6a0'
+                          }
+                        }}
                         disabled={!selectedLocation && !(formData.latitude && formData.longitude)}
                       >
                         ✅ Submit Report
@@ -475,7 +550,13 @@ export default function HazardReporting() {
                             weatherRelated: false
                           })
                         }}
-                        className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+                        className="font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+                        style={{
+                          backgroundColor: '#374151',
+                          color: '#e5e7eb'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#374151'}
                       >
                         Cancel
                       </button>
@@ -484,19 +565,28 @@ export default function HazardReporting() {
                 ) : (
                   <div className="text-center py-12">
                     <div className="text-6xl mb-4">🗺️</div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">Click "Report" to start</h3>
-                    <p className="text-gray-600">Select a location on the map and fill out the hazard details</p>
+                    <h3 className="text-xl font-bold mb-2" style={{ 
+                      color: isLightMode ? '#0f172a' : '#ffffff' 
+                    }}>Click "Report" to start</h3>
+                    <p style={{ 
+                      color: isLightMode ? '#475569' : '#9ca3af' 
+                    }}>Select a location on the map and fill out the hazard details</p>
                   </div>
                 )}
               </div>
 
-              {/* Location Map & Recent Reports */}
+             
               <div className="space-y-8">
-                {/* Location Map */}
-                <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
+              
+                <div className="border-2 rounded-2xl p-6" style={{ 
+                  backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
+                  borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
+                }}>
                   <div className="flex items-center gap-2 mb-4">
-                    <span className="text-blue-600">🗺️</span>
-                    <h3 className="text-xl font-bold text-primary-dark">Hazard Map</h3>
+                    <span className="text-blue-400">🗺️</span>
+                    <h3 className="text-xl font-bold" style={{ 
+                      color: isLightMode ? '#0f172a' : '#ffffff' 
+                    }}>Hazard Map</h3>
                   </div>
                   
                   {showReportForm && (
@@ -530,11 +620,11 @@ export default function HazardReporting() {
                   />
                 </div>
 
-                {/* Recent Reports */}
-                <div className="bg-white border-2 border-gray-200 rounded-2xl p-6">
+             
+                <div className="border-2 border-gray-200 rounded-2xl p-6" style={{ backgroundColor: '#ffffff' }}>
                   <div className="flex items-center gap-2 mb-4">
                     <span className="text-green-600">📊</span>
-                    <h3 className="text-xl font-bold text-primary-dark">Recent Reports in Your Area</h3>
+                    <h3 className="text-xl font-bold" style={{ color: '#0f172a' }}>Recent Reports in Your Area</h3>
                   </div>
 
                   {!Array.isArray(hazards) || hazards.length === 0 ? (
@@ -576,7 +666,7 @@ export default function HazardReporting() {
                                 </span>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <div className="font-semibold text-primary-dark capitalize text-sm">
+                                    <div className="font-semibold capitalize text-sm" style={{ color: '#0f172a' }}>
                                       {hazard.hazardType.replace('_', ' ')}
                                     </div>
                                     {hazard.priorityLevel > 3 && (
@@ -589,7 +679,7 @@ export default function HazardReporting() {
                                     {hazard.description}
                                   </div>
                                   <div className="flex items-center gap-3 text-xs text-gray-500">
-                                    <span>� {timeAgo}</span>
+                                    <span>🕐 {timeAgo}</span>
                                     {hazard.distanceMeters && (
                                       <span>📍 {hazard.distanceMeters < 1000 
                                         ? `${Math.round(hazard.distanceMeters)}m` 
@@ -623,8 +713,8 @@ export default function HazardReporting() {
           </div>
         </section>
 
-        {/* Emergency Situations */}
-        <section className="py-12">
+        {/* EMERGENCY SITUATIONS */}
+        <section className="py-12" style={{ backgroundColor: '#ffffff' }}>
           <div className="container mx-auto px-6">
             <div className="max-w-4xl mx-auto bg-red-50 border-2 border-red-200 rounded-2xl p-8">
               <div className="text-center mb-8">

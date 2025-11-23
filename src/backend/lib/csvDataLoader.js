@@ -19,6 +19,16 @@ class CsvDataLoader {
     const startTime = Date.now();
     
     const crimeDataPath = path.join(__dirname, '../crimedata');
+    
+    // Check if the crimedata directory exists
+    if (!fs.existsSync(crimeDataPath)) {
+      console.warn('⚠️  Crime data directory not found. Server will run without crime data.');
+      console.warn(`   Expected path: ${crimeDataPath}`);
+      console.warn('   To add crime data, create the directory and add CSV files.');
+      this.loaded = true;
+      return;
+    }
+    
     const months = fs.readdirSync(crimeDataPath).filter(dir => dir.startsWith('20'));
     
     // Load only the most recent 3 months for better performance
@@ -69,7 +79,12 @@ class CsvDataLoader {
           }
         })
         .on('end', () => {
-          this.crimeData.push(...records);
+          // Push records in batches to avoid stack overflow
+          const batchSize = 1000;
+          for (let i = 0; i < records.length; i += batchSize) {
+            const batch = records.slice(i, i + batchSize);
+            this.crimeData.push(...batch);
+          }
           resolve();
         })
         .on('error', reject);

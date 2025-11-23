@@ -10,19 +10,19 @@ module.exports = {
     container: { center: true, padding: "1rem", screens: { "2xl": "1200px" } },
     extend: {
       colors: {
-        primary: "#1e293b",
-        "primary-dark": "#0f172a",
-        accent: "#06d6a0",
-        "accent-light": "#4ade80",
-        "text-primary": "#f8fafc",
-        "text-secondary": "#94a3b8",
-        hazard: "#f59e0b", // base orange
-        "hazard-light": "#fbbf24", // a bit lighter (amber 400)
-        "hazard-soft": "#fde68a", // much lighter (amber 200)
-        "hazard-softest": "#fffbeb", // ultra light (amber 50)
-        danger: "#ef4444", // red for destinations/stops
-        "danger-light": "#f87171", // lighter red
-        success: "#06d6a0", // same as accent for consistency
+        primary: "var(--color-primary)",
+        "primary-dark": "var(--color-primary-dark)",
+        accent: "var(--color-accent)",
+        "accent-light": "var(--color-accent-light)",
+        "text-primary": "var(--color-text-primary)",
+        "text-secondary": "var(--color-text-secondary)",
+        hazard: "var(--color-hazard)",
+        "hazard-light": "var(--color-hazard-light)",
+        "hazard-soft": "var(--color-hazard-soft)",
+        "hazard-softest": "var(--color-hazard-softest)",
+        danger: "var(--color-danger)",
+        "danger-light": "var(--color-danger-light)",
+        success: "var(--color-success)",
       },
       boxShadow: { soft: "0 8px 24px rgba(0,0,0,0.08)" },
       borderRadius: { xl2: "1.25rem" },

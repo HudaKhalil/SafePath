@@ -12,7 +12,10 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
-      throw error.response?.data || { success: false, message: 'Network error' };
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
     }
   },
 
@@ -25,7 +28,10 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
-      throw error.response?.data || { success: false, message: 'Network error' };
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
     }
   },
 
@@ -40,7 +46,10 @@ export const authService = {
       const response = await api.get('/auth/profile');
       return response.data;
     } catch (error) {
-      throw error.response?.data || { success: false, message: 'Network error' };
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
     }
   },
 
@@ -50,7 +59,10 @@ export const authService = {
       const response = await api.put('/auth/profile', profileData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { success: false, message: 'Network error' };
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
     }
   },
 
