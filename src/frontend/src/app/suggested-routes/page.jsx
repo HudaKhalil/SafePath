@@ -12,6 +12,7 @@ const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
 export default function SuggestedRoutes() {
   const [mapKey, setMapKey] = useState(0);
+  const [mapCenter, setMapCenter] = useState(null);
   const clearBackendRoutes = () => {
     setBackendRoutes([]);
     setSelectedRoute(null);
@@ -81,21 +82,37 @@ export default function SuggestedRoutes() {
   const getUserLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
-        () => setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER)
+        (pos) => {
+          const location = [pos.coords.latitude, pos.coords.longitude];
+          setUserLocation(location);
+          if (!mapCenter) setMapCenter(location);
+        },
+        () => {
+          setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER);
+          if (!mapCenter) setMapCenter(LOCATION_CONFIG.DEFAULT_CENTER);
+        }
       );
-    } else setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER);
+    } else {
+      setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER);
+      if (!mapCenter) setMapCenter(LOCATION_CONFIG.DEFAULT_CENTER);
+    }
   };
 
   const handleFromLocationChange = (value, locationData) => {
     setFromLocation(value);
-    if (locationData) setFromCoords([locationData.lat, locationData.lon]);
+    if (locationData) {
+      setFromCoords([locationData.lat, locationData.lon]);
+    }
   };
 
   const handleToLocationChange = (value, locationData) => {
     setToLocation(value);
-    if (locationData) setToCoords([locationData.lat, locationData.lon]);
+    if (locationData) {
+      setToCoords([locationData.lat, locationData.lon]);
+    }
   };
+
+
 
  const handleFindRoutes = async (e) => {
    e.preventDefault();
@@ -349,11 +366,11 @@ export default function SuggestedRoutes() {
   return (
     <ProtectedRoute>
     
-      <div className="min-h-screen" style={{ background: 'var(--bg-body)' }}>
+      <div className="min-h-screen" style={{ backgroundColor: '#ffffff' }}>
       
         <div className="text-center pt-12 pb-8">
        
-          <h1 className="text-4xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+          <h1 className="text-4xl font-bold" style={{ color: 'var(--color-primary)' }}>
             Find the <span style={{ color: '#06d6a0' }}>Safest Route</span>
           </h1>
          
@@ -362,51 +379,122 @@ export default function SuggestedRoutes() {
           </p>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 pb-20 grid lg:grid-cols-5 gap-8">
-       
-          <div className="lg:col-span-2">
-            <div className="p-6 rounded-2xl shadow-xl h-fit sticky top-24" style={{ backgroundColor: '#ffffff' }}>
-              <form onSubmit={handleFindRoutes} className="space-y-6">
+        <div className="relative w-full" style={{ height: 'calc(100vh - 200px)' }}>
+          {/* Floating search card - top left like Google Maps */}
+          <div className="absolute top-4 left-4 z-[1000] w-96">
+            <div className="p-4 rounded-2xl shadow-2xl" style={{ backgroundColor: '#ffffff' }}>
+              <div className="flex justify-end mb-2">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const londonCenter = [51.5074, -0.1278];
+                    setUserLocation(londonCenter);
+                    setMapCenter(londonCenter);
+                    setMapZoom(13);
+                    setMapKey((prev) => prev + 1);
+                    const originalText = e.target.textContent;
+                    e.target.textContent = '✓ Set to London';
+                    e.target.style.backgroundColor = '#10b981';
+                    setTimeout(() => {
+                      e.target.textContent = originalText;
+                      e.target.style.backgroundColor = '#06d6a0';
+                    }, 1500);
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 border shadow-md"
+                  style={{
+                    backgroundColor: '#06d6a0',
+                    color: '#0f172a',
+                    borderColor: '#059669'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
+                  title="Set current location to London for testing"
+                >
+                  <span className="text-base">🇬🇧</span>
+                  <span className="font-medium">Set to London</span>
+                </button>
+              </div>
+              <form onSubmit={handleFindRoutes} className="space-y-3">
                 <AddressAutocomplete
                   value={fromLocation}
                   onChange={handleFromLocationChange}
-                  placeholder="Enter starting location"
+                  placeholder="Choose starting point or click on map"
                   icon="from"
                 />
                 <AddressAutocomplete
                   value={toLocation}
                   onChange={handleToLocationChange}
-                  placeholder="Enter destination"
+                  placeholder="Choose destination or click on map"
                   icon="to"
                 />
 
-                <div className="flex justify-center gap-6 py-2">
-                  <label className="flex items-center gap-2 cursor-pointer" style={{ color: '#0f172a' }}>
-                    <input
-                      type="radio"
-                      name="mode"
-                      value="walking"
-                      checked={transportMode === "walking"}
-                      onChange={(e) => setTransportMode(e.target.value)}
-                    />
-                    🚶 Walking
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer" style={{ color: '#0f172a' }}>
-                    <input
-                      type="radio"
-                      name="mode"
-                      value="cycling"
-                      checked={transportMode === "cycling"}
-                      onChange={(e) => setTransportMode(e.target.value)}
-                    />
-                    🚴 Cycling
-                  </label>
+                <div className="flex justify-center gap-4 py-1">
+                  <button
+                    type="button"
+                    onClick={() => setTransportMode("walking")}
+                    className="relative group transition-all duration-200"
+                    title="Walking"
+                  >
+                    <div 
+                      className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200"
+                      style={{
+                        backgroundColor: transportMode === "walking" ? '#1e293b' : '#e2e8f0',
+                        color: transportMode === "walking" ? '#ffffff' : '#94a3b8'
+                      }}
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 24 24" 
+                        fill="currentColor"
+                        className="w-7 h-7"
+                      >
+                        <path d="M13.5 5.5c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                      </svg>
+                    </div>
+                    <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                      Walking
+                    </span>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setTransportMode("cycling")}
+                    className="relative group transition-all duration-200"
+                    title="Cycling"
+                  >
+                    <div 
+                      className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200"
+                      style={{
+                        backgroundColor: transportMode === "cycling" ? '#1e293b' : '#e2e8f0',
+                        color: transportMode === "cycling" ? '#ffffff' : '#94a3b8'
+                      }}
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                        className="w-7 h-7"
+                      >
+                        <circle cx="18.5" cy="17.5" r="3.5"/>
+                        <circle cx="5.5" cy="17.5" r="3.5"/>
+                        <circle cx="15" cy="5" r="1"/>
+                        <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+                      </svg>
+                    </div>
+                    <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                      Cycling
+                    </span>
+                  </button>
                 </div>
 
-               
                 <button
+                  id="find-routes-btn"
                   type="submit"
-                  className="w-full font-bold py-3 rounded-lg transition shadow-md"
+                  className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
                   style={{
                     backgroundColor: '#06d6a0',
                     color: '#0f172a'
@@ -420,81 +508,49 @@ export default function SuggestedRoutes() {
             </div>
           </div>
 
-        
-          <div className="lg:col-span-3">
-            <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10" style={{ backgroundColor: '#ffffff' }}>
-              <div className="bg-gradient-to-br from-primary-dark via-primary to-slate-700 p-4">
-                <div className="text-center mb-3">
-                  <div className="flex items-center justify-center gap-3 mb-2">
-           
-                    <p className="text-sm font-medium" style={{ color: '#ffffff' }}>
-                      {!fromCoords
-                        ? "📍 Click on map to set starting point"
-                        : !toCoords
-                        ? "🎯 Click on map to set destination"
-                        : "✓ Both points selected - click again to change destination"}
-                    </p>
-                    <button
+          {/* Full screen map */}
+          <div className="w-full h-full">
+            <div className="w-full h-full rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#1e293b' }}>
+              <div className="bg-gradient-to-br from-primary-dark via-primary to-slate-700 p-3">
+                <div className="flex items-center justify-center gap-4 relative">
+                  <p className="text-sm font-medium" style={{ color: '#ffffff' }}>
+                    {!fromCoords
+                      ? "📍 Click on map to set starting point"
+                      : !toCoords
+                      ? "🎯 Click on map to set destination"
+                      : "✓ Both points selected - click again to change destination"}
+                  </p>
+                  
+                  {(backendRoutes.length > 0 || routes.length > 0 || (fromCoords && toCoords)) && (
+                    <a
+                      href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        const londonCenter = [51.5074, -0.1278];
-                        setUserLocation(londonCenter);
+                        setBackendRoutes([]);
+                        setRoutes([]);
+                        setFromLocation("");
+                        setToLocation("");
+                        setFromCoords(null);
+                        setToCoords(null);
+                        setShowRouting(false);
+                        setSelectedRoute(null);
                         setMapKey((prev) => prev + 1);
-                        const originalText = e.target.textContent;
-                        e.target.textContent = '✓ Set to London';
-                        e.target.classList.add('bg-green-500');
-                        setTimeout(() => {
-                          e.target.textContent = originalText;
-                          e.target.classList.remove('bg-green-500');
-                        }, 1500);
                       }}
-                      className="text-xs px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 backdrop-blur-sm border shadow-lg"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                        color: '#ffffff',
-                        borderColor: 'rgba(255, 255, 255, 0.3)'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.3)'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
-                      title="Set current location to London for testing"
+                      className="underline transition cursor-pointer text-sm absolute right-0"
+                      style={{ color: '#ffffff' }}
+                      onMouseEnter={(e) => e.target.style.color = '#ef4444'}
+                      onMouseLeave={(e) => e.target.style.color = '#ffffff'}
                     >
-                      <span className="text-base">🇬🇧</span>
-                      <span className="font-medium">Set to London</span>
-                    </button>
-                  </div>
-                  {(backendRoutes.length > 0 || routes.length > 0 || (fromCoords && toCoords)) && (
-                    <div className="flex justify-center mb-4">
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setBackendRoutes([]);
-                          setRoutes([]);
-                          setFromLocation("");
-                          setToLocation("");
-                          setFromCoords(null);
-                          setToCoords(null);
-                          setShowRouting(false);
-                          setSelectedRoute(null);
-                          setMapKey((prev) => prev + 1);
-                        }}
-                        className="underline transition cursor-pointer text-lg"
-                        style={{ color: '#ffffff' }}
-                        onMouseEnter={(e) => e.target.style.color = '#ef4444'}
-                        onMouseLeave={(e) => e.target.style.color = '#ffffff'}
-                      >
-                        Clear Selection
-                      </a>
-                    </div>
+                      Clear
+                    </a>
                   )}
                 </div>
-                <div className="rounded-xl overflow-hidden">
+                <div className="overflow-hidden" style={{ height: 'calc(100vh - 280px)' }}>
                   {!loading && (
                     <Map
                       key={mapKey}
                       center={
-                        selectedRoute?.coordinates?.[0] ||
-                        fromCoords ||
+                        mapCenter ||
                         userLocation ||
                         LOCATION_CONFIG.DEFAULT_CENTER
                       }
@@ -523,12 +579,12 @@ export default function SuggestedRoutes() {
                           path: r.path?.coordinates || [],
                         })),
                       ]}
-                      height="600px"
+                      height="100%"
                       fromCoords={fromCoords}
                       toCoords={toCoords}
                       showRouting={false}
                       transportMode={transportMode}
-                      autoFitBounds={true}
+                      autoFitBounds={false}
                       onPlaceSelect={
                         routes.length === 0 ? handleMapPlaceSelect : null
                       }

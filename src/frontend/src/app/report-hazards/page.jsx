@@ -256,9 +256,8 @@ export default function HazardReporting() {
       <div className="min-h-screen">
         {/*WHITE IN LIGHT MODE, DARK IN DARK MODE */}
         <section className="relative overflow-hidden py-20" style={{ 
-          background: isLightMode    ? 'linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 50%, #f8fafc 100%)' 
-  : 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%)'
-        }}>
+  background: isLightMode ? '#ffffff' : 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%)'
+}}>
           <div className="container mx-auto px-6 text-center">
             <h1 className="text-5xl md:text-6xl font-bold mb-2">
               <span style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>Report a </span>
@@ -312,10 +311,8 @@ export default function HazardReporting() {
         )}
 
      
-        <section className="py-16" style={{ backgroundColor: isLightMode ? '#f8fafc' : '#0f172a' }}>
-          <div className="container mx-auto px-6">
+<section className="py-16" style={{ backgroundColor: isLightMode ? '#ffffff' : '#0f172a' }}>          <div className="container mx-auto px-6">
             <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-              {/* SUBMIT HAZARD REPORT FORM */}
               <div className="border-2 rounded-2xl p-8" style={{ 
                 backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
                 borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'

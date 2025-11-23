@@ -1,3 +1,4 @@
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -25,7 +26,7 @@ export default function Home() {
           <div className="grid items-center gap-8 sm:gap-10 lg:gap-14 lg:grid-cols-12">
             {/* Artwork card */}
             <div className="lg:col-span-7 order-1">
-              <div className="rounded-2xl p-[6px] sm:p-2 bg-white/90 shadow-lg ring-1 ring-white/30">
+              <div className="rounded-2xl p-[6px] sm:p-2 shadow-lg ring-1 ring-white/30" style={{ backgroundColor: 'rgba(15, 23, 42, 0.95)' }}>
                 <div className="relative h-56 sm:h-72 md:h-96 lg:h-[30rem] rounded-xl overflow-hidden bg-transparent">
                   <Image
                     src="/app-hero.png"
@@ -45,12 +46,12 @@ export default function Home() {
                 <span aria-hidden></span> Safer journeys for walkers & cyclists
               </p>
 
-              <h1 className="mt-5 md:mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold">
-                Find Your Safer Way
-              </h1>
-              <h2 className="hero-subtitle -mt-1 sm:-mt-2">
-                Built for Walkers &amp; Cyclists
-              </h2>
+             <h1 className="mt-5 md:mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold">
+  Find Your <span style={{ color: '#06d6a0' }}>Safer</span> Way
+</h1>
+<h2 className="hero-subtitle mt-4 sm:mt-5">  {/* CHANGED: Added mt-4 sm:mt-5 instead of -mt-1 sm:-mt-2 */}
+  Built for Walkers &amp; Cyclists
+</h2>
 
               <p className="mt-4 max-w-xl lg:max-w-none mx-auto lg:mx-0 text-base sm:text-lg md:text-xl text-text-secondary leading-relaxed">
                 Discover the safest routes in any city with real-time hazard
@@ -66,11 +67,17 @@ export default function Home() {
                   Go Safe
                 </Link>
                 <Link
-                  href="/report-hazards"
-                  className="btn-hazard inline-flex items-center gap-2 justify-center"
-                >
-                  Report Hazard
-                </Link>
+  href="/report-hazards"
+  className="inline-flex items-center gap-2 justify-center font-semibold px-6 py-2 rounded-lg transition-all duration-200"
+  style={{
+    backgroundColor: '#fb3737ff',
+    color: '#ffffff'
+  }}
+  onMouseEnter={(e) => e.target.style.backgroundColor = '#f80707ff'}
+  onMouseLeave={(e) => e.target.style.backgroundColor = '#fb3737ff'}
+>
+  Report Hazard
+</Link>
               </div>
 
               <p className="mt-3 sm:mt-4 text-[11px] sm:text-xs text-text-secondary">

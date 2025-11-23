@@ -2,14 +2,14 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { authService } from '../lib/services'
-import ThemeToggle from './ThemeToggle';
 
 
 
 export default function Navbar() {
   const router = useRouter()
+  const pathname = usePathname() 
   const [open, setOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
@@ -75,12 +75,59 @@ export default function Navbar() {
  <div style={{ color: '#f8fafc' }} className="font-bold text-lg">SafePath</div>        </Link>
 
         <nav className="hidden md:flex gap-8 items-center font-bold">
-          <Link href="/" className="nav-link">Home</Link>
-          <Link href="/suggested-routes" className="nav-link">Suggested Routes</Link>
-          <Link href="/report-hazards" className="nav-link">Report Hazards</Link>
-          <Link href="/findBuddy" className="nav-link">Find Buddy</Link>
-          
-          
+          <Link 
+      href="/" 
+      className="transition-colors duration-200"
+      style={{
+        color: pathname === '/' ? '#06d6a0' : '#94a3b8'
+      }}
+      onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+      onMouseLeave={(e) => e.target.style.color = pathname === '/' ? '#06d6a0' : '#94a3b8'}
+    >
+      Home
+    </Link>
+    
+    {/* SUGGESTED ROUTES LINK - UPDATED */}
+    <Link 
+      href="/suggested-routes" 
+      className="transition-colors duration-200"
+      style={{
+        color: pathname === '/suggested-routes' ? '#06d6a0' : '#94a3b8'
+      }}
+      onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+      onMouseLeave={(e) => e.target.style.color = pathname === '/suggested-routes' ? '#06d6a0' : '#94a3b8'}
+    >
+      Suggested Routes
+    </Link>
+    
+    {/* REPORT HAZARDS LINK - UPDATED */}
+    <Link 
+      href="/report-hazards" 
+      className="transition-colors duration-200"
+      style={{
+        color: pathname === '/report-hazards' ? '#06d6a0' : '#94a3b8'
+      }}
+      onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+      onMouseLeave={(e) => e.target.style.color = pathname === '/report-hazards' ? '#06d6a0' : '#94a3b8'}
+    >
+      Report Hazards
+    </Link>
+    
+    {/* FIND BUDDY LINK - UPDATED */}
+    <Link 
+      href="/findBuddy" 
+      className="transition-colors duration-200"
+      style={{
+        color: pathname === '/findBuddy' ? '#06d6a0' : '#94a3b8'
+      }}
+      onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+      onMouseLeave={(e) => e.target.style.color = pathname === '/findBuddy' ? '#06d6a0' : '#94a3b8'}
+    >
+      Find Buddy
+    </Link>
+    
+    
+
           {isLoggedIn ? (
             <div className="flex items-center gap-4">
               <span style={{ color: '#94a3b8' }}>Welcome, {user?.name || 'User'}</span>
@@ -100,8 +147,17 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="flex items-center gap-4">
-              <Link href="/auth/login" className="nav-link">Login</Link>
-            
+ <Link 
+      href="/auth/login" 
+      className="transition-colors duration-200"
+      style={{
+        color: pathname === '/auth/login' ? '#06d6a0' : '#94a3b8'
+      }}
+      onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+      onMouseLeave={(e) => e.target.style.color = pathname === '/auth/login' ? '#06d6a0' : '#94a3b8'}
+    >
+      Login
+    </Link>            
               <Link 
                 href="/auth/signup" 
                 className="px-4 py-2 rounded font-medium transition-colors"
@@ -114,7 +170,6 @@ export default function Navbar() {
               >
                 Sign Up
               </Link>
-              <ThemeToggle />
 </div>
           )}
         </nav>
@@ -151,7 +206,7 @@ export default function Navbar() {
             <Link href="/suggested-routes" onClick={() => setOpen(false)} className="nav-link">Suggested Routes</Link>
             <Link href="/report-hazards" onClick={() => setOpen(false)} className="nav-link">Report Hazards</Link>
             <Link href="/findBuddy" onClick={() => setOpen(false)} className="nav-link">Find Buddy</Link>
-            
+
             {isLoggedIn ? (
               <div 
                 className="pt-4 space-y-2"

@@ -392,11 +392,12 @@ export default function Map({
   // Create improved custom icons with better fallback
   const createCustomIcon = (color, type) => {
     const iconConfigs = {
-      hazard: { symbol: '⚠️', bgColor: color, size: [28, 36] },
-      buddy: { symbol: '👤', bgColor: color, size: [28, 36] },
-      from: { symbol: '🚶', bgColor: color, size: [32, 40] },
-      to: { symbol: '🎯', bgColor: color, size: [32, 40] },
-      default: { symbol: '📍', bgColor: color, size: [26, 34] }
+  hazard: { symbol: '⚠️', bgColor: color, size: [28, 36] },
+  buddy: { symbol: '👤', bgColor: color, size: [28, 36] },
+  from: { symbol: '📍', bgColor: '#10b981', size: [32, 40] }, 
+  to: { symbol: '🎯', bgColor: '#ef4444', size: [32, 40] },    
+  default: { symbol: '📍', bgColor: color, size: [26, 34] }
+
     };
 
     const config = iconConfigs[type] || iconConfigs.default;
