@@ -80,19 +80,19 @@ export default function Home() {
                   className="btn-primary inline-flex items-center gap-2 justify-center text-lg px-6 py-3 rounded-lg"
                 >
                   Go Safe
-                </Link>
-                <Link
-  href="/report-hazards"
-  className="inline-flex items-center gap-2 justify-center font-semibold px-6 py-2 rounded-lg transition-all duration-200"
-  style={{
-    backgroundColor: '#fb3737ff',
-    color: '#ffffff'
-  }}
-  onMouseEnter={(e) => e.target.style.backgroundColor = '#f80707ff'}
-  onMouseLeave={(e) => e.target.style.backgroundColor = '#fb3737ff'}
->
-  Report Hazard
-</Link>
+                </button>
+                <button
+                  onClick={(e) => handleProtectedAction(e, '/report-hazards')}
+                  className="inline-flex items-center gap-2 justify-center font-semibold px-6 py-2 rounded-lg transition-all duration-200"
+                  style={{
+                    backgroundColor: '#fb3737ff',
+                    color: '#ffffff'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f80707ff'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#fb3737ff'}
+                >
+                  Report Hazard
+                </button>
               </div>
 
               <p className="mt-3 sm:mt-4 text-[11px] sm:text-xs text-text-secondary">
