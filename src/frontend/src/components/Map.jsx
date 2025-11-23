@@ -15,6 +15,44 @@ import "leaflet/dist/leaflet.css";
 import { LOCATION_CONFIG } from "../lib/locationConfig";
 import { routingService } from "../lib/services";
 
+
+function AutoFitBounds({ routes, fromCoords, toCoords }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!routes || routes.length === 0) return;
+
+    // Collect all coordinates from routes and markers
+    const allCoordinates = [];
+
+    // Add route coordinates
+    routes.forEach((route) => {
+      if (route.coordinates && route.coordinates.length > 0) {
+        allCoordinates.push(...route.coordinates);
+      }
+    });
+
+    // Add from/to markers
+    if (fromCoords) allCoordinates.push(fromCoords);
+    if (toCoords) allCoordinates.push(toCoords);
+
+    // If we have coordinates, fit bounds
+    if (allCoordinates.length > 0) {
+      const bounds = L.latLngBounds(allCoordinates);
+      
+      // Fit with padding and smooth animation
+      map.fitBounds(bounds, {
+        padding: [50, 50], // 50px padding on all sides
+        maxZoom: 15, // Don't zoom in too much
+        animate: true,
+        duration: 0.8, // Smooth 800ms animation
+      });
+    }
+  }, [routes, fromCoords, toCoords, map]);
+
+  return null;
+}
+
 // Fix Leaflet default markers
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -348,15 +386,18 @@ export default function Map({
   onMapClick = null,
   onPlaceSelect = null,
   routeColor = "#3b82f6", // Default light blue color
+    autoFitBounds = false,
+
 }) {
   // Create improved custom icons with better fallback
   const createCustomIcon = (color, type) => {
     const iconConfigs = {
-      hazard: { symbol: '⚠️', bgColor: color, size: [28, 36] },
-      buddy: { symbol: '👤', bgColor: color, size: [28, 36] },
-      from: { symbol: '🚶', bgColor: color, size: [32, 40] },
-      to: { symbol: '🎯', bgColor: color, size: [32, 40] },
-      default: { symbol: '📍', bgColor: color, size: [26, 34] }
+  hazard: { symbol: '⚠️', bgColor: color, size: [28, 36] },
+  buddy: { symbol: '👤', bgColor: color, size: [28, 36] },
+  from: { symbol: '📍', bgColor: '#10b981', size: [32, 40] }, 
+  to: { symbol: '🎯', bgColor: '#ef4444', size: [32, 40] },    
+  default: { symbol: '📍', bgColor: color, size: [26, 34] }
+
     };
 
     const config = iconConfigs[type] || iconConfigs.default;
@@ -445,6 +486,12 @@ export default function Map({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        {/* Auto-fit bounds to show entire route */}
+        {autoFitBounds && (
+          <AutoFitBounds routes={routes} fromCoords={fromCoords} toCoords={toCoords} />
+        )}
+        
         {/* Enhanced click catcher with place selection */}
         {(onMapClick || onPlaceSelect) && (
           <ClickCatcher onMapClick={onMapClick} onPlaceSelect={onPlaceSelect} />
@@ -472,11 +519,11 @@ export default function Map({
         {fromCoords && (
           <Marker
             position={fromCoords}
-            icon={createCustomIcon("#10b981", "from")}
+            icon={createCustomIcon("#ef4444", "from")}
           >
             <Popup>
               <div className="text-sm">
-                <strong>Starting Point</strong>
+                <strong>You</strong>
               </div>
             </Popup>
           </Marker>
@@ -518,7 +565,10 @@ export default function Map({
           <Marker
             key={buddy.id}
             position={[buddy.latitude, buddy.longitude]}
-            icon={createCustomIcon("#3b82f6", "buddy")}
+            icon={createCustomIcon(
+              buddy.mode === 'cycling' ? '#10b981' : '#3b82f6', 
+              "buddy"
+            )}
             eventHandlers={{
               click: () => onBuddyClick(buddy),
             }}
@@ -526,10 +576,13 @@ export default function Map({
             <Popup>
               <div className="text-sm">
                 <h3 className="font-semibold">{buddy.name}</h3>
-                <p>Available for: {buddy.availableFor}</p>
+                <p className="text-xs">{buddy.mode === 'cycling' ? '🚴 Cycling' : '🚶 Walking'} • {buddy.pace || 'Medium pace'}</p>
                 <p className="text-xs text-gray-500">
-                  Distance: {buddy.distance?.toFixed(1)} km away
+                  {buddy.distance ? `${(buddy.distance / 1000).toFixed(1)} km away` : 'Nearby'}
                 </p>
+                {buddy.rating && (
+                  <p className="text-xs text-gray-500">⭐ {buddy.rating}</p>
+                )}
               </div>
             </Popup>
           </Marker>
