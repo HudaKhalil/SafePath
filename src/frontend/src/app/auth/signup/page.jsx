@@ -152,30 +152,44 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ background: 'var(--bg-body)' }}>
+   <div 
+      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" 
+      style={{ background: 'var(--bg-body)' }}
+    >
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="flex justify-center">
-            <div className="w-16 h-16 flex items-center justify-center">
+            <div className="w-24 h-24 flex items-center justify-center">
               <img 
                src="/logo.png" 
-                alt="London Safety Routing Logo" 
-                className="w-16 h-16 object-contain"
+                alt="SafePath Logo" 
+                className="w-24 h-24 object-contain"
               />
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold" style={{ color: 'var(--color-text-primary)' }}>
+          
+          <h2 
+            className="mt-6 text-center text-4xl font-extrabold" 
+            style={{ color: 'var(--color-text-primary)' }}
+          >
             Create your account
           </h2>
-          <p className="mt-2 text-center text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+          <p 
+            className="mt-2 text-center text-sm" 
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            Join SafePath for safer journeys
           </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {/* Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+              <label 
+                htmlFor="name" 
+                className="block text-lg font-medium mb-2" 
+                style={{ color: 'var(--color-text-primary)' }}
+              >
                 Full Name
               </label>
               <input
@@ -185,22 +199,26 @@ export default function SignUp() {
                 required
                 value={formData.name}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-base"
                 style={{
-                  borderColor: 'var(--color-text-secondary)', 
+                  borderWidth: '2px',
+                  borderColor: 'var(--border-color)',
                   backgroundColor: 'var(--bg-card)',
                   color: 'var(--color-text-primary)'
                 }}
                 placeholder="Enter your full name"
               />
               {errors.name && (
-                <p className="mt-1 text-sm text-red-400">{errors.name}</p>
+                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
               )}
             </div>
 
-            {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+              <label 
+                htmlFor="email" 
+                className="block text-lg font-medium mb-2" 
+                style={{ color: 'var(--color-text-primary)' }}
+              >
                 Email Address
               </label>
               <input
@@ -210,22 +228,26 @@ export default function SignUp() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-base"
                 style={{
-                  borderColor: 'var(--color-text-secondary)', // CHANGED: DARKER BORDER SAME AS LABEL TEXT
+                  borderWidth: '2px',
+                  borderColor: 'var(--border-color)',
                   backgroundColor: 'var(--bg-card)',
                   color: 'var(--color-text-primary)'
                 }}
                 placeholder="Enter your email address"
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
               )}
             </div>
 
-            {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+              <label 
+                htmlFor="password" 
+                className="block text-lg font-medium mb-2" 
+                style={{ color: 'var(--color-text-primary)' }}
+              >
                 Password
               </label>
               <input
@@ -235,22 +257,26 @@ export default function SignUp() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-base"
                 style={{
-                  borderColor: 'var(--color-text-secondary)', // CHANGED: DARKER BORDER SAME AS LABEL TEXT
+                  borderWidth: '2px',
+                  borderColor: 'var(--border-color)',
                   backgroundColor: 'var(--bg-card)',
                   color: 'var(--color-text-primary)'
                 }}
                 placeholder="Enter your password"
               />
               {errors.password && (
-                <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
               )}
             </div>
 
-            {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+              <label 
+                htmlFor="confirmPassword" 
+                className="block text-lg font-medium mb-2" 
+                style={{ color: 'var(--color-text-primary)' }}
+              >
                 Confirm Password
               </label>
               <input
@@ -260,30 +286,36 @@ export default function SignUp() {
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="appearance-none relative block w-full px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-base"
                 style={{
-                  borderColor: 'var(--color-text-secondary)', 
+                  borderWidth: '2px',
+                  borderColor: 'var(--border-color)',
                   backgroundColor: 'var(--bg-card)',
                   color: 'var(--color-text-primary)'
                 }}
                 placeholder="Confirm your password"
               />
               {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-400">{errors.confirmPassword}</p>
+                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
               )}
             </div>
 
-            {/* Location Section */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                <label 
+                  className="block text-lg font-medium" 
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
                   Location (Optional)
                 </label>
                 <button
                   type="button"
                   onClick={getCurrentLocation}
                   disabled={locationLoading}
-                  className="text-sm text-accent hover:text-accent/80 transition-colors disabled:opacity-50"
+                  className="text-sm underline font-medium transition-colors disabled:opacity-50"
+                  style={{ color: 'var(--color-text-primary)' }}
+                  onMouseEnter={(e) => !locationLoading && (e.target.style.color = '#06d6a0')}
+                  onMouseLeave={(e) => e.target.style.color = 'var(--color-text-primary)'}
                 >
                   {locationLoading ? 'Getting location...' : 'Use my location'}
                 </button>
@@ -298,16 +330,17 @@ export default function SignUp() {
                     step="any"
                     value={formData.latitude}
                     onChange={handleChange}
-                    className="appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                    className="appearance-none relative block w-full px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-base"
                     style={{
-                      borderColor: 'var(--color-text-secondary)', 
+                      borderWidth: '2px',
+                      borderColor: 'var(--border-color)',
                       backgroundColor: 'var(--bg-card)',
                       color: 'var(--color-text-primary)'
                     }}
                     placeholder="Latitude"
                   />
                   {errors.latitude && (
-                    <p className="mt-1 text-xs text-red-400">{errors.latitude}</p>
+                    <p className="mt-1 text-xs text-red-600">{errors.latitude}</p>
                   )}
                 </div>
                 <div>
@@ -318,16 +351,17 @@ export default function SignUp() {
                     step="any"
                     value={formData.longitude}
                     onChange={handleChange}
-                    className="appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                    className="appearance-none relative block w-full px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-base"
                     style={{
-                      borderColor: 'var(--color-text-secondary)', 
+                      borderWidth: '2px',
+                      borderColor: 'var(--border-color)',
                       backgroundColor: 'var(--bg-card)',
                       color: 'var(--color-text-primary)'
                     }}
                     placeholder="Longitude"
                   />
                   {errors.longitude && (
-                    <p className="mt-1 text-xs text-red-400">{errors.longitude}</p>
+                    <p className="mt-1 text-xs text-red-600">{errors.longitude}</p>
                   )}
                 </div>
               </div>
@@ -337,33 +371,38 @@ export default function SignUp() {
             </div>
           </div>
 
-          {/* General Error */}
           {errors.general && (
-            <div className="bg-red-900/20 border border-red-500 text-red-400 px-4 py-3 rounded relative">
+            <div className="bg-red-50 border-2 border-red-500 text-red-700 px-4 py-3 rounded relative">
               {errors.general}
             </div>
           )}
 
-          {/* Submit Button */}
           <div>
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-lg font-bold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               style={{
-                backgroundColor: 'var(--color-accent)',
-                color: 'var(--color-text-on-accent)'
+                backgroundColor: '#06d6a0',
+                color: '#0f172a'
               }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
             >
               {isLoading ? 'Creating Account...' : 'Sign Up'}
             </button>
           </div>
 
-          {/* Login Link */}
           <div className="text-center">
             <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
               Already have an account?{' '}
-              <Link href="/auth/login" className="font-medium text-accent hover:text-accent/80 transition-colors">
+              <Link 
+                href="/auth/login" 
+                className="font-medium underline transition-colors"
+                style={{ color: 'var(--color-text-primary)' }}
+                onMouseEnter={(e) => e.target.style.color = '#06d6a0'}
+                onMouseLeave={(e) => e.target.style.color = 'var(--color-text-primary)'}
+              >
                 Sign in here
               </Link>
             </p>
@@ -373,14 +412,6 @@ export default function SignUp() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
 
 
 
