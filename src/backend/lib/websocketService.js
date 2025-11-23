@@ -62,6 +62,21 @@ class WebSocketService {
         this.subscribeToHazards(socket, data);
       });
 
+      // Update user location
+      socket.on('update_location', (data) => {
+        this.updateUserLocation(socket, data);
+      });
+
+      // Track user position for nearby hazard detection
+      socket.on('user_position', async (coords) => {
+        await this.handleUserPosition(socket, coords);
+      });
+
+      // Unsubscribe from hazard updates
+      socket.on('unsubscribe_hazard_updates', () => {
+        this.unsubscribeFromHazards(socket);
+      });
+
       // Handle disconnect
       socket.on('disconnect', (reason) => {
         this.handleDisconnect(socket, reason);
@@ -146,6 +161,107 @@ class WebSocketService {
   }
 
   /**
+   * Handle user position update for nearby hazard detection
+   */
+  async handleUserPosition(socket, coords) {
+    try {
+      const { latitude, longitude, radius = 1500 } = coords;
+
+      if (!latitude || !longitude) {
+        socket.emit('error', { message: 'Invalid coordinates' });
+        return;
+      }
+
+      // Import database connection dynamically to avoid circular dependency
+      const db = require('../config/database');
+      
+      // Query nearby hazards using PostGIS
+      const query = `
+        SELECT 
+          id,
+          hazard_type,
+          severity,
+          description,
+          ST_Y(location::geometry) as latitude,
+          ST_X(location::geometry) as longitude,
+          priority_level,
+          affects_traffic,
+          weather_related,
+          status,
+          reported_at,
+          created_at,
+          ST_Distance(
+            location,
+            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+          ) as distance_meters
+        FROM hazards
+        WHERE 
+          status = 'active'
+          AND ST_DWithin(
+            location,
+            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+            $3
+          )
+        ORDER BY distance_meters ASC
+        LIMIT 20
+      `;
+
+      const result = await db.query(query, [longitude, latitude, radius]);
+      
+      // Emit nearby hazards to client
+      socket.emit('nearby_hazards', {
+        hazards: result.rows,
+        userLocation: { latitude, longitude },
+        radius: radius,
+        count: result.rows.length,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`[WebSocket] Sent ${result.rows.length} nearby hazards to socket ${socket.id}`);
+      
+    } catch (error) {
+      console.error('[WebSocket] Error handling user position:', error);
+      socket.emit('error', { 
+        message: 'Failed to fetch nearby hazards',
+        details: error.message 
+      });
+    }
+  }
+
+  /**
+   * Update user's location
+   */
+  updateUserLocation(socket, data) {
+    const connection = this.connections.get(socket.id);
+    
+    if (!connection) {
+      socket.emit('error', { message: 'Not subscribed' });
+      return;
+    }
+
+    const { latitude, longitude } = data;
+
+    if (latitude && longitude) {
+      connection.location = {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude)
+      };
+
+      this.connections.set(socket.id, connection);
+      socket.emit('location_updated', { location: connection.location });
+    }
+  }
+
+  /**
+   * Unsubscribe from hazard updates
+   */
+  unsubscribeFromHazards(socket) {
+    this.connections.delete(socket.id);
+    socket.emit('unsubscribed', { message: 'Unsubscribed from hazard updates' });
+    console.log(`Socket ${socket.id} unsubscribed from hazards`);
+  }
+
+  /**
    * Handle socket disconnect
    */
   handleDisconnect(socket, reason) {
@@ -208,5 +324,3 @@ process.on('SIGTERM', async () => {
 });
 
 module.exports = websocketService;
-
-
