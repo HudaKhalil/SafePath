@@ -1,13 +1,28 @@
 "use client";
 
+import { useRouter } from 'next/navigation';
 import Image from "next/image";
-import Link from "next/link";
+import Cookies from 'js-cookie';
 
 function Section({ className = "", ...props }) {
   return <section className={`relative ${className}`} {...props} />;
 }
 
 export default function Home() {
+  const router = useRouter();
+
+  const handleProtectedAction = (e, path) => {
+    e.preventDefault();
+    const token = Cookies.get('auth_token');
+    
+    if (!token) {
+      // Not authenticated, redirect to login
+      router.push('/auth/login');
+    } else {
+      // Authenticated, navigate to requested page
+      router.push(path);
+    }
+  };
   return (
     <main className="min-h-screen bg-primary-dark text-text-primary">
       {/* HERO */}
@@ -60,9 +75,9 @@ export default function Home() {
               </p>
 
               <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:gap-4 lg:justify-start justify-center">
-                <Link
-                  href="/suggested-routes"
-                  className="btn-primary inline-flex items-center gap-2 justify-center"
+                <button
+                  onClick={(e) => handleProtectedAction(e, '/suggested-routes')}
+                  className="btn-primary inline-flex items-center gap-2 justify-center text-lg px-6 py-3 rounded-lg"
                 >
                   Go Safe
                 </Link>
