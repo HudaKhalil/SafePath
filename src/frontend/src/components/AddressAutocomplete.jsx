@@ -82,9 +82,91 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
     setShowSuggestions(false)
   }
 
-  const handleBlur = () => {
-    // Delay hiding suggestions to allow clicking
-    setTimeout(() => setShowSuggestions(false), 200)
+  const handleKeyDown = async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      
+      // If there are suggestions, use the first one
+      if (suggestions.length > 0) {
+        handleSuggestionClick(suggestions[0])
+      } else if (value.length >= 3) {
+        // Otherwise, search for the current value
+        setIsLoading(true)
+        try {
+          let result;
+          try {
+            result = await geocodingService.searchLocations(value, { 
+              limit: 1, 
+              countrycode: LOCATION_CONFIG.COUNTRY_CODE
+            });
+          } catch (backendError) {
+            result = await geocodingService.searchNominatim(value, { 
+              limit: 1, 
+              countrycode: LOCATION_CONFIG.COUNTRY_CODE
+            });
+          }
+
+          if (result.success && result.data.locations && result.data.locations.length > 0) {
+            const location = result.data.locations[0]
+            onChange(location.display_name, {
+              lat: location.lat,
+              lon: location.lon,
+              value: location.display_name,
+              address: location.address
+            })
+          }
+        } catch (error) {
+          console.error('Enter key geocoding error:', error)
+        } finally {
+          setIsLoading(false)
+          setSuggestions([])
+          setShowSuggestions(false)
+        }
+      }
+    }
+  }
+
+  const handleBlur = async () => {
+    // Delay to allow clicking suggestions
+    setTimeout(async () => {
+      setShowSuggestions(false)
+      
+      // Auto-geocode if user typed but didn't select from dropdown
+      if (value.length >= 3 && suggestions.length > 0) {
+        // Use the first suggestion automatically
+        const firstSuggestion = suggestions[0]
+        onChange(firstSuggestion.value, firstSuggestion)
+        setSuggestions([])
+      } else if (value.length >= 3) {
+        // Try to geocode what they typed
+        try {
+          let result;
+          try {
+            result = await geocodingService.searchLocations(value, { 
+              limit: 1, 
+              countrycode: LOCATION_CONFIG.COUNTRY_CODE
+            });
+          } catch (backendError) {
+            result = await geocodingService.searchNominatim(value, { 
+              limit: 1, 
+              countrycode: LOCATION_CONFIG.COUNTRY_CODE
+            });
+          }
+
+          if (result.success && result.data.locations && result.data.locations.length > 0) {
+            const location = result.data.locations[0]
+            onChange(location.display_name, {
+              lat: location.lat,
+              lon: location.lon,
+              value: location.display_name,
+              address: location.address
+            })
+          }
+        } catch (error) {
+          console.error('Auto-geocoding error:', error)
+        }
+      }
+    }, 300)
   }
 
   const handleFocus = () => {
@@ -109,6 +191,7 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
           onChange={handleInputChange}
           onBlur={handleBlur}
           onFocus={handleFocus}
+          onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className="w-full p-4 rounded-lg border-2 border-gray-200 focus:outline-none focus:border-accent text-gray-900"
           autoComplete="off"

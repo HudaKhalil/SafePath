@@ -131,7 +131,17 @@ export default function Navbar() {
           {isLoggedIn ? (
             <div className="flex items-center gap-4">
               <span style={{ color: '#94a3b8' }}>Welcome, {user?.name || 'User'}</span>
-              <Link href="/profile" className="nav-link">Profile</Link>
+              <Link 
+                href="/profile" 
+                className="transition-colors duration-200"
+                style={{
+                  color: pathname === '/profile' ? '#06d6a0' : '#94a3b8'
+                }}
+                onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+                onMouseLeave={(e) => e.target.style.color = pathname === '/profile' ? '#06d6a0' : '#94a3b8'}
+              >
+                Profile
+              </Link>
               <button 
                 onClick={handleLogout}
                 className="px-3 py-1 rounded text-sm transition-colors"
