@@ -270,6 +270,99 @@ class WebSocketService {
   }
 
   /**
+   * Broadcast new hazard to relevant clients
+   * @param {Object} hazardData - Hazard information
+   */
+  broadcastNewHazard(hazardData) {
+    if (!this.io) {
+      console.error('WebSocket service not initialized');
+      return;
+    }
+
+    const {
+      id,
+      hazard_type,
+      severity,
+      description,
+      latitude,
+      longitude,
+      priority_level,
+      affects_traffic,
+      weather_related,
+      status,
+      reported_at
+    } = hazardData;
+
+    let notificationsSent = 0;
+
+    // Iterate through all connected clients
+    for (const [socketId, connection] of this.connections) {
+      try {
+        const distance = this.calculateDistance(
+          connection.location.latitude,
+          connection.location.longitude,
+          latitude,
+          longitude
+        );
+
+        // Send notification if hazard is within user's radius
+        if (distance <= connection.radius) {
+          const notification = this.createNotificationMessage({
+            ...hazardData,
+            distance_meters: Math.round(distance)
+          });
+
+          this.io.to(socketId).emit('new_hazard', notification);
+          notificationsSent++;
+
+          console.log(`Hazard ${id} sent to user ${connection.userId} (${Math.round(distance)}m away)`);
+        }
+      } catch (error) {
+        console.error(`Error broadcasting to socket ${socketId}:`, error);
+        this.connections.delete(socketId);
+      }
+    }
+
+    if (notificationsSent > 0) {
+      console.log(`Broadcast complete: ${notificationsSent} users notified of hazard ${id}`);
+    }
+
+    return notificationsSent;
+  }
+
+  /**
+   * Broadcast hazard update (status change, verification, etc.)
+   */
+  broadcastHazardUpdate(hazardData) {
+    if (!this.io) return;
+
+    const notification = this.createNotificationMessage(hazardData, 'hazard_updated');
+    
+    let notificationsSent = 0;
+
+    for (const [socketId, connection] of this.connections) {
+      try {
+        const distance = this.calculateDistance(
+          connection.location.latitude,
+          connection.location.longitude,
+          hazardData.latitude,
+          hazardData.longitude
+        );
+
+        if (distance <= connection.radius) {
+          this.io.to(socketId).emit('hazard_updated', notification);
+          notificationsSent++;
+        }
+      } catch (error) {
+        console.error(`Error broadcasting update to socket ${socketId}:`, error);
+      }
+    }
+
+    console.log(`Hazard update broadcast: ${notificationsSent} users notified`);
+    return notificationsSent;
+  }
+
+  /**
    * Create formatted notification message
    */
   createNotificationMessage(hazardData, eventType = 'new_hazard') {
