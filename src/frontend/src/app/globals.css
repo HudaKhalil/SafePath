@@ -14,25 +14,24 @@
   --color-danger: #ef4444;
   --color-danger-light: #f87171;
   --color-success: #06d6a0;
-  
-  /* dark mode colors */
-  --bg-body: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-  --bg-card: rgba(30, 41, 59, 0.95); /* DARK CARD BACKGROUND */
-  --bg-icon: rgba(255, 255, 255, 0.1); /* ICON BACKGROUND IN DARK MODE */
-  --color-text-primary: #f8fafc; /* PRIMARY TEXT IN DARK MODE */
-  --color-text-secondary: #94a3b8; /* SECONDARY TEXT IN DARK MODE */
-  --border-color: rgba(255, 255, 255, 0.2); /* BORDERS IN DARK MODE */
 }
 
-/* light mode where only text and bg colors */
-html:not(.dark) {
- 
-  --bg-body: #f8fafc;
-  --bg-card: #ffffff; /* LIGHT CARD BACKGROUND */
-  --bg-icon: rgba(6, 214, 160, 0.1); /* ICON BACKGROUND IN LIGHT MODE */
-  --color-text-primary: #0f172a; /* PRIMARY TEXT IN LIGHT MODE */
-  --color-text-secondary: #475569; /* SECONDARY TEXT IN LIGHT MODE */
-  --border-color: rgba(0, 0, 0, 0.1); /* BORDERS IN LIGHT MODE */
+/* DEFAULT LIGHT MODE COLORS (no class needed) */
+:root {
+  --bg-card: #f8fafc;
+  --bg-icon: rgba(6, 214, 160, 0.1);
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* DARK MODE COLORS (when .dark class is present) */
+.dark {
+  --bg-card: #1e293b;
+  --bg-icon: rgba(255, 255, 255, 0.1);
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --border-color: rgba(255, 255, 255, 0.2);
 }
 
 html, body {
@@ -42,12 +41,16 @@ html, body {
 }
 
 body {
-  background: var(--bg-body);
+  background: #ffffff;
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+.dark body {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
 }
 
 

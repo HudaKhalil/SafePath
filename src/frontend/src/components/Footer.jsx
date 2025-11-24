@@ -8,23 +8,23 @@ export default function Footer() {
 
   return (
     <footer 
-      className="hidden md:block py-16"
+      className="hidden md:block py-3"
       style={{ 
         backgroundColor: '#0f172a'
       }}
     >
       <div className="container mx-auto px-4 md:px-6 max-w-4xl">
         {/* Centered Layout */}
-        <div className="flex flex-col items-center text-center space-y-8">
+        <div className="flex flex-col items-center text-center space-y-2">
           
           {/* Social Links - Centered at top */}
-          <div className="flex items-center justify-center gap-6">
+          <div className="flex items-center justify-center gap-4">
             <a
               href="https://github.com/KaranJoseph12/SafePath.git"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="GitHub Repository"
-              className="inline-flex items-center justify-center h-14 w-14 rounded-full transition-all"
+              className="inline-flex items-center justify-center h-10 w-10 rounded-full transition-all"
               style={{ 
                 backgroundColor: '#ffffff',
                 color: '#0f172a'
@@ -38,13 +38,13 @@ export default function Footer() {
                 e.currentTarget.style.color = '#0f172a';
               }}
             >
-              <Github className="h-7 w-7" />
+              <Github className="h-5 w-5" />
             </a>
             
             <a
               href="mailto:support@safepath.app"
               aria-label="Email Support"
-              className="inline-flex items-center justify-center h-14 w-14 rounded-full transition-all"
+              className="inline-flex items-center justify-center h-10 w-10 rounded-full transition-all"
               style={{ 
                 backgroundColor: '#ffffff',
                 color: '#0f172a'
@@ -58,15 +58,15 @@ export default function Footer() {
                 e.currentTarget.style.color = '#0f172a';
               }}
             >
-              <Mail className="h-7 w-7" />
+              <Mail className="h-5 w-5" />
             </a>
           </div>
 
           {/* Navigation Links - Horizontal centered */}
-          <div className="flex flex-wrap items-center justify-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/privacy"
-              className="text-lg transition-colors px-2"
+              className="text-sm transition-colors px-2"
               style={{ color: '#94a3b8' }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
@@ -75,7 +75,7 @@ export default function Footer() {
             </Link>
             <Link
               href="/terms"
-              className="text-lg transition-colors px-2"
+              className="text-sm transition-colors px-2"
               style={{ color: '#94a3b8' }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
@@ -84,7 +84,7 @@ export default function Footer() {
             </Link>
             <a
               href="mailto:support@safepath.app"
-              className="text-lg transition-colors px-2"
+              className="text-sm transition-colors px-2"
               style={{ color: '#94a3b8' }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
@@ -93,7 +93,7 @@ export default function Footer() {
             </a>
             <Link
               href="/about"
-              className="text-lg transition-colors px-2"
+              className="text-sm transition-colors px-2"
               style={{ color: '#94a3b8' }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}

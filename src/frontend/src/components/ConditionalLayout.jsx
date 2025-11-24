@@ -8,17 +8,16 @@ import Footer from './Footer'
 export default function ConditionalLayout({ children }) {
   const pathname = usePathname()
   
-  // Pages where we don't want to show navigation
-  const authPages = ['/login', '/signup', '/register']
-  const isAuthPage = authPages.includes(pathname)
+  // Always show navbar and footer, only hide BottomNav on auth pages
+  const isAuthPage = pathname.startsWith('/auth/')
 
   return (
-    <>
-      {/* Show Navbar only if NOT on auth pages */}
-      {!isAuthPage && <Navbar />}
+    <div className="flex flex-col min-h-screen">
+      {/* Always show Navbar */}
+      <Navbar />
       
-      {/* Main content */}
-      <main>
+      {/* Main content - takes remaining space */}
+      <main className="flex-1 flex flex-col">
         {children}
       </main>
       
@@ -27,6 +26,6 @@ export default function ConditionalLayout({ children }) {
       
       {/* Always show Footer */}
       <Footer />
-    </>
+    </div>
   )
 }

@@ -13,6 +13,7 @@ export default function Login() {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isDark, setIsDark] = useState(false);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -20,6 +21,17 @@ export default function Login() {
       router.push('/');
     }
   }, [router]);
+
+  // Track dark mode changes
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -126,8 +138,8 @@ export default function Login() {
   };
 
   return (
-    <div className="flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#ffffff' }}>
-      <div className="max-w-md w-full space-y-6">
+    <div className="flex-1 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: isDark ? 'transparent' : '#f1f5f9' }}>
+      <div className="max-w-md w-full space-y-6 rounded-2xl p-8 shadow-2xl dark:border dark:border-white/20" style={{ backgroundColor: 'var(--bg-card)' }}>
         <div>
           <div className="flex justify-center">
             <div className="w-16 h-16 flex items-center justify-center">
@@ -138,10 +150,10 @@ export default function Login() {
               />
             </div>
           </div>
-          <h2 className="mt-4 text-center text-2xl font-extrabold" style={{ color: '#1e293b' }}>
+          <h2 className="mt-4 text-center text-2xl font-extrabold" style={{ color: isDark ? '#ffffff' : '#0f172a' }}>
             Sign in
           </h2>
-          <p className="mt-1 text-center text-base" style={{ color: '#1e293b' }}>
+          <p className="mt-1 text-center text-base" style={{ color: isDark ? '#ffffff' : '#0f172a' }}>
             Welcome back to SafePath!
           </p>
         </div>
@@ -150,7 +162,7 @@ export default function Login() {
           <div className="space-y-3">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-lg font-medium" style={{ color: '#1e293b' }}>
+              <label htmlFor="email" className="block text-lg font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
                 Email Address
               </label>
               <input
@@ -161,12 +173,8 @@ export default function Login() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
-                style={{
-                  borderColor: '#1e293b', 
-                  backgroundColor: '#ffffff',
-                  color: '#1e293b'
-                }}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 dark:px-4 dark:py-3 border border-gray-300 dark:border-[#06d6a0]/30 rounded-md dark:rounded-lg focus:outline-none focus:ring-2 focus:ring-[#06d6a0] focus:border-[#06d6a0] sm:text-sm text-gray-900 dark:text-[#06d6a0] placeholder-gray-500 dark:placeholder-[#06d6a0]/60 transition-all"
+                style={{ backgroundColor: 'var(--bg-card)' }}
                 placeholder="Enter your email address"
               />
               {errors.email && (
@@ -176,7 +184,7 @@ export default function Login() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-lg font-medium" style={{ color: '#1e293b' }}>
+              <label htmlFor="password" className="block text-lg font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
                 Password
               </label>
               <input
@@ -187,12 +195,8 @@ export default function Login() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
-                style={{
-                  borderColor: '#1e293b', 
-                  backgroundColor: '#ffffff',
-                  color: '#1e293b'
-                }}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 dark:px-4 dark:py-3 border border-gray-300 dark:border-[#06d6a0]/30 rounded-md dark:rounded-lg focus:outline-none focus:ring-2 focus:ring-[#06d6a0] focus:border-[#06d6a0] sm:text-sm text-gray-900 dark:text-[#06d6a0] placeholder-gray-500 dark:placeholder-[#06d6a0]/60 transition-all"
+                style={{ backgroundColor: 'var(--bg-card)' }}
                 placeholder="Enter your password"
               />
               {errors.password && (
@@ -224,14 +228,14 @@ export default function Login() {
 
           {/* Sign Up Link */}
           <div className="text-center">
-            <p className="text-sm" style={{ color: '#1e293b' }}>
+            <p className="text-sm" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
               Don't have an account?{' '}
               <Link 
                 href="/auth/signup" 
                 className="font-medium underline transition-colors"
-                style={{ color: '#1e293b' }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
-                onMouseLeave={(e) => e.currentTarget.style.color = '#1e293b'}
+                style={{ color: isDark ? '#06d6a0' : '#0f172a' }}
+                onMouseEnter={(e) => e.target.style.color = isDark ? '#ffffff' : '#059669'}
+                onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#0f172a'}
               >
                 Sign up here
               </Link>
