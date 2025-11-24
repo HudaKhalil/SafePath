@@ -150,12 +150,12 @@ export default function Profile() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen pt-20" style={{ background: 'var(--bg-body)' }}>
-          <div className="container mx-auto px-6 py-12">
+        <div style={{ backgroundColor: '#ffffff' }}>
+          <div className="container mx-auto px-6 py-8">
             <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-accent"></div>
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2" style={{ borderColor: '#06d6a0' }}></div>
             </div>
-            <p className="text-center mt-4" style={{ color: 'var(--color-text-primary)' }}>Loading profile...</p>
+            <p className="text-center mt-4" style={{ color: '#0f172a' }}>Loading profile...</p>
           </div>
         </div>
       </ProtectedRoute>
@@ -164,14 +164,14 @@ export default function Profile() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen pt-20" style={{ background: 'var(--bg-body)' }}>
-        <div className="container mx-auto px-6 py-12">
+      <div style={{ backgroundColor: '#ffffff' }}>
+        <div className="container mx-auto px-6 py-6">
           {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold mb-4" style={{ color: 'var(--color-text-primary)' }}>
-              User <span className="text-accent">Profile</span>
+          <div className="text-center mb-6">
+            <h1 className="text-3xl font-bold" style={{ color: 'var(--color-primary)' }}>
+              User <span style={{ color: '#06d6a0' }}>Profile</span>
             </h1>
-            <p className="text-xl" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="mt-1 text-sm" style={{ color: 'var(--color-text-primary)', opacity: 0.8 }}>
               Manage your account settings and safety preferences
             </p>
           </div>
@@ -195,63 +195,63 @@ export default function Profile() {
 
           {/* Profile Card */}
           <div className="max-w-2xl mx-auto">
-            <div className="rounded-2xl shadow-2xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
+            <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
               {/* Profile Header */}
-              <div className="bg-gradient-to-r from-primary-dark to-primary p-8 text-center">
-                <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'var(--color-accent)' }}>
-  <span className="text-4xl" style={{ color: 'var(--color-text-on-accent)' }}>👤</span>
-</div>
-              <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>{user?.name || 'User'}</h2>
-<p style={{ color: 'var(--color-text-secondary)' }}>{user?.email}</p>
-<p className="text-sm mt-2" style={{ color: 'var(--color-text-secondary)' }}>
-  Member since: {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
-</p>
+              <div className="p-6 text-center" style={{ backgroundColor: '#0f172a' }}>
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#06d6a0' }}>
+                  <span className="text-3xl" style={{ color: '#0f172a' }}>👤</span>
+                </div>
+                <h2 className="text-xl font-bold mb-1" style={{ color: '#ffffff' }}>{user?.name || 'User'}</h2>
+                <p className="text-sm" style={{ color: '#e2e8f0' }}>{user?.email}</p>
+                <p className="text-xs mt-1" style={{ color: '#cbd5e1' }}>
+                  Member since: {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                </p>
               </div>
 
               {/* Profile Content */}
-              <div className="p-8">
+              <div className="p-6">
                 {!editing ? (
                   // View Mode
-                  <div className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Full Name</label>
-                        <p className="text-lg" style={{ color: 'var(--color-text-primary)' }}>{user?.name || 'Not provided'}</p>
+                        <label className="text-sm font-medium text-gray-600">Full Name</label>
+                        <p className="text-lg text-gray-900">{user?.name || 'Not provided'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Email</label>
-                        <p className="text-lg" style={{ color: 'var(--color-text-primary)' }}>{user?.email}</p>
+                        <label className="text-sm font-medium text-gray-600">Email</label>
+                        <p className="text-lg text-gray-900">{user?.email}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Phone</label>
-                        <p className="text-lg" style={{ color: 'var(--color-text-primary)' }}>{user?.phone || 'Not provided'}</p>
+                        <label className="text-sm font-medium text-gray-600">Phone</label>
+                        <p className="text-lg text-gray-900">{user?.phone || 'Not provided'}</p>
                       </div>
                       <div>
-                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Emergency Contact</label>
-                        <p className="text-lg" style={{ color: 'var(--color-text-primary)' }}>{user?.emergency_contact || 'Not provided'}</p>
+                        <label className="text-sm font-medium text-gray-600">Emergency Contact</label>
+                        <p className="text-lg text-gray-900">{user?.emergency_contact || 'Not provided'}</p>
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Address</label>
-                      <p className="text-lg" style={{ color: 'var(--color-text-primary)' }}>{user?.address || 'Not provided'}</p>
+                      <label className="text-sm font-medium text-gray-600">Address</label>
+                      <p className="text-lg text-gray-900">{user?.address || 'Not provided'}</p>
                     </div>
 
                     {/* Safety Preferences */}
-                    <div className="pt-6" style={{ borderTop: '1px solid var(--border-color)' }}>
-                      <h3 className="text-xl font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Safety Preferences</h3>
+                    <div className="border-t pt-6">
+                      <h3 className="text-xl font-semibold text-gray-800 mb-4">Safety Preferences</h3>
                       <div className="grid md:grid-cols-2 gap-6">
                         <div>
-                          <label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Preferred Transport</label>
-                          <p className="text-lg capitalize" style={{ color: 'var(--color-text-primary)' }}>
+                          <label className="text-sm font-medium text-gray-600">Preferred Transport</label>
+                          <p className="text-lg text-gray-900 capitalize">
                             {user?.preferred_transport || 'Walking'} 
                             {user?.preferred_transport === 'walking' && ' 🚶'}
                             {user?.preferred_transport === 'cycling' && ' 🚴'}
                           </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Safety Priority</label>
-                          <p className="text-lg capitalize" style={{ color: 'var(--color-text-primary)' }}>
+                          <label className="text-sm font-medium text-gray-600">Safety Priority</label>
+                          <p className="text-lg text-gray-900 capitalize">
                             {user?.safety_priority || 'High'} 
                             {user?.safety_priority === 'high' && ' 🛡️'}
                             {user?.safety_priority === 'medium' && ' ⚖️'}
@@ -260,8 +260,8 @@ export default function Profile() {
                         </div>
                       </div>
                       <div className="mt-4">
-                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Notifications</label>
-                        <p className="text-lg" style={{ color: 'var(--color-text-primary)' }}>
+                        <label className="text-sm font-medium text-gray-600">Notifications</label>
+                        <p className="text-lg text-gray-900">
                           {user?.notifications ? '✅ Enabled' : '❌ Disabled'}
                         </p>
                       </div>
@@ -271,11 +271,10 @@ export default function Profile() {
                     <div className="flex gap-4 pt-6">
                       <button
                         onClick={() => setEditing(true)}
-                        className="flex-1 font-bold py-3 px-6 rounded-lg transition-all duration-200 hover:opacity-90"
-                        style={{
-                          backgroundColor: 'var(--color-accent)',
-                          color: 'var(--color-text-on-accent)'
-                        }}
+                        className="flex-1 font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-md"
+                        style={{ backgroundColor: '#06d6a0', color: '#0f172a' }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
                       >
                         ✏️ Edit Profile
                       </button>
@@ -286,103 +285,73 @@ export default function Profile() {
                   <form onSubmit={handleSave} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Full Name</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
                         <input
                           type="text"
                           name="name"
                           value={formData.name}
                           onChange={handleInputChange}
-                          className="w-full p-3 border-2 rounded-lg focus:outline-none focus:border-accent"
-                          style={{
-                            borderColor: 'var(--color-text-secondary)',
-                            backgroundColor: 'var(--bg-card)',
-                            color: 'var(--color-text-primary)'
-                          }}
+                          className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-accent text-gray-900"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Email</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                         <input
                           type="email"
                           value={formData.email}
-                          className="w-full p-3 border-2 rounded-lg cursor-not-allowed"
-                          style={{
-                            borderColor: 'var(--border-color)',
-                            backgroundColor: 'var(--bg-icon)',
-                            color: 'var(--color-text-secondary)'
-                          }}
+                          className="w-full p-3 border-2 border-gray-200 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
                           disabled
                         />
-                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>Email cannot be changed</p>
+                        <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Phone</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
                         <input
                           type="tel"
                           name="phone"
                           value={formData.phone}
                           onChange={handleInputChange}
-                          className="w-full p-3 border-2 rounded-lg focus:outline-none focus:border-accent"
-                          style={{
-                            borderColor: 'var(--color-text-secondary)',
-                            backgroundColor: 'var(--bg-card)',
-                            color: 'var(--color-text-primary)'
-                          }}
+                          className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-accent text-gray-900"
                           placeholder="+44 71xxxxx"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Emergency Contact</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Emergency Contact</label>
                         <input
                           type="tel"
                           name="emergencyContact"
                           value={formData.emergencyContact}
                           onChange={handleInputChange}
-                          className="w-full p-3 border-2 rounded-lg focus:outline-none focus:border-accent"
-                          style={{
-                            borderColor: 'var(--color-text-secondary)',
-                            backgroundColor: 'var(--bg-card)',
-                            color: 'var(--color-text-primary)'
-                          }}
+                          className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-accent text-gray-900"
                           placeholder="+44 712xxxxxxx"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Address</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
                       <textarea
                         name="address"
                         value={formData.address}
                         onChange={handleInputChange}
                         rows={3}
-                        className="w-full p-3 border-2 rounded-lg focus:outline-none focus:border-accent"
-                        style={{
-                          borderColor: 'var(--color-text-secondary)',
-                          backgroundColor: 'var(--bg-card)',
-                          color: 'var(--color-text-primary)'
-                        }}
+                        className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-accent text-gray-900"
                         placeholder="Your home address"
                       />
                     </div>
 
                     {/* Preferences */}
-                    <div className="pt-6" style={{ borderTop: '1px solid var(--border-color)' }}>
-                      <h3 className="text-xl font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>Safety Preferences</h3>
+                    <div className="border-t pt-6">
+                      <h3 className="text-xl font-semibold text-gray-800 mb-4">Safety Preferences</h3>
                       <div className="grid md:grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Preferred Transport</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Transport</label>
                           <select
                             name="preferences.preferredTransport"
                             value={formData.preferences.preferredTransport}
                             onChange={handleInputChange}
-                            className="w-full p-3 border-2 rounded-lg focus:outline-none focus:border-accent"
-                            style={{
-                              borderColor: 'var(--color-text-secondary)',
-                              backgroundColor: 'var(--bg-card)',
-                              color: 'var(--color-text-primary)'
-                            }}
+                            className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-accent text-gray-900"
                           >
                             <option value="walking">🚶 Walking</option>
                             <option value="cycling">🚴 Cycling</option>
@@ -390,17 +359,12 @@ export default function Profile() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Safety Priority</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Safety Priority</label>
                           <select
                             name="preferences.safetyPriority"
                             value={formData.preferences.safetyPriority}
                             onChange={handleInputChange}
-                            className="w-full p-3 border-2 rounded-lg focus:outline-none focus:border-accent"
-                            style={{
-                              borderColor: 'var(--color-text-secondary)',
-                              backgroundColor: 'var(--bg-card)',
-                              color: 'var(--color-text-primary)'
-                            }}
+                            className="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-accent text-gray-900"
                           >
                             <option value="high">🛡️ High - Prioritize safety over speed</option>
                             <option value="medium">⚖️ Medium - Balance safety and efficiency</option>
@@ -417,7 +381,7 @@ export default function Profile() {
                             onChange={handleInputChange}
                             className="w-4 h-4 text-accent bg-gray-100 border-gray-300 rounded focus:ring-accent focus:ring-2"
                           />
-                          <span className="ml-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Enable safety notifications and alerts</span>
+                          <span className="ml-2 text-sm text-gray-700">Enable safety notifications and alerts</span>
                         </label>
                       </div>
                     </div>
@@ -426,7 +390,10 @@ export default function Profile() {
                     <div className="flex gap-4 pt-6">
                       <button
                         type="submit"
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200"
+                        className="flex-1 font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-md"
+                        style={{ backgroundColor: '#06d6a0', color: '#0f172a' }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
                       >
                         💾 Save Changes
                       </button>
@@ -437,7 +404,8 @@ export default function Profile() {
                           setError('')
                           setSuccess('')
                         }}
-                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200"
+                        className="flex-1 bg-gray-200 hover:bg-gray-300 font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-md"
+                        style={{ color: '#475569' }}
                       >
                         ❌ Cancel
                       </button>
@@ -452,29 +420,3 @@ export default function Profile() {
     </ProtectedRoute>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

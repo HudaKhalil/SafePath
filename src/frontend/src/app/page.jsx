@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import { useRouter } from 'next/navigation';
 import Image from "next/image";
@@ -24,7 +24,7 @@ export default function Home() {
     }
   };
   return (
-    <main className="min-h-screen bg-primary-dark text-text-primary">
+    <main style={{ backgroundColor: '#ffffff' }}>
       {/* HERO */}
       <Section className="overflow-hidden">
         {/* decorative gradient blob */}
@@ -37,8 +37,8 @@ export default function Home() {
           }}
         />
 
-        <div className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20 lg:py-28 animate-fadeIn">
-          <div className="grid items-center gap-8 sm:gap-10 lg:gap-14 lg:grid-cols-12">
+        <div className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12 animate-fadeIn">
+          <div className="grid items-center gap-6 sm:gap-8 lg:gap-10 lg:grid-cols-12">
             {/* Artwork card */}
             <div className="lg:col-span-7 order-1">
               <div className="rounded-2xl p-[6px] sm:p-2 shadow-lg ring-1 ring-white/30" style={{ backgroundColor: 'rgba(15, 23, 42, 0.95)' }}>
@@ -61,20 +61,20 @@ export default function Home() {
                 <span aria-hidden></span> Safer journeys for walkers & cyclists
               </p>
 
-             <h1 className="mt-5 md:mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold">
-  Find Your <span style={{ color: '#06d6a0' }}>Safer</span> Way
-</h1>
-<h2 className="hero-subtitle mt-4 sm:mt-5">  {/* CHANGED: Added mt-4 sm:mt-5 instead of -mt-1 sm:-mt-2 */}
-  Built for Walkers &amp; Cyclists
-</h2>
+              <h1 className="mt-3 md:mt-4 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold" style={{ color: '#1e293b' }}>
+                Find Your Safer Way
+              </h1>
+              <h2 className="hero-subtitle -mt-1 sm:-mt-2">
+                Built for Walkers &amp; Cyclists
+              </h2>
 
-              <p className="mt-4 max-w-xl lg:max-w-none mx-auto lg:mx-0 text-base sm:text-lg md:text-xl text-text-secondary leading-relaxed">
+              <p className="mt-3 max-w-xl lg:max-w-none mx-auto lg:mx-0 text-sm sm:text-base md:text-lg leading-relaxed" style={{ color: '#64748b' }}>
                 Discover the safest routes in any city with real-time hazard
                 data, community insights, and intelligent routing for
                 pedestrians and cyclists.
               </p>
 
-              <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:gap-4 lg:justify-start justify-center">
+              <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row gap-3 sm:gap-4 lg:justify-start justify-center">
                 <button
                   onClick={(e) => handleProtectedAction(e, '/suggested-routes')}
                   className="btn-primary inline-flex items-center gap-2 justify-center text-lg px-6 py-3 rounded-lg"
@@ -83,13 +83,13 @@ export default function Home() {
                 </button>
                 <button
                   onClick={(e) => handleProtectedAction(e, '/report-hazards')}
-                  className="inline-flex items-center gap-2 justify-center font-semibold px-6 py-2 rounded-lg transition-all duration-200"
+                  className="inline-flex items-center gap-2 justify-center text-lg px-6 py-3 rounded-lg font-semibold transition-all duration-200"
                   style={{
-                    backgroundColor: '#fb3737ff',
+                    backgroundColor: '#f87171',
                     color: '#ffffff'
                   }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f80707ff'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#fb3737ff'}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#ef4444'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f87171'}
                 >
                   Report Hazard
                 </button>
