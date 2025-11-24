@@ -1,7 +1,5 @@
 import './globals.css'
-import Navbar from '../components/Navbar'
-import BottomNav from '../components/BottomNav'
-import Footer from '../components/Footer'
+import ConditionalLayout from '../components/ConditionalLayout'
 
 
 export const metadata = {
@@ -22,12 +20,9 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        <Navbar />
-        <main className="min-h-screen animate-fadeIn pb-20 md:pb-0">{children}</main>
-        <BottomNav />
-        <Footer />
+    <html lang="en" style={{ height: '100%' }}>
+      <body style={{ height: '100%', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' }}>
+        <ConditionalLayout>{children}</ConditionalLayout>
       </body>
     </html>
   )
