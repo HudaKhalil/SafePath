@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ProtectedRoute from '../../components/auth/ProtectedRoute';
 import BuddyHeader from '../../components/BuddyHeader';
 import ModeFilterChips from '../../components/ModeFilterChips';
@@ -8,8 +8,16 @@ import ShareLocationToggle from '../../components/ShareLocationToggle';
 import BuddyMapView from '../../components/BuddyMapView';
 import BottomSheet from '../../components/BottomSheet';
 import EnhancedBuddyCard from '../../components/EnhancedBuddyCard';
+import { buddyService } from '../../lib/services';
 
-// Mock buddy data
+// Avatar colors for buddy cards
+const avatarColors = [
+  'bg-teal-500', 'bg-cyan-500', 'bg-green-500', 
+  'bg-blue-500', 'bg-purple-500', 'bg-pink-500',
+  'bg-indigo-500', 'bg-orange-500'
+];
+
+// Mock buddy data (fallback)
 const mockBuddies = [
   {
     id: 1,
@@ -17,7 +25,7 @@ const mockBuddies = [
     initials: 'SK',
     latitude: 51.5074,
     longitude: -0.1278,
-    distance: 234,
+    distance: 234, // meters
     mode: 'cycling',
     pace: 'Medium pace',
     routeOverlap: { distance: 1.3, unit: 'km' },
@@ -122,25 +130,124 @@ export default function FindBuddy() {
     time: 'now',
     context: null
   });
-  const [filteredBuddies, setFilteredBuddies] = useState(mockBuddies);
-  const [notificationCount, setNotificationCount] = useState(2);
+  const [buddies, setBuddies] = useState([]);
+  const [filteredBuddies, setFilteredBuddies] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [userLocation, setUserLocation] = useState([51.5074, -0.1278]); // Default: London
 
-  const userLocation = [51.5074, -0.1278];
+  // Get user's current location
+  useEffect(() => {
+    if (navigator.geolocation && isLocationSharing) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation([position.coords.latitude, position.coords.longitude]);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          // Keep default location
+        }
+      );
+    }
+  }, [isLocationSharing]);
+
+  // Fetch buddies from API
+  useEffect(() => {
+    if (!isLocationSharing) {
+      setBuddies([]);
+      setFilteredBuddies([]);
+      return;
+    }
+
+    const fetchBuddies = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Convert filter modes to API format
+        const apiModes = filters.modes.map(mode => {
+          if (mode === 'walk') return 'walking';
+          if (mode === 'cycle') return 'cycling';
+          return mode;
+        });
+
+        const response = await buddyService.getNearbyBuddies({
+          lat: userLocation[0],
+          lon: userLocation[1],
+          radius: 5,
+          modes: apiModes.join(','),
+          status: 'available'
+        });
+
+        if (response.success && response.data.buddies) {
+          // Transform API data to match UI format
+          const transformedBuddies = response.data.buddies.map((buddy, index) => {
+            // Get initials from username
+            const nameParts = buddy.username.split('_').map(part => part.charAt(0).toUpperCase());
+            const initials = nameParts.slice(0, 2).join('');
+            
+            // Determine mode from preferred_modes
+            const hasWalking = buddy.preferred_modes.includes('walking') || buddy.preferred_modes.includes('running');
+            const hasCycling = buddy.preferred_modes.includes('cycling');
+            const mode = hasCycling ? 'cycling' : 'walking';
+
+            return {
+              id: buddy.id,
+              name: buddy.username.replace('_', ' '),
+              initials: initials,
+              latitude: userLocation[0] + (Math.random() - 0.5) * 0.01, // Mock location near user
+              longitude: userLocation[1] + (Math.random() - 0.5) * 0.01,
+              distance: Math.round(buddy.distance_km * 1000), // Convert to meters
+              mode: mode,
+              pace: 'Medium pace',
+              routeOverlap: { 
+                distance: buddy.distance_km < 1 ? (buddy.distance_km * 1000).toFixed(0) : buddy.distance_km.toFixed(1), 
+                unit: buddy.distance_km < 1 ? 'm' : 'km' 
+              },
+              rating: buddy.rating,
+              ridesCount: buddy.total_ratings,
+              verified: buddy.rating >= 4.5,
+              availability: 'Available now',
+              status: buddy.availability_status === 'available' ? 'online' : 'offline',
+              avatarColor: avatarColors[index % avatarColors.length],
+              bio: buddy.bio
+            };
+          });
+
+          setBuddies(transformedBuddies);
+          setFilteredBuddies(transformedBuddies);
+        } else {
+          // Fallback to mock data
+          console.warn('API returned no buddies, using mock data');
+          setBuddies(mockBuddies);
+          setFilteredBuddies(mockBuddies);
+        }
+      } catch (error) {
+        console.error('Error fetching buddies:', error);
+        setError(error.message);
+        // Fallback to mock data on error
+        setBuddies(mockBuddies);
+        setFilteredBuddies(mockBuddies);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBuddies();
+  }, [isLocationSharing, filters.modes, userLocation[0], userLocation[1]]);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
-    
-    const filtered = mockBuddies.filter(buddy => {
-      const modeMatch = newFilters.modes.includes(buddy.mode === 'cycling' ? 'cycle' : 'walk');
-      const statusMatch = buddy.status === 'online';
-      return modeMatch && statusMatch;
-    });
-    
-    setFilteredBuddies(filtered);
+    // API fetch will be triggered by useEffect when filters change
   };
 
   const handleLocationToggle = (isSharing) => {
     setIsLocationSharing(isSharing);
+    if (!isSharing) {
+      setBuddies([]);
+      setFilteredBuddies([]);
+    }
   };
 
   const handleAskToJoin = (buddy) => {
@@ -210,7 +317,17 @@ export default function FindBuddy() {
           maxHeight={500}
         >
           <div className="space-y-3 pb-24">
-            {displayedBuddies.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                  <svg className="w-8 h-8 text-gray-500 dark:text-text-secondary animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+                <p className="text-gray-900 dark:text-text-primary font-medium mb-2">Finding buddies...</p>
+                <p className="text-sm text-gray-600 dark:text-text-secondary">Searching nearby for available buddies</p>
+              </div>
+            ) : displayedBuddies.length > 0 ? (
               displayedBuddies.map((buddy) => (
                 <EnhancedBuddyCard
                   key={buddy.id}

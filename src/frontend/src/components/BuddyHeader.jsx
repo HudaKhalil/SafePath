@@ -12,39 +12,23 @@ export default function BuddyHeader({
   const router = useRouter();
 
   return (
-    <div className="backdrop-blur-md border-b px-4 py-3 sticky top-0 z-[1001]" style={{ 
-      backgroundColor: 'var(--bg-card)',
-      borderColor: 'var(--border-color)'
-    }}>
-      {/* Top row with back button, title, and actions */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3 flex-1">
-          {/* Back button */}
-          <button
-            onClick={() => router.back()}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:opacity-80 transition-all"
-            style={{ backgroundColor: 'var(--bg-icon)' }}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
-          </button>
-          
-          {/* Title */}
-          <h1 className="text-lg md:text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
-            Find Buddy
-          </h1>
-        </div>
+    <div className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-[1001] shadow-sm">
+      {/* Top row with centered title and action buttons */}
+      <div className="flex items-center justify-center mb-2 relative">
+        {/* Title - centered */}
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          Find <span style={{ color: '#06d6a0' }}>Buddy</span>
+        </h1>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2">
+        {/* Action buttons - absolute positioned to right */}
+        <div className="absolute right-0 flex items-center gap-2">
           {/* Notifications */}
           <button
             onClick={onNotificationClick}
-            className="relative w-9 h-9 flex items-center justify-center rounded-full hover:opacity-80 transition-all"
-            style={{ backgroundColor: 'var(--bg-icon)' }}
+            className="relative w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
             aria-label={`${notificationCount} notifications`}
           >
-            <Bell className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+            <Bell className="w-5 h-5 text-gray-700" />
             {notificationCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
                 {notificationCount}
@@ -55,32 +39,18 @@ export default function BuddyHeader({
           {/* Settings */}
           <button
             onClick={onSettingsClick}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:opacity-80 transition-all"
-            style={{ backgroundColor: 'var(--bg-icon)' }}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
             aria-label="Settings"
           >
-            <Settings className="w-5 h-5" style={{ color: 'var(--color-text-primary)' }} />
+            <Settings className="w-5 h-5 text-gray-700" />
           </button>
         </div>
       </div>
 
       {/* Subtitle */}
-      <p className="text-xs md:text-sm mb-2 pl-12" style={{ color: 'var(--color-text-secondary)' }}>
+      <p className="text-sm md:text-base text-gray-600 text-center">
         Walk or cycle with someone nearby
       </p>
-
-      {/* Status pill */}
-      <div className="pl-12">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border" style={{
-          backgroundColor: 'var(--bg-icon)',
-          borderColor: 'var(--color-accent)'
-        }}>
-          <span style={{ color: 'var(--color-accent)' }} className="text-sm">✓</span>
-          <span className="text-xs md:text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-            {buddyCount} buddies available now
-          </span>
-        </div>
-      </div>
     </div>
   );
 }
