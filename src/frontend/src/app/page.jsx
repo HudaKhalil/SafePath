@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import Image from "next/image";
 import Cookies from 'js-cookie';
 
@@ -10,6 +11,18 @@ function Section({ className = "", ...props }) {
 
 export default function Home() {
   const router = useRouter();
+  const [isDark, setIsDark] = useState(false);
+
+  // Track dark mode changes
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const handleProtectedAction = (e, path) => {
     e.preventDefault();
@@ -24,7 +37,7 @@ export default function Home() {
     }
   };
   return (
-    <main style={{ backgroundColor: '#ffffff' }}>
+    <main style={{ backgroundColor: isDark ? 'transparent' : '#ffffff' }}>
       {/* HERO */}
       <Section className="overflow-hidden">
         {/* decorative gradient blob */}
@@ -41,34 +54,28 @@ export default function Home() {
           <div className="grid items-center gap-6 sm:gap-8 lg:gap-10 lg:grid-cols-12">
             {/* Artwork card */}
             <div className="lg:col-span-7 order-1">
-              <div className="rounded-2xl p-[6px] sm:p-2 shadow-lg ring-1 ring-white/30" style={{ backgroundColor: 'rgba(15, 23, 42, 0.95)' }}>
-                <div className="relative h-56 sm:h-72 md:h-96 lg:h-[30rem] rounded-xl overflow-hidden bg-transparent">
-                  <Image
-                    src="/app-hero.png"
-                    alt="SafePath — your guide to a safer journey"
-                    fill
-                    priority
-                    className="object-contain"
-                    sizes="(min-width: 1024px) 720px, (min-width: 768px) 640px, 100vw"
-                  />
-                </div>
+              <div className="relative h-56 sm:h-72 md:h-96 lg:h-[30rem] overflow-hidden bg-transparent">
+                <Image
+                  src="/app-hero.png"
+                  alt="SafePath — your guide to a safer journey"
+                  fill
+                  priority
+                  className="object-contain"
+                  sizes="(min-width: 1024px) 720px, (min-width: 768px) 640px, 100vw"
+                />
               </div>
             </div>
 
             {/* Copy + CTAs */}
             <div className="lg:col-span-5 order-2 text-center lg:text-left">
-              <p className="inline-flex items-center gap-2 rounded-full glass-effect px-3 py-1 text-xs sm:text-sm">
-                <span aria-hidden></span> Safer journeys for walkers & cyclists
-              </p>
-
-              <h1 className="mt-3 md:mt-4 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold" style={{ color: '#1e293b' }}>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
                 Find Your Safer Way
               </h1>
-              <h2 className="hero-subtitle -mt-1 sm:-mt-2">
-                Built for Walkers &amp; Cyclists
+              <h2 className="hero-subtitle mt-2 sm:mt-3">
+                Safer journeys for walkers &amp; cyclists
               </h2>
 
-              <p className="mt-3 max-w-xl lg:max-w-none mx-auto lg:mx-0 text-sm sm:text-base md:text-lg leading-relaxed" style={{ color: '#64748b' }}>
+              <p className="mt-3 max-w-xl lg:max-w-none mx-auto lg:mx-0 text-sm sm:text-base md:text-lg leading-relaxed" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
                 Discover the safest routes in any city with real-time hazard
                 data, community insights, and intelligent routing for
                 pedestrians and cyclists.
@@ -78,6 +85,7 @@ export default function Home() {
                 <button
                   onClick={(e) => handleProtectedAction(e, '/suggested-routes')}
                   className="btn-primary inline-flex items-center gap-2 justify-center text-lg px-6 py-3 rounded-lg"
+                  title="Plan a safe journey"
                 >
                   Go Safe
                 </button>
@@ -90,14 +98,11 @@ export default function Home() {
                   }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#ef4444'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = '#f87171'}
+                  title="Help others: report a hazard here"
                 >
                   Report Hazard
                 </button>
               </div>
-
-              <p className="mt-3 sm:mt-4 text-[11px] sm:text-xs text-text-secondary">
-                Choose safest • fastest — switch anytime
-              </p>
             </div>
           </div>
         </div>

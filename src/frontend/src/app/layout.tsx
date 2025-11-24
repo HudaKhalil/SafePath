@@ -20,8 +20,20 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" style={{ height: '100%' }}>
+    <html lang="en" style={{ height: '100%' }} suppressHydrationWarning>
       <body style={{ height: '100%', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' }}>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const theme = localStorage.getItem('theme') || 'light';
+                if (theme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
         <ConditionalLayout>{children}</ConditionalLayout>
       </body>
     </html>
