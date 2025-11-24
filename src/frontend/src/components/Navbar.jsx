@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { authService } from '../lib/services'
+import ThemeToggle from './ThemeToggle'
 
 
 
@@ -75,6 +76,7 @@ export default function Navbar() {
  <div style={{ color: '#f8fafc' }} className="font-bold text-2xl">SafePath</div>        </Link>
 
         <nav className="hidden md:flex gap-8 items-center font-bold">
+          <ThemeToggle />
           <Link 
       href="/" 
       className="transition-colors duration-200"
@@ -185,7 +187,8 @@ export default function Navbar() {
         </nav>
 
 
-        <div className="md:hidden">
+        <div className="md:hidden flex items-center gap-3">
+          <ThemeToggle />
           <button 
             onClick={() => setOpen(!open)} 
             className="p-2 rounded-lg transition-colors"

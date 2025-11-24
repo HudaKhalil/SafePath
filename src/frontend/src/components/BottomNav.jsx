@@ -35,7 +35,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-1001 bg-white/95 backdrop-blur border-t border-slate-200"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-1001 bg-white/95 dark:bg-[#1e293b]/95 backdrop-blur border-t border-slate-200 dark:border-white/20"
       role="navigation"
       aria-label="Primary"
     >
