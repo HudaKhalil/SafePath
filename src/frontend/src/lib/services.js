@@ -501,3 +501,129 @@ export const geocodingService = {
     }
   }
 };
+
+export const buddyService = {
+  // Get nearby available buddies
+  async getNearbyBuddies(params = {}) {
+    try {
+      const { lat, lon, radius = 5, modes, status } = params;
+      
+      if (!lat || !lon) {
+        throw new Error('Latitude and longitude are required');
+      }
+
+      const queryParams = {
+        lat,
+        lon,
+        radius,
+        ...(modes && { modes: Array.isArray(modes) ? modes.join(',') : modes }),
+        ...(status && { status })
+      };
+
+      const response = await api.get('/buddies/nearby', { params: queryParams });
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Get detailed profile of a buddy
+  async getBuddyProfile(userId) {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
+      const response = await api.get(`/buddies/profile/${userId}`);
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Get current user's buddy profile
+  async getMyProfile() {
+    try {
+      const response = await api.get('/buddies/my-profile');
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Update current user's buddy profile
+  async updateMyProfile(profileData) {
+    try {
+      const response = await api.put('/buddies/my-profile', profileData);
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Send a buddy request (placeholder for future implementation)
+  async sendRequest(recipientId, requestData) {
+    try {
+      if (!recipientId) {
+        throw new Error('Recipient ID is required');
+      }
+
+      const response = await api.post('/buddies/requests', {
+        recipient_id: recipientId,
+        ...requestData
+      });
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Get buddy requests (placeholder for future implementation)
+  async getRequests(filter = 'all') {
+    try {
+      const response = await api.get('/buddies/requests', {
+        params: { filter }
+      });
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Respond to a buddy request (placeholder for future implementation)
+  async respondToRequest(requestId, action) {
+    try {
+      if (!requestId || !action) {
+        throw new Error('Request ID and action are required');
+      }
+
+      const response = await api.put(`/buddies/requests/${requestId}`, {
+        action // 'accept' or 'reject'
+      });
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  }
+};
