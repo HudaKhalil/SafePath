@@ -14,6 +14,8 @@ const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 export default function SuggestedRoutes() {
   const [mapKey, setMapKey] = useState(0);
   const [mapCenter, setMapCenter] = useState(null);
+  const [isDark, setIsDark] = useState(false);
+  
   const clearBackendRoutes = () => {
     setBackendRoutes([]);
     setSelectedRoute(null);
@@ -57,6 +59,8 @@ export default function SuggestedRoutes() {
   const [mapZoom, setMapZoom] = useState(14);
   const resultsRef = useRef(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showRoutePanel, setShowRoutePanel] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(true);
 
   const fetchBackendRoutes = async () => {
     setBackendLoading(true);
@@ -81,13 +85,23 @@ export default function SuggestedRoutes() {
     getUserLocation();
   }, []);
 
+  // Track dark mode changes
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (routes.length > 0 || backendRoutes.length > 0) {
       // Show toast notification
       setShowSuccessToast(true);
-      
-      // Don't scroll - let user see routes on map and cards are visible below
-      // If on mobile, user can scroll down manually to see cards
+      // Open route panel automatically
+      setShowRoutePanel(true);
       
       // Hide toast after 4 seconds
       setTimeout(() => {
@@ -401,7 +415,7 @@ export default function SuggestedRoutes() {
         <div 
           className="fixed top-24 left-1/2 transform -translate-x-1/2 z-9999 animate-slide-down"
           style={{
-            backgroundColor: '#f0fdf4',
+            backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : '#f0fdf4',
             border: '2px solid #06d6a0',
             boxShadow: '0 10px 40px rgba(6, 214, 160, 0.3)'
           }}
@@ -409,8 +423,8 @@ export default function SuggestedRoutes() {
           <div className="px-6 py-4 rounded-xl flex items-center gap-3">
             <span className="text-2xl">✓</span>
             <div>
-              <h3 className="font-bold text-lg" style={{ color: '#0f172a' }}>Routes Found!</h3>
-              <p className="text-sm" style={{ color: '#64748b' }}>
+              <h3 className="font-bold text-lg" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>Routes Found!</h3>
+              <p className="text-sm" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
                 {backendRoutes.length > 0 ? `${backendRoutes.length} routes` : `${routes.length} routes`} available on map. Scroll down to compare details.
               </p>
             </div>
@@ -418,11 +432,11 @@ export default function SuggestedRoutes() {
         </div>
       )}
     
-      <div className="min-h-screen" style={{ backgroundColor: '#ffffff' }}>
+      <div className="min-h-screen" style={{ backgroundColor: isDark ? 'transparent' : '#ffffff' }}>
       
         <div className="text-center pt-6 pb-3 md:pt-12 md:pb-8">
        
-          <h1 className="text-3xl md:text-4xl font-bold" style={{ color: 'var(--color-primary)' }}>
+          <h1 className="text-3xl md:text-4xl font-bold" style={{ color: isDark ? '#f8fafc' : 'var(--color-primary)' }}>
             Find the <span style={{ color: '#06d6a0' }}>Safest Route</span>
           </h1>
          
@@ -432,10 +446,87 @@ export default function SuggestedRoutes() {
         </div>
 
         <div className="relative w-full" style={{ height: 'calc(100vh - 230px)' }}>
-          {/* Floating search card - desktop only */}
-          <div className="hidden md:block absolute top-4 left-4 z-1000 w-96">
-            <div className="p-4 rounded-2xl shadow-2xl" style={{ backgroundColor: '#ffffff' }}>
-              <div className="flex justify-end mb-2">
+          {/* Search Panel - Collapsible from Left (Desktop) */}
+          <div 
+            className={`hidden md:block fixed top-20 left-0 z-1000 transition-transform duration-300 ease-in-out ${
+              showSearchPanel ? 'translate-x-0' : '-translate-x-full'
+            }`}
+            style={{ 
+              width: '420px',
+              height: 'calc(100vh - 5rem)',
+              boxShadow: '4px 0 12px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            {/* Toggle Button */}
+            <button
+              onClick={() => setShowSearchPanel(!showSearchPanel)}
+              className="absolute right-0 top-1/2 translate-x-full -translate-y-1/2 py-6 px-3 rounded-r-lg shadow-lg transition-all"
+              style={{ 
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#06d6a0' : '#0f172a'
+              }}
+              title={showSearchPanel ? 'Hide search' : 'Show search'}
+            >
+              <span className="text-xl font-bold">
+                {showSearchPanel ? '←' : '→'}
+              </span>
+            </button>
+
+            {/* Panel Content */}
+            <div 
+              className="h-full overflow-y-auto"
+              style={{ 
+                background: isDark 
+                  ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)' 
+                  : '#ffffff',
+                borderRight: isDark ? '1px solid #334155' : '1px solid #e5e7eb'
+              }}
+            >
+              <div className="p-4 pt-8" style={{ 
+                background: 'transparent'
+              }}>
+              {/* Title and Subtitle */}
+              <div className="mb-6">
+                <h2 className="text-lg font-bold mb-1" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+                  Plan Your Route
+                </h2>
+                <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                  Find the safest path
+                </p>
+              </div>
+              
+              <div className="flex justify-between items-center mb-4">
+                {fromLocation && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setFromLocation("");
+                      setToLocation("");
+                      setFromCoords(null);
+                      setToCoords(null);
+                      setRoutes([]);
+                      setBackendRoutes([]);
+                      setSelectedRoute(null);
+                      setShowRouting(false);
+                      setMapKey((prev) => prev + 1);
+                    }}
+                    className="text-sm px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 border shadow-md"
+                    style={{
+                      backgroundColor: '#06d6a0',
+                      color: '#0f172a',
+                      borderColor: '#059669'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#059669';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#06d6a0';
+                    }}
+                    title="Clear all selections"
+                  >
+                    <span className="font-semibold">Clear</span>
+                  </button>
+                )}
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -452,7 +543,7 @@ export default function SuggestedRoutes() {
                       e.target.style.backgroundColor = '#06d6a0';
                     }, 1500);
                   }}
-                  className="text-xs px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 border shadow-md"
+                  className="text-xs px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 border shadow-md ml-auto"
                   style={{
                     backgroundColor: '#06d6a0',
                     color: '#0f172a',
@@ -490,8 +581,9 @@ export default function SuggestedRoutes() {
                     <div 
                       className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200"
                       style={{
-                        backgroundColor: transportMode === "walking" ? '#1e293b' : '#e2e8f0',
-                        color: transportMode === "walking" ? '#ffffff' : '#94a3b8'
+                        backgroundColor: transportMode === "walking" ? '#06d6a0' : (isDark ? '#475569' : '#e2e8f0'),
+                        color: transportMode === "walking" ? '#0f172a' : (isDark ? '#cbd5e1' : '#94a3b8'),
+                        border: isDark && transportMode !== "walking" ? '1px solid #64748b' : 'none'
                       }}
                     >
                       <svg 
@@ -517,8 +609,9 @@ export default function SuggestedRoutes() {
                     <div 
                       className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200"
                       style={{
-                        backgroundColor: transportMode === "cycling" ? '#1e293b' : '#e2e8f0',
-                        color: transportMode === "cycling" ? '#ffffff' : '#94a3b8'
+                        backgroundColor: transportMode === "cycling" ? '#06d6a0' : (isDark ? '#475569' : '#e2e8f0'),
+                        color: transportMode === "cycling" ? '#0f172a' : (isDark ? '#cbd5e1' : '#94a3b8'),
+                        border: isDark && transportMode !== "cycling" ? '1px solid #64748b' : 'none'
                       }}
                     >
                       <svg 
@@ -546,17 +639,16 @@ export default function SuggestedRoutes() {
                 <button
                   id="find-routes-btn"
                   type="submit"
-                  className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
+                  className="w-full font-bold py-2.5 rounded-lg text-sm"
                   style={{
                     backgroundColor: '#06d6a0',
                     color: '#0f172a'
                   }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
                 >
                   🔍 Find Routes
                 </button>
               </form>
+            </div>
             </div>
           </div>
 
@@ -569,9 +661,34 @@ export default function SuggestedRoutes() {
               minHeight={160}
               maxHeight={520}
             >
-              <div className="space-y-2 pb-2">
-                <div className="flex justify-between items-center">
-                  <div className="flex gap-2">
+              <div className="space-y-2 pb-2 pt-2">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex gap-2 items-center">
+                    {fromLocation && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setFromLocation("");
+                          setToLocation("");
+                          setFromCoords(null);
+                          setToCoords(null);
+                          setRoutes([]);
+                          setBackendRoutes([]);
+                          setSelectedRoute(null);
+                          setShowRouting(false);
+                          setMapKey((prev) => prev + 1);
+                        }}
+                        className="text-sm px-3 py-1.5 rounded-full transition-all duration-200 flex items-center border shadow-md"
+                        style={{
+                          backgroundColor: '#06d6a0',
+                          color: '#0f172a',
+                          borderColor: '#059669'
+                        }}
+                        title="Clear all selections"
+                      >
+                        <span className="font-semibold">Clear</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setTransportMode("walking")}
@@ -581,8 +698,9 @@ export default function SuggestedRoutes() {
                       <div 
                         className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
                         style={{
-                          backgroundColor: transportMode === "walking" ? '#1e293b' : '#e2e8f0',
-                          color: transportMode === "walking" ? '#ffffff' : '#94a3b8'
+                          backgroundColor: transportMode === "walking" ? '#06d6a0' : (isDark ? '#475569' : '#e2e8f0'),
+                          color: transportMode === "walking" ? '#0f172a' : (isDark ? '#cbd5e1' : '#94a3b8'),
+                          border: isDark && transportMode !== "walking" ? '1px solid #64748b' : 'none'
                         }}
                       >
                         <svg 
@@ -605,8 +723,9 @@ export default function SuggestedRoutes() {
                       <div 
                         className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
                         style={{
-                          backgroundColor: transportMode === "cycling" ? '#1e293b' : '#e2e8f0',
-                          color: transportMode === "cycling" ? '#ffffff' : '#94a3b8'
+                          backgroundColor: transportMode === "cycling" ? '#06d6a0' : (isDark ? '#475569' : '#e2e8f0'),
+                          color: transportMode === "cycling" ? '#0f172a' : (isDark ? '#cbd5e1' : '#94a3b8'),
+                          border: isDark && transportMode !== "cycling" ? '1px solid #64748b' : 'none'
                         }}
                       >
                         <svg 
@@ -674,42 +793,14 @@ export default function SuggestedRoutes() {
 
                   <button
                     type="submit"
-                    className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
+                    className="w-full font-bold py-2.5 rounded-lg text-sm"
                     style={{
                       backgroundColor: '#06d6a0',
                       color: '#0f172a'
                     }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
                   >
                     🔍 Find Routes
                   </button>
-
-                  {(backendRoutes.length > 0 || routes.length > 0) && (
-                    <div className="text-center mt-2">
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setBackendRoutes([]);
-                          setRoutes([]);
-                          setFromLocation("");
-                          setToLocation("");
-                          setFromCoords(null);
-                          setToCoords(null);
-                          setShowRouting(false);
-                          setSelectedRoute(null);
-                          setMapKey((prev) => prev + 1);
-                        }}
-                        className="text-sm underline transition-colors"
-                        style={{ color: '#64748b' }}
-                        onMouseEnter={(e) => e.target.style.color = '#ef4444'}
-                        onMouseLeave={(e) => e.target.style.color = '#64748b'}
-                      >
-                        ✕ Clear & Start Over
-                      </a>
-                    </div>
-                  )}
                 </form>
               </div>
             </RoutesSheet>
@@ -719,7 +810,7 @@ export default function SuggestedRoutes() {
           <div className="w-full h-full">
             <div className="w-full h-full rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#1e293b' }}>
               <div className="bg-linear-to-br from-primary-dark via-primary to-slate-700 p-3">
-                <div className="flex items-center justify-center gap-4 relative">
+                <div className="flex items-center justify-center gap-4">
                   <p className="text-sm font-medium" style={{ color: '#ffffff' }}>
                     {!fromCoords
                       ? "📍 Click on map to set starting point"
@@ -727,30 +818,6 @@ export default function SuggestedRoutes() {
                       ? "🎯 Click on map to set destination"
                       : "✓ Both points selected - click again to change destination"}
                   </p>
-                  
-                  {(backendRoutes.length > 0 || routes.length > 0 || (fromCoords && toCoords)) && (
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setBackendRoutes([]);
-                        setRoutes([]);
-                        setFromLocation("");
-                        setToLocation("");
-                        setFromCoords(null);
-                        setToCoords(null);
-                        setShowRouting(false);
-                        setSelectedRoute(null);
-                        setMapKey((prev) => prev + 1);
-                      }}
-                      className="underline transition cursor-pointer text-sm absolute right-0"
-                      style={{ color: '#ffffff' }}
-                      onMouseEnter={(e) => e.target.style.color = '#ef4444'}
-                      onMouseLeave={(e) => e.target.style.color = '#ffffff'}
-                    >
-                      Clear
-                    </a>
-                  )}
                 </div>
                 <div className="overflow-hidden" style={{ height: 'calc(100vh - 320px)' }}>
                   {!loading && (
@@ -818,52 +885,94 @@ export default function SuggestedRoutes() {
           </div>
         )}
 
+        {/* Collapsible Route Panel - Desktop */}
         {routes.length > 0 && (
-          <section ref={resultsRef} className="max-w-6xl mx-auto py-8 rounded-2xl shadow-lg mt-8" style={{ backgroundColor: '#ffffff' }}>
-            <h2 className="text-2xl font-bold text-center mb-6" style={{ color: '#0f172a' }}>
-              Route Comparison
-            </h2>
-            <div className="grid md:grid-cols-2 gap-6 px-6">
+          <>
+            {/* Toggle Button - Always Visible */}
+            <button
+              onClick={() => setShowRoutePanel(!showRoutePanel)}
+              className="hidden md:block fixed top-1/2 py-6 px-3 rounded-l-lg shadow-lg transition-all z-1001"
+              style={{ 
+                right: showRoutePanel ? '480px' : '0',
+                transform: 'translateY(-50%)',
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#06d6a0' : '#0f172a',
+                transitionProperty: 'all',
+                transitionDuration: '300ms'
+              }}
+              title={showRoutePanel ? 'Hide routes' : 'Show routes'}
+            >
+              <span className="text-xl font-bold">
+                {showRoutePanel ? '→' : '←'}
+              </span>
+            </button>
+
+          <div 
+            className={`hidden md:block fixed top-20 right-0 z-1000 transition-transform duration-300 ease-in-out ${
+              showRoutePanel ? 'translate-x-0' : 'translate-x-full'
+            }`}
+            style={{ 
+              width: '480px',
+              height: 'calc(100vh - 5rem)',
+              boxShadow: '-4px 0 12px rgba(0, 0, 0, 0.15)',
+              overflow: 'hidden'
+            }}
+          >
+
+            {/* Panel Content */}
+            <div 
+              className="h-full overflow-y-scroll overflow-x-hidden route-panel-scroll flex flex-col"
+              style={{ 
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                scrollbarWidth: 'thin',
+                scrollbarColor: isDark ? '#475569 #1e293b' : '#cbd5e1 #f1f5f9'
+              }}
+            >
+              <div className="sticky top-0 z-10 p-4 border-b shrink-0" style={{ 
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                borderColor: isDark ? '#334155' : '#e5e7eb'
+              }}>
+                <h2 className="text-xl font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                  Route Comparison
+                </h2>
+              </div>
+              
+              <div className="p-4 space-y-4 flex-1 pb-8">
               {routes.map((route) => (
                 <div
                   key={route.id}
-                  className={`bg-gray-50 rounded-xl p-6 shadow-md border-2 ${
-                    route.type === 'fastest' ? 'border-blue-500' : 'border-green-500'
-                  }`}
+                  className="rounded-xl p-4 shadow-md border-2"
+                  style={{
+                    backgroundColor: isDark ? '#334155' : '#f9fafb',
+                    borderColor: route.type === 'fastest' ? '#3b82f6' : '#10b981'
+                  }}
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl">
-                        {route.type === 'fastest' ? '⚡' : '🛡️'}
-                      </span>
-                      <div>
-                        <h3 className="text-xl font-bold" style={{ color: '#0f172a' }}>
-                          {route.name}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          {route.type === 'fastest' ? 'Quickest path' : 'Safest path'}
-                        </p>
-                      </div>
-                    </div>
+                  <div className="mb-3">
+                    <h3 className="text-lg font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                      {route.name}
+                    </h3>
+                    <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                      {route.type === 'fastest' ? 'Quickest path' : 'Safest path'}
+                    </p>
                   </div>
 
-                  <div className="space-y-3 mb-4">
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                      <span className="text-gray-600 font-medium">Distance</span>
-                      <span className="text-xl font-bold text-blue-600">
+                  <div className="space-y-2 mb-3">
+                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Distance</span>
+                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#3b82f6' : '#10b981' }}>
                         {route.distance} km
                       </span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                      <span className="text-gray-600 font-medium">Time</span>
-                      <span className="text-xl font-bold text-blue-600">
+                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Time</span>
+                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#3b82f6' : '#10b981' }}>
                         {route.estimatedTime} min
                       </span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                      <span className="text-gray-600 font-medium">Safety Score</span>
+                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Safety Score</span>
                       <div className="flex items-center gap-2">
-                        <div className="w-32 h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className={`h-full ${
                               route.safetyRating >= 7 ? 'bg-green-500' : 
@@ -873,7 +982,7 @@ export default function SuggestedRoutes() {
                             style={{ width: `${route.safetyRating * 10}%` }}
                           />
                         </div>
-                        <span className={`text-xl font-bold ${
+                        <span className={`text-sm font-bold ${
                           route.safetyRating >= 7 ? 'text-green-600' : 
                           route.safetyRating >= 5 ? 'text-yellow-600' : 
                           'text-red-600'
@@ -886,37 +995,138 @@ export default function SuggestedRoutes() {
 
                   <button
                     onClick={() => startNavigation(route)}
-                    className={`w-full font-bold py-3 rounded-lg transition shadow-md ${
-                      route.type === 'fastest' 
-                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
+                    className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
+                    style={{
+                      backgroundColor: route.type === 'fastest' ? '#3b82f6' : '#10b981',
+                      color: '#ffffff'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = route.type === 'fastest' ? '#2563eb' : '#059669'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = route.type === 'fastest' ? '#3b82f6' : '#10b981'}
                   >
                     Start {route.type === 'fastest' ? 'Fastest' : 'Safest'} Route
                   </button>
                 </div>
               ))}
-            </div>
 
-            {routes.length === 2 && (
-              <div className="mt-6 px-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-bold text-blue-900 mb-2">Route Analysis</h4>
-                  <div className="text-sm text-blue-800 space-y-1">
+              {routes.length === 2 && (
+                <div className="rounded-lg p-3 mx-4 mb-4" style={{ 
+                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
+                  border: `1px solid ${isDark ? '#3b82f6' : '#bfdbfe'}`
+                }}>
+                  <h4 className="font-bold mb-2 text-sm" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>Route Analysis</h4>
+                  <div className="text-xs space-y-1" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
                     <p>
-                      • The safest route is {((routes[1].distance / routes[0].distance - 1) * 100).toFixed(0)}% longer 
+                      • Safest is {((routes[1].distance / routes[0].distance - 1) * 100).toFixed(0)}% longer 
                       but {((routes[0].safetyRating / routes[1].safetyRating - 1) * 100).toFixed(0)}% safer
                     </p>
                     <p>
-                      • Time difference: {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime).toFixed(1)} minutes
+                      • Time difference: {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime).toFixed(1)} min
                     </p>
                     <p>
-                      • Safety scores are based on crime data, lighting conditions, and historical hazard reports
+                      • Based on crime data, lighting & hazard reports
                     </p>
                   </div>
                 </div>
+              )}
               </div>
-            )}
+            </div>
+          </div>
+          </>
+        )}
+
+        {/* Mobile Route Cards - Below Map */}
+        {routes.length > 0 && (
+          <section className="md:hidden max-w-6xl mx-auto py-6 rounded-2xl shadow-lg mt-6" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+            <h2 className="text-xl font-bold text-center mb-4 px-4" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+              Route Comparison
+            </h2>
+            <div className="space-y-4 px-4">
+              {routes.map((route) => (
+                <div
+                  key={route.id}
+                  className="rounded-xl p-4 shadow-md border-2"
+                  style={{
+                    backgroundColor: isDark ? '#334155' : '#f9fafb',
+                    borderColor: route.type === 'fastest' ? '#3b82f6' : '#10b981'
+                  }}
+                >
+                  <div className="mb-3">
+                    <h3 className="text-lg font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                      {route.name}
+                    </h3>
+                    <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                      {route.type === 'fastest' ? 'Quickest path' : 'Safest path'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 mb-3">
+                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Distance</span>
+                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#3b82f6' : '#10b981' }}>
+                        {route.distance} km
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Time</span>
+                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#3b82f6' : '#10b981' }}>
+                        {route.estimatedTime} min
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Safety</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${
+                              route.safetyRating >= 7 ? 'bg-green-500' : 
+                              route.safetyRating >= 5 ? 'bg-yellow-500' : 
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${route.safetyRating * 10}%` }}
+                          />
+                        </div>
+                        <span className={`text-sm font-bold ${
+                          route.safetyRating >= 7 ? 'text-green-600' : 
+                          route.safetyRating >= 5 ? 'text-yellow-600' : 
+                          'text-red-600'
+                        }`}>
+                          {route.safetyRating.toFixed(1)}/10
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => startNavigation(route)}
+                    className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
+                    style={{
+                      backgroundColor: route.type === 'fastest' ? '#3b82f6' : '#10b981',
+                      color: '#ffffff'
+                    }}
+                  >
+                    Start {route.type === 'fastest' ? 'Fastest' : 'Safest'} Route
+                  </button>
+                </div>
+              ))}
+
+              {routes.length === 2 && (
+                <div className="rounded-lg p-3 mb-32" style={{ 
+                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
+                  border: `1px solid ${isDark ? '#3b82f6' : '#bfdbfe'}`
+                }}>
+                  <h4 className="font-bold mb-2 text-sm" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>Route Analysis</h4>
+                  <div className="text-xs space-y-1" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
+                    <p>
+                      • Safest is {((routes[1].distance / routes[0].distance - 1) * 100).toFixed(0)}% longer 
+                      but {((routes[0].safetyRating / routes[1].safetyRating - 1) * 100).toFixed(0)}% safer
+                    </p>
+                    <p>
+                      • Time difference: {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime).toFixed(1)} min
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
         )}
 
@@ -926,83 +1136,225 @@ export default function SuggestedRoutes() {
           </div>
         )}
 
-       
+        {/* Backend Routes - Collapsible Side Panel (Desktop) */}
         {backendRoutes.length > 0 && (
-          <section className="max-w-6xl mx-auto py-8 rounded-2xl shadow-lg mt-8" style={{ backgroundColor: '#ffffff' }}>
-            <h2 className="text-2xl font-bold text-center mb-6" style={{ color: '#0f172a' }}>
-              🛡️ Suggested Routes
-            </h2>
-            <div className="space-y-4 px-6">
+          <div 
+            className={`hidden md:block fixed top-20 right-0 z-1000 transition-transform duration-300 ease-in-out ${
+              showBackendPanel ? 'translate-x-0' : 'translate-x-full'
+            }`}
+            style={{ 
+              width: '480px',
+              height: 'calc(100vh - 5rem)',
+              boxShadow: '-4px 0 12px rgba(0, 0, 0, 0.15)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Toggle Button */}
+            <button
+              onClick={() => setShowBackendPanel(!showBackendPanel)}
+              className="absolute left-0 top-1/2 -translate-x-full -translate-y-1/2 py-6 px-3 rounded-l-lg shadow-lg transition-all"
+              style={{ 
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#06d6a0' : '#0f172a'
+              }}
+              title={showBackendPanel ? 'Hide backend routes' : 'Show backend routes'}
+            >
+              <span className="text-xl font-bold">
+                {showBackendPanel ? '→' : '←'}
+              </span>
+            </button>
+
+            {/* Panel Content */}
+            <div 
+              className="h-full overflow-y-scroll overflow-x-hidden route-panel-scroll flex flex-col"
+              style={{ 
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                scrollbarWidth: 'thin',
+                scrollbarColor: isDark ? '#475569 #1e293b' : '#cbd5e1 #f1f5f9'
+              }}
+            >
+              <div className="sticky top-0 z-10 p-4 border-b shrink-0" style={{ 
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                borderColor: isDark ? '#334155' : '#e5e7eb'
+              }}>
+                <h2 className="text-xl font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                  🛡️ Suggested Routes
+                </h2>
+              </div>
+              
+              <div className="p-4 space-y-3 flex-1 pb-8">
               {[...backendRoutes]
                 .sort((a, b) => b.safetyRating - a.safetyRating)
                 .map((route) => (
                   <div
                     key={route.id}
-                    className={`bg-gray-50 rounded-xl p-6 shadow-md cursor-pointer ${selectedRoute?.id === route.id ? 'ring-2 ring-blue-500' : ''}`}
+                    className="rounded-xl p-4 shadow-md cursor-pointer"
+                    style={{
+                      backgroundColor: isDark ? '#334155' : '#f9fafb',
+                      border: `2px solid ${selectedRoute?.id === route.id ? '#3b82f6' : (isDark ? '#475569' : '#e5e7eb')}`
+                    }}
                     onClick={() => setSelectedRoute(route)}
                   >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">🛡️</span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🛡️</span>
                         <div>
-                          <h3 className="text-lg font-bold" style={{ color: '#0f172a' }}>
+                          <h3 className="text-base font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
                             {route.name}
                           </h3>
-                          <p className="text-sm text-gray-500 capitalize">
+                          <p className="text-xs capitalize" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
                             {route.difficulty} route
                           </p>
                         </div>
                       </div>
                       <span
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${getSafetyBadgeColor(
-                          route.safetyRating
-                        )}`}
+                        className="px-2 py-1 rounded-full text-xs font-medium"
+                        style={{
+                          backgroundColor: route.safetyRating >= 8 ? '#dcfce7' : route.safetyRating >= 6 ? '#fef9c3' : '#fee2e2',
+                          color: route.safetyRating >= 8 ? '#166534' : route.safetyRating >= 6 ? '#854d0e' : '#991b1b'
+                        }}
                       >
-                        Safety: {route.safetyRating}/10
+                        {route.safetyRating}/10
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 text-center mb-4">
+                    <div className="grid grid-cols-3 gap-2 text-center mb-3">
                       <div>
-                        <p className="text-xl font-semibold text-blue-600">
+                        <p className="text-lg font-semibold" style={{ color: '#3b82f6' }}>
                           {route.distanceKm} km
                         </p>
-                        <p className="text-sm text-gray-500">Distance</p>
+                        <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Distance</p>
                       </div>
                       <div>
-                        <p className="text-xl font-semibold text-blue-600">
+                        <p className="text-lg font-semibold" style={{ color: '#3b82f6' }}>
                           {route.estimatedTimeMinutes} min
                         </p>
-                        <p className="text-sm text-gray-500">Duration</p>
+                        <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Duration</p>
                       </div>
                       <div>
-                        <p
-                          className={`text-xl font-semibold ${getSafetyColor(
-                            route.safetyRating
-                          )}`}
-                        >
+                        <p className={`text-lg font-semibold ${
+                          route.safetyRating >= 8 ? 'text-green-600' : 
+                          route.safetyRating >= 6 ? 'text-yellow-600' : 
+                          'text-red-600'
+                        }`}>
                           {route.safetyRating}
                         </p>
-                        <p className="text-sm text-gray-500">Safety</p>
+                        <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Safety</p>
                       </div>
                     </div>
                     {route.description && (
-                      <div className="mb-2 text-gray-700 text-sm">
+                      <div className="mb-2 text-xs" style={{ color: isDark ? '#94a3b8' : '#4b5563' }}>
                         {route.description}
                       </div>
                     )}
-                    <div className="pt-4 border-t border-gray-200 flex flex-col items-center gap-2">
-                      {selectedRoute?.id === route.id && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startBackendNavigation(route);
-                          }}
-                          className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition shadow-md"
-                        >
-                          Start Navigation
-                        </button>
-                      )}
+                    {selectedRoute?.id === route.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startBackendNavigation(route);
+                        }}
+                        className="w-full font-bold py-2 rounded-lg transition shadow-md text-sm mt-2"
+                        style={{
+                          backgroundColor: '#3b82f6',
+                          color: '#ffffff'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                      >
+                        Start Navigation
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Backend Routes - Below Map */}
+        {backendRoutes.length > 0 && (
+          <section className="md:hidden max-w-6xl mx-auto py-6 rounded-2xl shadow-lg mt-6" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+            <h2 className="text-xl font-bold text-center mb-4 px-4" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+              🛡️ Suggested Routes
+            </h2>
+            <div className="space-y-3 px-4">
+              {[...backendRoutes]
+                .sort((a, b) => b.safetyRating - a.safetyRating)
+                .map((route) => (
+                  <div
+                    key={route.id}
+                    className="rounded-xl p-4 shadow-md cursor-pointer"
+                    style={{
+                      backgroundColor: isDark ? '#334155' : '#f9fafb',
+                      border: `2px solid ${selectedRoute?.id === route.id ? '#3b82f6' : (isDark ? '#475569' : '#e5e7eb')}`
+                    }}
+                    onClick={() => setSelectedRoute(route)}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🛡️</span>
+                        <div>
+                          <h3 className="text-base font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                            {route.name}
+                          </h3>
+                          <p className="text-xs capitalize" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                            {route.difficulty} route
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className="px-2 py-1 rounded-full text-xs font-medium"
+                        style={{
+                          backgroundColor: route.safetyRating >= 8 ? '#dcfce7' : route.safetyRating >= 6 ? '#fef9c3' : '#fee2e2',
+                          color: route.safetyRating >= 8 ? '#166534' : route.safetyRating >= 6 ? '#854d0e' : '#991b1b'
+                        }}
+                      >
+                        {route.safetyRating}/10
+                      </span>
                     </div>
+                    <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                      <div>
+                        <p className="text-lg font-semibold" style={{ color: '#3b82f6' }}>
+                          {route.distanceKm} km
+                        </p>
+                        <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Distance</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold" style={{ color: '#3b82f6' }}>
+                          {route.estimatedTimeMinutes} min
+                        </p>
+                        <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Duration</p>
+                      </div>
+                      <div>
+                        <p className={`text-lg font-semibold ${
+                          route.safetyRating >= 8 ? 'text-green-600' : 
+                          route.safetyRating >= 6 ? 'text-yellow-600' : 
+                          'text-red-600'
+                        }`}>
+                          {route.safetyRating}
+                        </p>
+                        <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Safety</p>
+                      </div>
+                    </div>
+                    {route.description && (
+                      <div className="mb-2 text-xs" style={{ color: isDark ? '#94a3b8' : '#4b5563' }}>
+                        {route.description}
+                      </div>
+                    )}
+                    {selectedRoute?.id === route.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startBackendNavigation(route);
+                        }}
+                        className="w-full font-bold py-2 rounded-lg transition shadow-md text-sm mt-2"
+                        style={{
+                          backgroundColor: '#3b82f6',
+                          color: '#ffffff'
+                        }}
+                      >
+                        Start Navigation
+                      </button>
+                    )}
                   </div>
                 ))}
             </div>
