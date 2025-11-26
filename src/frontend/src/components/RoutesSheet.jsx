@@ -15,7 +15,19 @@ export default function RoutesSheet({
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentHeight, setCurrentHeight] = useState(minHeight);
+  const [isDark, setIsDark] = useState(false);
   const sheetRef = useRef(null);
+
+  // Track dark mode changes
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     setCurrentHeight(isExpanded ? maxHeight : minHeight);
@@ -92,14 +104,16 @@ export default function RoutesSheet({
   return (
     <div
       ref={sheetRef}
-      className="fixed bottom-0 right-0 rounded-t-3xl shadow-2xl transition-all duration-300 ease-out z-[999]"
+      className="fixed bottom-0 right-0 rounded-t-3xl shadow-2xl transition-all duration-300 ease-out z-999"
       style={{
         height: `${currentHeight}px`,
         width: '100%',
         maxWidth: '480px',
-        backgroundColor: '#ffffff',
-        borderTop: '1px solid #e2e8f0',
-        borderLeft: '1px solid #e2e8f0',
+        background: isDark 
+          ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)' 
+          : '#ffffff',
+        borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+        borderLeft: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
       }}
     >
       {/* Drag Handle */}
@@ -111,7 +125,9 @@ export default function RoutesSheet({
         onMouseDown={handleMouseDown}
       >
         {/* Handle bar */}
-        <div className="w-12 h-1 rounded-full mx-auto mb-2" style={{ backgroundColor: '#cbd5e1' }}></div>
+        <div className="w-12 h-1 rounded-full mx-auto mb-2" style={{ 
+          backgroundColor: isDark ? '#475569' : '#cbd5e1' 
+        }}></div>
         
         {/* Header row */}
         <div className="px-4 flex items-center justify-between">
@@ -120,8 +136,8 @@ export default function RoutesSheet({
               <button
                 onClick={toggleSheet}
                 className="p-1 rounded transition-colors"
-                style={{ color: '#64748b' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? '#334155' : '#f1f5f9'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 aria-label={isExpanded ? 'Collapse' : 'Expand'}
               >
@@ -133,14 +149,14 @@ export default function RoutesSheet({
               </button>
               <h2 
                 className="text-base md:text-lg font-bold transition-colors cursor-pointer" 
-                style={{ color: '#1e293b' }}
+                style={{ color: isDark ? '#f8fafc' : '#1e293b' }}
                 onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
-                onMouseLeave={(e) => e.currentTarget.style.color = '#1e293b'}
+                onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#f8fafc' : '#1e293b'}
               >
                 {title}
               </h2>
             </div>
-            <p className="text-xs ml-8" style={{ color: '#64748b' }}>{subtitle}</p>
+            <p className="text-xs ml-8" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>{subtitle}</p>
           </div>
         </div>
       </div>
