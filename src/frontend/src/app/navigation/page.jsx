@@ -197,3 +197,161 @@ export default function NavigationPage() {
 
 	setHazardAlerts(prev => [alert, ...prev.slice(0, 2)]); // Keep last 3 alerts
 
+    // Auto-dismiss after 15 seconds
+    setTimeout(() => {
+      setHazardAlerts(prev => prev.filter(a => a.id !== alert.id));
+    }, 15000);
+  };
+
+  // Calculate distance between two coordinates (Haversine formula)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+  };
+
+  // Calculate bearing between two points
+  const calculateBearing = (lat1, lon1, lat2, lon2) => {
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const y = Math.sin(dLon) * Math.cos((lat2 * Math.PI) / 180);
+    const x =
+      Math.cos((lat1 * Math.PI) / 180) * Math.sin((lat2 * Math.PI) / 180) -
+      Math.sin((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.cos(dLon);
+    const bearing = Math.atan2(y, x);
+    return ((bearing * 180) / Math.PI + 360) % 360; // Convert to degrees
+  };
+
+  // Find closest point on route and snap to it
+  const snapToRoute = (currentLat, currentLon) => {
+    if (routeCoordinates.length === 0) return null;
+
+    let minDistance = Infinity;
+    let closestPoint = null;
+    let closestIndex = 0;
+    let closestSegmentIndex = 0;
+
+    // Find closest point on any route segment
+    for (let i = 0; i < routeCoordinates.length - 1; i++) {
+      const segmentStart = routeCoordinates[i];
+      const segmentEnd = routeCoordinates[i + 1];
+
+      // Calculate closest point on this segment
+      const snapped = closestPointOnSegment(
+        currentLat,
+        currentLon,
+        segmentStart[0],
+        segmentStart[1],
+        segmentEnd[0],
+        segmentEnd[1]
+      );
+
+      const dist = calculateDistance(currentLat, currentLon, snapped[0], snapped[1]);
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestPoint = snapped;
+        closestIndex = i;
+        closestSegmentIndex = i;
+      }
+    }
+
+    return {
+      position: closestPoint,
+      segmentIndex: closestSegmentIndex,
+      distance: minDistance,
+    };
+  };
+
+  // Find closest point on a line segment
+  const closestPointOnSegment = (px, py, ax, ay, bx, by) => {
+    const atob = { x: bx - ax, y: by - ay };
+    const atop = { x: px - ax, y: py - ay };
+    const len = atob.x * atob.x + atob.y * atob.y;
+    let dot = atop.x * atob.x + atop.y * atob.y;
+    const t = Math.min(1, Math.max(0, dot / len));
+
+    return [ax + atob.x * t, ay + atob.y * t];
+  };
+
+  // Update navigation progress
+  const updateNavigationProgress = (currentLat, currentLon, segmentIndex) => {
+    if (instructions.length === 0 || routeCoordinates.length === 0) return;
+
+    // Check if arrived at destination
+    const destination = routeCoordinates[routeCoordinates.length - 1];
+    const distanceToDestination = calculateDistance(
+      currentLat,
+      currentLon,
+      destination[0],
+      destination[1]
+    );
+
+    if (distanceToDestination < 0.05) { // Within 50 meters
+      setHasArrived(true);
+      speak("You have arrived at your destination");
+      return;
+    }
+
+    // Calculate route progress percentage
+    const totalSegments = routeCoordinates.length - 1;
+    const progress = ((segmentIndex / totalSegments) * 100).toFixed(0);
+    setRouteProgress(progress);
+
+    // Calculate remaining distance from current position
+    let remaining = 0;
+    
+    // Distance from current position to next waypoint
+    if (segmentIndex < routeCoordinates.length - 1) {
+      remaining += calculateDistance(
+        currentLat,
+        currentLon,
+        routeCoordinates[segmentIndex + 1][0],
+        routeCoordinates[segmentIndex + 1][1]
+      );
+    }
+    
+    // Add distances of all remaining segments
+    for (let i = segmentIndex + 1; i < routeCoordinates.length - 1; i++) {
+      remaining += calculateDistance(
+        routeCoordinates[i][0],
+        routeCoordinates[i][1],
+        routeCoordinates[i + 1][0],
+        routeCoordinates[i + 1][1]
+      );
+    }
+    setTotalDistanceRemaining(remaining);
+
+    // Update estimated time (assuming average speed)
+    const avgSpeed = routeType === "cycling" ? 15 : 5; // km/h
+    const timeRemaining = (remaining / avgSpeed) * 60; // minutes
+    setEstimatedTimeRemaining(Math.round(timeRemaining));
+
+    // Find next turn instruction
+    // Instructions are typically at specific waypoints
+    if (currentInstructionIndex < instructions.length - 1) {
+      // Estimate next instruction point (simplified)
+      const instructionInterval = Math.floor(routeCoordinates.length / Math.max(instructions.length, 1));
+      const nextInstructionIndex = (currentInstructionIndex + 1) * instructionInterval;
+      const nextInstructionPoint = routeCoordinates[
+        Math.min(nextInstructionIndex, routeCoordinates.length - 1)
+      ];
+      
+      if (nextInstructionPoint) {
+        const distanceToNext = calculateDistance(
+          currentLat,
+          currentLon,
+          nextInstructionPoint[0],
+          nextInstructionPoint[1]
+        );
+        setDistanceToNextTurn(distanceToNext);
+	
