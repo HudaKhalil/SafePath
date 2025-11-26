@@ -363,6 +363,23 @@ class WebSocketService {
   }
 
   /**
+   * Broadcast hazard resolution
+   */
+  broadcastHazardResolved(hazardId, hazardData) {
+    if (!this.io) return;
+
+    const notification = {
+      type: 'hazard_resolved',
+      hazardId: hazardId,
+      message: 'Hazard has been resolved',
+      timestamp: new Date().toISOString()
+    };
+
+    this.io.emit('hazard_resolved', notification);
+    console.log(`Hazard ${hazardId} resolution broadcast to all clients`);
+  }
+
+  /**
    * Create formatted notification message
    */
   createNotificationMessage(hazardData, eventType = 'new_hazard') {
