@@ -270,6 +270,178 @@ class WebSocketService {
   }
 
   /**
+   * Broadcast new hazard to relevant clients
+   * @param {Object} hazardData - Hazard information
+   */
+  broadcastNewHazard(hazardData) {
+    if (!this.io) {
+      console.error('WebSocket service not initialized');
+      return;
+    }
+
+    const {
+      id,
+      hazard_type,
+      severity,
+      description,
+      latitude,
+      longitude,
+      priority_level,
+      affects_traffic,
+      weather_related,
+      status,
+      reported_at
+    } = hazardData;
+
+    let notificationsSent = 0;
+
+    // Iterate through all connected clients
+    for (const [socketId, connection] of this.connections) {
+      try {
+        const distance = this.calculateDistance(
+          connection.location.latitude,
+          connection.location.longitude,
+          latitude,
+          longitude
+        );
+
+        // Send notification if hazard is within user's radius
+        if (distance <= connection.radius) {
+          const notification = this.createNotificationMessage({
+            ...hazardData,
+            distance_meters: Math.round(distance)
+          });
+
+          this.io.to(socketId).emit('new_hazard', notification);
+          notificationsSent++;
+
+          console.log(`Hazard ${id} sent to user ${connection.userId} (${Math.round(distance)}m away)`);
+        }
+      } catch (error) {
+        console.error(`Error broadcasting to socket ${socketId}:`, error);
+        this.connections.delete(socketId);
+      }
+    }
+
+    if (notificationsSent > 0) {
+      console.log(`Broadcast complete: ${notificationsSent} users notified of hazard ${id}`);
+    }
+
+    return notificationsSent;
+  }
+
+  /**
+   * Broadcast hazard update (status change, verification, etc.)
+   */
+  broadcastHazardUpdate(hazardData) {
+    if (!this.io) return;
+
+    const notification = this.createNotificationMessage(hazardData, 'hazard_updated');
+    
+    let notificationsSent = 0;
+
+    for (const [socketId, connection] of this.connections) {
+      try {
+        const distance = this.calculateDistance(
+          connection.location.latitude,
+          connection.location.longitude,
+          hazardData.latitude,
+          hazardData.longitude
+        );
+
+        if (distance <= connection.radius) {
+          this.io.to(socketId).emit('hazard_updated', notification);
+          notificationsSent++;
+        }
+      } catch (error) {
+        console.error(`Error broadcasting update to socket ${socketId}:`, error);
+      }
+    }
+
+    console.log(`Hazard update broadcast: ${notificationsSent} users notified`);
+    return notificationsSent;
+  }
+
+  /**
+   * Create formatted notification message
+   */
+  createNotificationMessage(hazardData, eventType = 'new_hazard') {
+    const hazardEmojis = {
+      construction: '🚧',
+      accident: '🚗💥',
+      crime: '🚔',
+      flooding: '🌊',
+      poor_lighting: '💡',
+      road_damage: '🕳️',
+      pothole: '🕳️',
+      unsafe_crossing: '⚠️',
+      broken_glass: '🔍',
+      suspicious_activity: '👁️',
+      vandalism: '🎯',
+      other: '⚠️'
+    };
+
+    const severityColors = {
+      low: 'green',
+      medium: 'yellow',
+      high: 'orange',
+      critical: 'red'
+    };
+
+    const emoji = hazardEmojis[hazardData.hazard_type] || '⚠️';
+    const severityColor = severityColors[hazardData.severity] || 'yellow';
+
+    let message = '';
+    if (eventType === 'new_hazard') {
+      message = `${emoji} New ${hazardData.severity} risk: ${hazardData.hazard_type.replace('_', ' ')} reported nearby`;
+    } else if (eventType === 'hazard_updated') {
+      message = `${emoji} Hazard status updated`;
+    }
+
+    return {
+      type: eventType,
+      hazard: {
+        id: hazardData.id,
+        hazardType: hazardData.hazard_type,
+        severity: hazardData.severity,
+        severityColor: severityColor,
+        description: hazardData.description,
+        location: {
+          latitude: hazardData.latitude,
+          longitude: hazardData.longitude
+        },
+        priorityLevel: hazardData.priority_level,
+        affectsTraffic: hazardData.affects_traffic,
+        weatherRelated: hazardData.weather_related,
+        status: hazardData.status,
+        ...(hazardData.distance_meters && { distanceMeters: hazardData.distance_meters })
+      },
+      message: message,
+      timestamp: hazardData.reported_at || new Date().toISOString(),
+      urgency: hazardData.severity === 'critical' ? 'high' : hazardData.severity === 'high' ? 'medium' : 'normal'
+    };
+  }
+
+  /**
+   * Calculate distance between two coordinates (Haversine formula)
+   * @returns {number} Distance in meters
+   */
+  calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  }
+
+  /**
    * Get service status
    */
   getStatus() {

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { authService } from '../lib/services'
+import ThemeToggle from './ThemeToggle'
 
 
 
@@ -75,6 +76,7 @@ export default function Navbar() {
  <div style={{ color: '#f8fafc' }} className="font-bold text-2xl">SafePath</div>        </Link>
 
         <nav className="hidden md:flex gap-8 items-center font-bold">
+          <ThemeToggle />
           <Link 
       href="/" 
       className="transition-colors duration-200"
@@ -131,7 +133,17 @@ export default function Navbar() {
           {isLoggedIn ? (
             <div className="flex items-center gap-4">
               <span style={{ color: '#94a3b8' }}>Welcome, {user?.name || 'User'}</span>
-              <Link href="/profile" className="nav-link">Profile</Link>
+              <Link 
+                href="/profile" 
+                className="transition-colors duration-200"
+                style={{
+                  color: pathname === '/profile' ? '#06d6a0' : '#94a3b8'
+                }}
+                onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+                onMouseLeave={(e) => e.target.style.color = pathname === '/profile' ? '#06d6a0' : '#94a3b8'}
+              >
+                Profile
+              </Link>
               <button 
                 onClick={handleLogout}
                 className="px-3 py-1 rounded text-sm transition-colors"
@@ -175,7 +187,8 @@ export default function Navbar() {
         </nav>
 
 
-        <div className="md:hidden">
+        <div className="md:hidden flex items-center gap-3">
+          <ThemeToggle />
           <button 
             onClick={() => setOpen(!open)} 
             className="p-2 rounded-lg transition-colors"
