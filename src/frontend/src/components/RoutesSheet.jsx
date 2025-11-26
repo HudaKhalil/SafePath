@@ -1,22 +1,68 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ChevronUp, ChevronDown, Maximize2, Minimize2, X } from 'lucide-react';
 
 export default function RoutesSheet({
   children,
   title = "Plan Your Route",
   subtitle = "Find the safest path",
   initialExpanded = false,
-  minHeight = 200, // collapsed height in px
-  maxHeight = 550, // expanded height in px
+  minHeight = 180, // collapsed height in px
+  maxHeight: propMaxHeight = null, // allow override, defaults to 90% of screen
+  settingsButton = null, // Optional settings button component
 }) {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [currentHeight, setCurrentHeight] = useState(minHeight);
   const [isDark, setIsDark] = useState(false);
+  const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
   const sheetRef = useRef(null);
+  const contentRef = useRef(null);
+
+  // Calculate maxHeight based on screen size (90% of viewport)
+  const maxHeight = propMaxHeight || Math.min(windowHeight * 0.9, 800);
+  // Leave space for navbar (approximately 70px) when in fullscreen
+  const navbarHeight = 70;
+  const fullScreenHeight = windowHeight - navbarHeight;
+
+  // Update window height on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowHeight(window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Auto-expand when user scrolls down in content area
+  const handleContentScroll = useCallback((e) => {
+    const element = e.target;
+    const scrollTop = element.scrollTop;
+    
+    // If user scrolls down and sheet is collapsed, expand it
+    if (scrollTop > 10 && !isExpanded && !isFullScreen) {
+      setIsExpanded(true);
+    }
+    
+    // If user scrolls more and is at expanded state, go full screen
+    if (scrollTop > 50 && isExpanded && !isFullScreen) {
+      // Check if content needs more space (scrollHeight > visible height)
+      const needsMoreSpace = element.scrollHeight > element.clientHeight + 100;
+      if (needsMoreSpace) {
+        setIsFullScreen(true);
+      }
+    }
+  }, [isExpanded, isFullScreen]);
+
+  // Auto-expand when user touches/clicks on content area while collapsed
+  const handleContentInteraction = useCallback(() => {
+    if (!isExpanded && !isFullScreen) {
+      setIsExpanded(true);
+    }
+  }, [isExpanded, isFullScreen]);
 
   // Track dark mode changes
   useEffect(() => {
@@ -30,8 +76,12 @@ export default function RoutesSheet({
   }, []);
 
   useEffect(() => {
-    setCurrentHeight(isExpanded ? maxHeight : minHeight);
-  }, [isExpanded, minHeight, maxHeight]);
+    if (isFullScreen) {
+      setCurrentHeight(fullScreenHeight);
+    } else {
+      setCurrentHeight(isExpanded ? maxHeight : minHeight);
+    }
+  }, [isExpanded, isFullScreen, minHeight, maxHeight, fullScreenHeight]);
 
   const handleTouchStart = (e) => {
     setIsDragging(true);
@@ -42,18 +92,27 @@ export default function RoutesSheet({
     if (!isDragging) return;
     const currentY = e.touches[0].clientY;
     const deltaY = startY - currentY;
-    const newHeight = Math.min(Math.max(currentHeight + deltaY, minHeight), maxHeight);
+    const effectiveMaxHeight = isFullScreen ? fullScreenHeight : maxHeight;
+    const newHeight = Math.min(Math.max(currentHeight + deltaY, minHeight), fullScreenHeight);
     setCurrentHeight(newHeight);
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
-    // Snap to closest state
-    const midPoint = (minHeight + maxHeight) / 2;
-    if (currentHeight > midPoint) {
+    // Three-state snapping: collapsed, expanded, full screen
+    const expandThreshold = (minHeight + maxHeight) / 2;
+    const fullThreshold = (maxHeight + fullScreenHeight) / 2;
+    
+    if (currentHeight > fullThreshold) {
+      setIsFullScreen(true);
+      setIsExpanded(true);
+      setCurrentHeight(fullScreenHeight);
+    } else if (currentHeight > expandThreshold) {
+      setIsFullScreen(false);
       setIsExpanded(true);
       setCurrentHeight(maxHeight);
     } else {
+      setIsFullScreen(false);
       setIsExpanded(false);
       setCurrentHeight(minHeight);
     }
@@ -68,19 +127,27 @@ export default function RoutesSheet({
     if (!isDragging) return;
     const currentY = e.clientY;
     const deltaY = startY - currentY;
-    const newHeight = Math.min(Math.max(currentHeight + deltaY, minHeight), maxHeight);
+    const newHeight = Math.min(Math.max(currentHeight + deltaY, minHeight), fullScreenHeight);
     setCurrentHeight(newHeight);
     setStartY(currentY);
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    // Snap to closest state
-    const midPoint = (minHeight + maxHeight) / 2;
-    if (currentHeight > midPoint) {
+    // Three-state snapping: collapsed, expanded, full screen
+    const expandThreshold = (minHeight + maxHeight) / 2;
+    const fullThreshold = (maxHeight + fullScreenHeight) / 2;
+    
+    if (currentHeight > fullThreshold) {
+      setIsFullScreen(true);
+      setIsExpanded(true);
+      setCurrentHeight(fullScreenHeight);
+    } else if (currentHeight > expandThreshold) {
+      setIsFullScreen(false);
       setIsExpanded(true);
       setCurrentHeight(maxHeight);
     } else {
+      setIsFullScreen(false);
       setIsExpanded(false);
       setCurrentHeight(minHeight);
     }
@@ -98,22 +165,43 @@ export default function RoutesSheet({
   }, [isDragging, currentHeight]);
 
   const toggleSheet = () => {
-    setIsExpanded(!isExpanded);
+    if (isFullScreen) {
+      // From fullscreen -> expanded
+      setIsFullScreen(false);
+      setIsExpanded(true);
+    } else if (isExpanded) {
+      // From expanded -> collapsed
+      setIsExpanded(false);
+    } else {
+      // From collapsed -> expanded
+      setIsExpanded(true);
+    }
+  };
+
+  const toggleFullScreen = () => {
+    if (isFullScreen) {
+      setIsFullScreen(false);
+      setIsExpanded(true);
+    } else {
+      setIsFullScreen(true);
+      setIsExpanded(true);
+    }
   };
 
   return (
     <div
       ref={sheetRef}
-      className="fixed bottom-0 right-0 rounded-t-3xl shadow-2xl transition-all duration-300 ease-out z-999"
+      className="fixed bottom-0 right-0 shadow-2xl transition-all duration-300 ease-out z-999"
       style={{
         height: `${currentHeight}px`,
         width: '100%',
         maxWidth: '480px',
+        borderRadius: isFullScreen ? '0' : '24px 24px 0 0',
         background: isDark 
           ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)' 
           : '#ffffff',
-        borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-        borderLeft: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+        borderTop: isFullScreen ? 'none' : (isDark ? '1px solid #334155' : '1px solid #e2e8f0'),
+        borderLeft: isFullScreen ? 'none' : (isDark ? '1px solid #334155' : '1px solid #e2e8f0'),
       }}
     >
       {/* Drag Handle */}
@@ -141,7 +229,9 @@ export default function RoutesSheet({
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 aria-label={isExpanded ? 'Collapse' : 'Expand'}
               >
-                {isExpanded ? (
+                {isFullScreen ? (
+                  <ChevronDown className="w-5 h-5" />
+                ) : isExpanded ? (
                   <ChevronDown className="w-5 h-5" />
                 ) : (
                   <ChevronUp className="w-5 h-5" />
@@ -158,17 +248,66 @@ export default function RoutesSheet({
             </div>
             <p className="text-xs ml-8" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>{subtitle}</p>
           </div>
+          
+          {/* Settings button (if provided) */}
+          {settingsButton && (
+            <div className="mr-2">
+              {settingsButton}
+            </div>
+          )}
+          
+          {/* Full screen toggle button */}
+          <button
+            onClick={toggleFullScreen}
+            className="p-2 rounded-lg transition-colors ml-2"
+            style={{ 
+              color: isDark ? '#94a3b8' : '#64748b',
+              backgroundColor: isFullScreen ? (isDark ? '#334155' : '#e2e8f0') : 'transparent'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? '#334155' : '#f1f5f9'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isFullScreen ? (isDark ? '#334155' : '#e2e8f0') : 'transparent'}
+            aria-label={isFullScreen ? 'Exit full screen' : 'Full screen'}
+          >
+            {isFullScreen ? (
+              <Minimize2 className="w-5 h-5" />
+            ) : (
+              <Maximize2 className="w-5 h-5" />
+            )}
+          </button>
+          
+          {/* Close/Collapse button - visible when expanded or fullscreen */}
+          {(isExpanded || isFullScreen) && (
+            <button
+              onClick={() => {
+                setIsFullScreen(false);
+                setIsExpanded(false);
+              }}
+              className="p-2 rounded-lg transition-colors ml-1"
+              style={{ 
+                color: isDark ? '#94a3b8' : '#64748b',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? '#334155' : '#f1f5f9'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              aria-label="Collapse panel"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Scrollable Content */}
       <div 
+        ref={contentRef}
         className="px-4 pb-4 overflow-y-auto overflow-x-hidden"
         style={{
           height: `calc(${currentHeight}px - 80px)`, // Subtract header height
           scrollBehavior: 'smooth',
           WebkitOverflowScrolling: 'touch',
         }}
+        onScroll={handleContentScroll}
+        onTouchStart={handleContentInteraction}
+        onMouseDown={handleContentInteraction}
       >
         {children}
       </div>
