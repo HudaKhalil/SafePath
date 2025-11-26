@@ -273,15 +273,18 @@ function RoadFollowingRoute({ route, onRouteClick, getRouteColor }) {
 
   // Styling based on route quality
   const isRoadFollowing = enhancedPath.length > 10 && !routeInfo?.fallback;
-  const lineWeight = isEnhancing ? 2 : (isRoadFollowing ? 4 : 3);
-  const lineOpacity = isEnhancing ? 0.4 : (isRoadFollowing ? 0.8 : 0.6);
+  const lineWeight = isEnhancing ? 2 : (isRoadFollowing ? 5 : 4);
+  const lineOpacity = isEnhancing ? 0.4 : (isRoadFollowing ? 0.9 : 0.7);
   const dashArray = isEnhancing ? "5, 5" : (routeInfo?.fallback ? "10, 10" : null);
+  
+  // Use route's own color if provided, otherwise fall back to safety-based color
+  const routeColor = route.color || getRouteColor(route.safetyRating);
 
   return (
     <Polyline
       key={`${route.id}-road-following`}
       positions={enhancedPath}
-      color={getRouteColor(route.safetyRating)}
+      color={routeColor}
       weight={lineWeight}
       opacity={lineOpacity}
       dashArray={dashArray}

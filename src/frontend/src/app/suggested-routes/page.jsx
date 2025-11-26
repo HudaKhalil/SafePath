@@ -7,6 +7,7 @@ import { geocodingService } from "../../lib/services";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
 import RoutesSheet from "../../components/RoutesSheet";
+import SafetySettings, { SafetySettingsButton, getSafetyWeights, getCurrentPreset, getPresetName } from "../../components/SafetySettings";
 import { LOCATION_CONFIG } from "../../lib/locationConfig";
 
 const Map = dynamic(() => import("../../components/Map"), { ssr: false });
@@ -57,10 +58,14 @@ export default function SuggestedRoutes() {
   const [backendLoading, setBackendLoading] = useState(false);
   const [mapZoom, setMapZoom] = useState(14);
   const resultsRef = useRef(null);
+  const [selectedRouteId, setSelectedRouteId] = useState(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showRoutePanel, setShowRoutePanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(true);
   const [previewRouteInfo, setPreviewRouteInfo] = useState(null);
+  const [showSafetySettings, setShowSafetySettings] = useState(false);
+  const [safetyWeights, setSafetyWeights] = useState(null);
+  const [currentSafetyPreset, setCurrentSafetyPreset] = useState('balanced');
 
   const fetchBackendRoutes = async () => {
     setBackendLoading(true);
@@ -83,6 +88,9 @@ export default function SuggestedRoutes() {
 
   useEffect(() => {
     getUserLocation();
+    // Load saved safety weights and preset
+    setSafetyWeights(getSafetyWeights());
+    setCurrentSafetyPreset(getCurrentPreset());
   }, []);
 
   // Track dark mode changes
@@ -198,6 +206,10 @@ export default function SuggestedRoutes() {
      const baseUrl = apiUrl.replace(/\/api$/, '');
      console.log('Calling API:', `${baseUrl}/api/routes/find`);
      
+     // Get current safety weights for the request
+     const currentWeights = safetyWeights || getSafetyWeights();
+     console.log('🛡️ Using safety weights:', currentWeights);
+     
      const response = await fetch(`${baseUrl}/api/routes/find`, {
        method: 'POST',
        headers: {
@@ -210,7 +222,10 @@ export default function SuggestedRoutes() {
          fromLon: fromCoords[1],
          toLat: toCoords[0],
          toLon: toCoords[1],
-         mode: transportMode
+         mode: transportMode,
+         userPreferences: {
+           factorWeights: currentWeights
+         }
        })
      });
 
@@ -289,6 +304,8 @@ export default function SuggestedRoutes() {
        })));
 
        setRoutes(formattedRoutes);
+       // Auto-select fastest route to show on map
+       setSelectedRouteId('fastest');
      } else {
        setError(result.message || "Failed to find routes");
      }
@@ -477,13 +494,31 @@ export default function SuggestedRoutes() {
                 background: 'transparent'
               }}>
               {/* Title and Subtitle */}
-              <div className="mb-6">
-                <h2 className="text-lg font-bold mb-1" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
-                  Plan Your Route
-                </h2>
-                <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-                  Find the safest path
-                </p>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold mb-1" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+                    Plan Your Route
+                  </h2>
+                  <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Find the safest path
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowSafetySettings(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(6, 214, 160, 0.15)' : 'rgba(15, 23, 42, 0.08)',
+                  }}
+                  title="Safety Settings"
+                >
+                  <span className="text-sm font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
+                    {getPresetName(currentSafetyPreset)}
+                  </span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke={isDark ? '#06d6a0' : '#0f172a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </button>
               </div>
               
               <div className="flex justify-between items-center mb-4">
@@ -667,6 +702,18 @@ export default function SuggestedRoutes() {
                 )}
               </form>
             </div>
+            
+              {/* Safety Settings Overlay Panel */}
+              <SafetySettings
+                isOpen={showSafetySettings}
+                onClose={() => setShowSafetySettings(false)}
+                isDark={isDark}
+                onSettingsChange={(weights, presetId) => {
+                  setSafetyWeights(weights);
+                  setCurrentSafetyPreset(presetId || getCurrentPreset());
+                  console.log('🛡️ Safety weights updated:', weights, 'Preset:', presetId);
+                }}
+              />
             </div>
           </div>
 
@@ -678,6 +725,24 @@ export default function SuggestedRoutes() {
               initialExpanded={false}
               minHeight={160}
               maxHeight={520}
+              settingsButton={
+                <button
+                  onClick={() => setShowSafetySettings(true)}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full transition-all duration-200"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(6, 214, 160, 0.15)' : 'rgba(15, 23, 42, 0.08)',
+                  }}
+                  title="Safety Settings"
+                >
+                  <span className="text-sm font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
+                    {getPresetName(currentSafetyPreset)}
+                  </span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke={isDark ? '#06d6a0' : '#0f172a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </button>
+              }
             >
               <div className="space-y-2 pb-2 pt-2">
                 <div className="flex justify-between items-center mb-3">
@@ -856,6 +921,27 @@ export default function SuggestedRoutes() {
                 </form>
               </div>
             </RoutesSheet>
+            
+            {/* Mobile Safety Settings Full Screen Overlay */}
+            {showSafetySettings && (
+              <div 
+                className="fixed inset-0 z-1001 flex flex-col"
+                style={{ 
+                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                }}
+              >
+                <SafetySettings
+                  isOpen={showSafetySettings}
+                  onClose={() => setShowSafetySettings(false)}
+                  isDark={isDark}
+                  onSettingsChange={(weights, presetId) => {
+                    setSafetyWeights(weights);
+                    setCurrentSafetyPreset(presetId || getCurrentPreset());
+                    console.log('🛡️ Safety weights updated:', weights, 'Preset:', presetId);
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Full screen map */}
@@ -881,17 +967,19 @@ export default function SuggestedRoutes() {
                     }
                     zoom={mapZoom}
                     routes={[
-                      ...routes.map((r) => ({
-                        id: r.id,
-                        name: r.name,
-                        type: r.type,
-                        color: r.color || "#3b82f6",
-                        coordinates: r.coordinates || [],
-                        safetyRating: r.safetyRating,
-                        distance: r.distance,
-                        estimatedTime: r.estimatedTime,
-                        path: r.coordinates || [],
-                      })),
+                      ...routes
+                        .filter((r) => selectedRouteId === null || r.id === selectedRouteId)
+                        .map((r) => ({
+                          id: r.id,
+                          name: r.name,
+                          type: r.type,
+                          color: r.color || "#3b82f6",
+                          coordinates: r.coordinates || [],
+                          safetyRating: r.safetyRating,
+                          distance: r.distance,
+                          estimatedTime: r.estimatedTime,
+                          path: r.coordinates || [],
+                        })),
                       ...backendRoutes.map((r) => ({
                         id: r.id,
                         name: r.name,
@@ -992,11 +1080,14 @@ export default function SuggestedRoutes() {
               {routes.map((route) => (
                 <div
                   key={route.id}
-                  className="rounded-xl p-4 shadow-md border-2"
+                  className="rounded-xl p-4 shadow-md border-2 cursor-pointer transition-all duration-200"
                   style={{
                     backgroundColor: isDark ? '#334155' : '#f9fafb',
-                    borderColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17'
+                    borderColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17',
+                    boxShadow: selectedRouteId === route.id ? `0 0 0 3px ${route.type === 'fastest' ? '#FFBF00' : '#4CBB17'}40` : undefined,
+                    transform: selectedRouteId === route.id ? 'scale(1.02)' : undefined
                   }}
+                  onClick={() => setSelectedRouteId(route.id)}
                 >
                   <div className="mb-3">
                     <h3 className="text-lg font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
@@ -1004,6 +1095,7 @@ export default function SuggestedRoutes() {
                     </h3>
                     <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
                       {route.type === 'fastest' ? 'Quickest path' : 'Safest path'}
+                      {selectedRouteId === route.id && ' • Showing on map'}
                     </p>
                   </div>
 
@@ -1045,7 +1137,10 @@ export default function SuggestedRoutes() {
                   </div>
 
                   <button
-                    onClick={() => startNavigation(route)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startNavigation(route);
+                    }}
                     className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
                     style={{
                       backgroundColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17',
@@ -1095,11 +1190,14 @@ export default function SuggestedRoutes() {
               {routes.map((route) => (
                 <div
                   key={route.id}
-                  className="rounded-xl p-4 shadow-md border-2"
+                  className="rounded-xl p-4 shadow-md border-2 cursor-pointer transition-all duration-200"
                   style={{
                     backgroundColor: isDark ? '#334155' : '#f9fafb',
-                    borderColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17'
+                    borderColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17',
+                    boxShadow: selectedRouteId === route.id ? `0 0 0 3px ${route.type === 'fastest' ? '#FFBF00' : '#4CBB17'}40` : undefined,
+                    transform: selectedRouteId === route.id ? 'scale(1.02)' : undefined
                   }}
+                  onClick={() => setSelectedRouteId(route.id)}
                 >
                   <div className="mb-3">
                     <h3 className="text-lg font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
@@ -1107,6 +1205,7 @@ export default function SuggestedRoutes() {
                     </h3>
                     <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
                       {route.type === 'fastest' ? 'Quickest path' : 'Safest path'}
+                      {selectedRouteId === route.id && ' • Showing on map'}
                     </p>
                   </div>
 
@@ -1148,7 +1247,10 @@ export default function SuggestedRoutes() {
                   </div>
 
                   <button
-                    onClick={() => startNavigation(route)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startNavigation(route);
+                    }}
                     className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
                     style={{
                       backgroundColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17',
