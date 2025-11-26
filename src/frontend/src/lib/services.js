@@ -274,6 +274,7 @@ export const routingService = {
   // Get route following actual roads using multiple routing providers
   async getRoute(fromLat, fromLon, toLat, toLon, transportMode = 'walking') {
     const providers = [
+      'osmde', // OpenStreetMap.de OSRM instances for foot/bike/car
       'osrm', // Primary: Free and reliable
       'openroute' // Secondary: More detailed but needs API key for heavy use
     ];
@@ -296,6 +297,8 @@ export const routingService = {
 
   async getRouteFromProvider(provider, fromLat, fromLon, toLat, toLon, transportMode) {
     switch (provider) {
+      case 'osmde':
+        return await this.getOSMDeRoute(fromLat, fromLon, toLat, toLon, transportMode);
       case 'osrm':
         return await this.getOSRMRoute(fromLat, fromLon, toLat, toLon, transportMode);
       case 'openroute':
@@ -308,14 +311,61 @@ export const routingService = {
     }
   },
 
+  async getOSMDeRoute(fromLat, fromLon, toLat, toLon, transportMode) {
+    const instanceMap = {
+      walking: {
+        base: 'https://routing.openstreetmap.de/routed-foot',
+        profile: 'foot'
+      },
+      cycling: {
+        base: 'https://routing.openstreetmap.de/routed-bike',
+        profile: 'bike'
+      },
+      driving: {
+        base: 'https://routing.openstreetmap.de/routed-car',
+        profile: 'driving'
+      }
+    };
+
+    const config = instanceMap[transportMode] || instanceMap.walking;
+    const url = `${config.base}/route/v1/${config.profile}/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=true`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`OSM.de routing error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.routes && data.routes.length > 0) {
+      const route = data.routes[0];
+      return {
+        success: true,
+        provider: 'osm.de-osrm',
+        coordinates: route.geometry.coordinates.map(coord => [coord[1], coord[0]]),
+        distance: route.distance,
+        duration: route.duration,
+        instructions: route.legs[0]?.steps?.map(step => ({
+          instruction: step.maneuver?.instruction || 'Continue',
+          distance: step.distance,
+          duration: step.duration
+        })) || []
+      };
+    }
+
+    throw new Error('No OSM.de route found');
+  },
+
   async getOSRMRoute(fromLat, fromLon, toLat, toLon, transportMode) {
+    // OSRM public server supports driving, walking, cycling profiles
     const profileMap = {
-      'walking': 'foot',
-      'cycling': 'bike',
-      'driving': 'driving'
+      walking: 'walking',
+      cycling: 'cycling',
+      driving: 'driving'
     };
     
-    const profile = profileMap[transportMode] || 'foot';
+    const profile = profileMap[transportMode] || 'walking';
     const url = `https://router.project-osrm.org/route/v1/${profile}/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=true`;
     
     const response = await fetch(url);
