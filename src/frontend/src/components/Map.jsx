@@ -16,6 +16,69 @@ import { LOCATION_CONFIG } from "../lib/locationConfig";
 import { routingService } from "../lib/services";
 
 
+// Preserve map view state to prevent unwanted zoom changes
+function PreserveMapView({ lockView = false }) {
+  const map = useMap();
+  const savedViewRef = useRef(null);
+  const isUserInteractingRef = useRef(false);
+
+  useEffect(() => {
+    // Track user interactions
+    const handleInteractionStart = () => {
+      isUserInteractingRef.current = true;
+    };
+    
+    const handleInteractionEnd = () => {
+      // Save view after user interaction completes
+      setTimeout(() => {
+        isUserInteractingRef.current = false;
+        savedViewRef.current = {
+          center: map.getCenter(),
+          zoom: map.getZoom()
+        };
+      }, 100);
+    };
+
+    const handleZoomStart = () => {
+      // If zoom is starting but user isn't interacting, something triggered it programmatically
+      if (!isUserInteractingRef.current && savedViewRef.current && lockView) {
+        // Restore previous view
+        setTimeout(() => {
+          if (savedViewRef.current) {
+            map.setView(savedViewRef.current.center, savedViewRef.current.zoom, { animate: false });
+          }
+        }, 50);
+      }
+    };
+
+    // Save initial view
+    if (!savedViewRef.current) {
+      savedViewRef.current = {
+        center: map.getCenter(),
+        zoom: map.getZoom()
+      };
+    }
+
+    map.on('mousedown', handleInteractionStart);
+    map.on('touchstart', handleInteractionStart);
+    map.on('mouseup', handleInteractionEnd);
+    map.on('touchend', handleInteractionEnd);
+    map.on('dragend', handleInteractionEnd);
+    map.on('zoomend', handleInteractionEnd);
+    
+    return () => {
+      map.off('mousedown', handleInteractionStart);
+      map.off('touchstart', handleInteractionStart);
+      map.off('mouseup', handleInteractionEnd);
+      map.off('touchend', handleInteractionEnd);
+      map.off('dragend', handleInteractionEnd);
+      map.off('zoomend', handleInteractionEnd);
+    };
+  }, [map, lockView]);
+
+  return null;
+}
+
 function AutoFitBounds({ routes, fromCoords, toCoords }) {
   const map = useMap();
 
@@ -64,171 +127,76 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-// Enhanced Component to handle routing with multiple providers
-function RoutingController({
-  fromCoords,
-  toCoords,
-  onRouteFound,
-  showRouting = false,
-  transportMode = 'walking'
-}) {
+// Simple OSM preview route that owns drawing logic
+function OSMPreviewRoute({ fromCoords, toCoords, transportMode, enablePreview, onRouteFound }) {
   const map = useMap();
-  const routingControlRef = useRef(null);
+  const routeLayerRef = useRef(null);
 
   useEffect(() => {
-    if (!showRouting || !fromCoords || !toCoords) {
-      // Remove existing routing control
-      if (routingControlRef.current) {
-        if (typeof routingControlRef.current.remove === 'function') {
-          routingControlRef.current.remove();
-        } else if (map && routingControlRef.current._map) {
-          map.removeControl(routingControlRef.current);
-        }
-        routingControlRef.current = null;
+    if (!map) return;
+
+    // If preview disabled or no points -> remove and exit
+    if (!enablePreview || !fromCoords || !toCoords) {
+      if (routeLayerRef.current) {
+        map.removeLayer(routeLayerRef.current);
+        routeLayerRef.current = null;
       }
       return;
     }
 
-    // Get proper road-following route
-    const getProperRoute = async () => {
+    let cancelled = false;
+
+    const fetchAndDraw = async () => {
       try {
-        console.log(`🗺️ Creating ${transportMode} route between points`);
-        
-        // Remove existing control first
-        if (routingControlRef.current) {
-          if (typeof routingControlRef.current.remove === 'function') {
-            routingControlRef.current.remove();
-          } else if (map && routingControlRef.current._map) {
-            map.removeControl(routingControlRef.current);
-          }
-        }
-        
-        // Use the enhanced routing service
         const routeResult = await routingService.getRoute(
-          fromCoords[0], fromCoords[1], // from lat, lon
-          toCoords[0], toCoords[1],     // to lat, lon
+          fromCoords[0], fromCoords[1],
+          toCoords[0], toCoords[1],
           transportMode
         );
-        
-        if (routeResult.success) {
-          const { coordinates, distance, duration, provider, fallback } = routeResult;
-          
-          // Use light blue for all search routes between two selected points
-          const routeColor = "#3b82f6"; // Light blue for search routes
-          
-          const routeLine = L.polyline(coordinates, {
-            color: routeColor,
-            weight: fallback ? 4 : 6, // Slightly thicker for better visibility
-            opacity: fallback ? 0.7 : 0.9,
-            dashArray: fallback ? "10, 10" : null, // Dashed line for straight-line fallback
-          }).addTo(map);
-          
-          // Add route markers for waypoints if it's not a fallback
-          const waypoints = [];
-          if (!fallback && coordinates.length > 10) {
-            // Add intermediate waypoints for longer routes
-            const step = Math.floor(coordinates.length / 5);
-            for (let i = step; i < coordinates.length - step; i += step) {
-              const waypoint = L.circleMarker(coordinates[i], {
-                color: routeColor,
-                fillColor: routeColor,
-                fillOpacity: 0.8,
-                radius: 3
-              }).addTo(map);
-              waypoints.push(waypoint);
-            }
-          }
-          
-          // Store reference for cleanup
-          routingControlRef.current = {
-            remove: () => {
-              if (map) {
-                if (routeLine) map.removeLayer(routeLine);
-                waypoints.forEach(waypoint => map.removeLayer(waypoint));
-              }
-            },
-            _map: map
-          };
-          
-          // Fit map to show the entire route with padding
-          const bounds = L.latLngBounds(coordinates);
-          map.fitBounds(bounds, { padding: [30, 30] });
-          
-          // Call onRouteFound with route data
-          if (onRouteFound) {
-            onRouteFound({
-              summary: {
-                totalDistance: distance, // meters
-                totalTime: duration, // seconds
-              },
-              coordinates: coordinates,
-              distance: (distance / 1000).toFixed(1), // km
-              duration: Math.round(duration / 60), // minutes
-              profile: transportMode,
-              provider: provider,
-              fallback: fallback || false,
-              instructions: routeResult.instructions || []
-            });
-          }
-          
-          console.log(`✅ Route created using ${provider} (${fallback ? 'fallback' : 'road-following'})`);
+
+        if (cancelled || !routeResult || !routeResult.success || !routeResult.coordinates?.length) return;
+
+        const coords = routeResult.coordinates;
+        const distance = routeResult.distance;
+        const duration = routeResult.duration;
+
+        const color = transportMode === 'walking' ? '#10b981' : '#1d4ed8';
+
+        const polyline = L.polyline(coords, {
+          color,
+          weight: 5,
+          opacity: 0.9,
+        });
+
+        // Replace previous preview route without blank gap
+        if (routeLayerRef.current) {
+          map.removeLayer(routeLayerRef.current);
         }
-        
-      } catch (error) {
-        console.error('❌ All routing providers failed:', error);
-        
-        // Last resort: simple straight line
-        const routeLine = L.polyline([fromCoords, toCoords], {
-          color: "#ef4444",
-          weight: 3,
-          opacity: 0.5,
-          dashArray: "15, 15",
-        }).addTo(map);
-        
-        routingControlRef.current = {
-          remove: () => {
-            if (map && routeLine) {
-              map.removeLayer(routeLine);
-            }
-          },
-          _map: map
-        };
-        
-        // Calculate simple distance
-        const distance = L.latLng(fromCoords).distanceTo(L.latLng(toCoords));
-        const walkingSpeed = transportMode === 'walking' ? 5 : transportMode === 'cycling' ? 15 : 30;
-        const duration = (distance / 1000 / walkingSpeed) * 3600; // seconds
-        
+
+        polyline.addTo(map);
+        // Don't auto-fit bounds on preview - let user control zoom
+        // map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+        routeLayerRef.current = polyline;
+
         if (onRouteFound) {
           onRouteFound({
-            summary: {
-              totalDistance: Math.round(distance),
-              totalTime: Math.round(duration),
-            },
-            coordinates: [fromCoords, toCoords],
-            distance: (distance / 1000).toFixed(1),
-            duration: Math.round(duration / 60),
-            profile: transportMode,
-            provider: 'emergency-fallback',
-            fallback: true,
-            error: error.message
+            distanceKm: distance / 1000,
+            durationMin: duration / 60,
+            mode: transportMode,
           });
         }
+      } catch (err) {
+        console.error("OSM preview route error", err);
       }
     };
-    
-    getProperRoute();
 
-    // Cleanup function
+    fetchAndDraw();
+
     return () => {
-      if (routingControlRef.current) {
-        if (typeof routingControlRef.current.remove === 'function') {
-          routingControlRef.current.remove();
-        }
-        routingControlRef.current = null;
-      }
+      cancelled = true;
+      // keep last drawn route to avoid StrictMode flash; removal handled next draw
     };
-  }, [map, fromCoords, toCoords, showRouting, onRouteFound, transportMode]);
+  }, [map, fromCoords, toCoords, transportMode, enablePreview, onRouteFound]);
 
   return null;
 }
@@ -377,8 +345,8 @@ export default function Map({
   markers = [],
   fromCoords = null,
   toCoords = null,
-  showRouting = false,
   transportMode = 'walking', // walking, cycling
+  enablePreview = false,
   onRouteClick = () => {},
   onHazardClick = () => {},
   onBuddyClick = () => {},
@@ -386,8 +354,7 @@ export default function Map({
   onMapClick = null,
   onPlaceSelect = null,
   routeColor = "#3b82f6", // Default light blue color
-    autoFitBounds = false,
-
+  autoFitBounds = false,
 }) {
   // Create improved custom icons with better fallback
   const createCustomIcon = (color, type) => {
@@ -487,6 +454,9 @@ export default function Map({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        {/* Preserve map view to prevent unwanted zoom changes */}
+        <PreserveMapView />
+
         {/* Auto-fit bounds to show entire route */}
         {autoFitBounds && (
           <AutoFitBounds routes={routes} fromCoords={fromCoords} toCoords={toCoords} />
@@ -506,13 +476,12 @@ export default function Map({
             getRouteColor={getRouteColor}
           />
         ))}
-
-        {/* Routing Controller */}
-        <RoutingController
+        {/* OSM live preview route */}
+        <OSMPreviewRoute
           fromCoords={fromCoords}
           toCoords={toCoords}
-          showRouting={showRouting}
           transportMode={transportMode}
+          enablePreview={enablePreview}
           onRouteFound={onRouteFound}
         />
         {/* From Location Marker */}
@@ -539,8 +508,10 @@ export default function Map({
           </Marker>
         )}
 
-        {/* Hazards */}
-        {hazards.map((hazard) => (
+        {/* Hazards - filter out invalid coordinates to prevent _leaflet_pos errors */}
+        {hazards
+          .filter((h) => Number.isFinite(h.latitude) && Number.isFinite(h.longitude))
+          .map((hazard) => (
           <Marker
             key={hazard.id}
             position={[hazard.latitude, hazard.longitude]}
@@ -560,8 +531,10 @@ export default function Map({
             </Popup>
           </Marker>
         ))}
-        {/* Buddies */}
-        {buddies.map((buddy) => (
+        {/* Buddies - filter out invalid coordinates to prevent _leaflet_pos errors */}
+        {buddies
+          .filter((b) => Number.isFinite(b.latitude) && Number.isFinite(b.longitude))
+          .map((buddy) => (
           <Marker
             key={buddy.id}
             position={[buddy.latitude, buddy.longitude]}
@@ -588,8 +561,10 @@ export default function Map({
           </Marker>
         ))}
 
-        {/* Custom Markers */}
-        {markers.map((marker, index) => (
+        {/* Custom Markers - filter out invalid coordinates to prevent _leaflet_pos errors */}
+        {markers
+          .filter((m) => Array.isArray(m.position) && m.position.length === 2 && Number.isFinite(m.position[0]) && Number.isFinite(m.position[1]))
+          .map((marker, index) => (
           <Marker
             key={index}
             position={marker.position}
