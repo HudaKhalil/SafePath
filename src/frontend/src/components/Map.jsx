@@ -209,23 +209,26 @@ function useEnhancedRoute(route) {
 
   useEffect(() => {
     const enhanceRoute = async () => {
-      if (!route?.path || route.path.length < 2) {
-        setEnhancedPath(route?.path || []);
+      // Support both 'path' and 'coordinates' property names
+      const routePath = route?.path || route?.coordinates;
+      
+      if (!routePath || routePath.length < 2) {
+        setEnhancedPath(routePath || []);
         setRouteInfo({ provider: 'none', fallback: true });
         return;
       }
 
       // If route already has many points, assume it's road-following
-      if (route.path.length > 10) {
-        setEnhancedPath(route.path);
+      if (routePath.length > 10) {
+        setEnhancedPath(routePath);
         setRouteInfo({ provider: 'existing', fallback: false });
         return;
       }
 
       try {
         setIsEnhancing(true);
-        const startPoint = route.path[0];
-        const endPoint = route.path[route.path.length - 1];
+        const startPoint = routePath[0];
+        const endPoint = routePath[routePath.length - 1];
         
         console.log(`🗺️ Enhancing route ${route.name} with road-following path`);
         
@@ -245,12 +248,12 @@ function useEnhancedRoute(route) {
           });
           console.log(`✅ Enhanced route ${route.name} with ${routeResult.coordinates.length} road points via ${routeResult.provider}`);
         } else {
-          setEnhancedPath(route.path);
+          setEnhancedPath(routePath);
           setRouteInfo({ provider: 'original', fallback: true });
         }
       } catch (error) {
         console.warn(`Could not enhance route ${route.name}:`, error);
-        setEnhancedPath(route.path);
+        setEnhancedPath(routePath);
         setRouteInfo({ provider: 'error', fallback: true, error: error.message });
       } finally {
         setIsEnhancing(false);

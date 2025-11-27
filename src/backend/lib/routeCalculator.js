@@ -275,8 +275,9 @@ class RouteCalculator {
     const fastestRoute = this.createFastestRoute(osrmRoute, mode, factorWeights);
     
     // Safest route = intelligently route around dangerous areas using waypoints
+    // Pass factorWeights to ensure consistent scoring
     const safestRoute = await this.calculateSafestRoute(
-      fromLat, fromLon, toLat, toLon, mode, osrmRoute, fastestRoute
+      fromLat, fromLon, toLat, toLon, mode, osrmRoute, fastestRoute, factorWeights
     );
 
     return {
@@ -335,7 +336,7 @@ class RouteCalculator {
    */
   calculateRouteSafetyScore(coordinates, factorWeights = null) {
     if (!coordinates || coordinates.length === 0) {
-      return 0.5; // Default moderate safety
+      return 0.1; // Default to safe if no coordinates
     }
 
     // Use provided weights or defaults
@@ -345,7 +346,7 @@ class RouteCalculator {
     const samplePoints = this.sampleRoutePoints(coordinates, 0.1); // 0.1 km = 100m
     
     if (samplePoints.length === 0) {
-      return 0.5;
+      return 0.1; // Default to safe if no sample points
     }
 
     // Get detailed safety metrics for each sampled point
@@ -410,9 +411,14 @@ class RouteCalculator {
    * 2. Generate safe waypoints to avoid dangerous areas
    * 3. Request OSRM routes through safe waypoints
    * 4. Compare candidates and return the safest viable route
+   * 
+   * @param {Object} factorWeights - User-configurable weights for consistent scoring
    */
-  async calculateSafestRoute(fromLat, fromLon, toLat, toLon, mode, originalRoute, fastestRoute) {
+  async calculateSafestRoute(fromLat, fromLon, toLat, toLon, mode, originalRoute, fastestRoute, factorWeights = null) {
     console.log('[SafestRoute] Calculating safest route...');
+    
+    // Use provided weights or defaults for consistent scoring
+    const weights = factorWeights || DEFAULT_FACTOR_WEIGHTS;
     
     const candidateRoutes = [];
     
@@ -427,7 +433,7 @@ class RouteCalculator {
     try {
       const altRoutes = await this.getOSRMAlternatives(fromLat, fromLon, toLat, toLon, mode);
       for (const altRoute of altRoutes) {
-        const safetyScore = this.calculateRouteSafetyScore(altRoute.coordinates);
+        const safetyScore = this.calculateRouteSafetyScore(altRoute.coordinates, weights);
         const safetyRating = Math.max(0, Math.min(10, (1 - safetyScore) * 10));
         
         candidateRoutes.push({
@@ -449,13 +455,14 @@ class RouteCalculator {
     }
 
     // Strategy 2: Identify dangerous segments and generate waypoint-based routes
-    const dangerousSegments = this.identifyDangerousSegments(originalRoute.coordinates);
+    // Use weighted score for consistency with user preferences
+    const dangerousSegments = this.identifyDangerousSegments(originalRoute.coordinates, weights);
     console.log(`[SafestRoute] Found ${dangerousSegments.length} dangerous segments`);
     
     if (dangerousSegments.length > 0) {
       // Generate safe waypoints to avoid dangerous areas
       const safeWaypoints = this.generateSafeWaypoints(
-        fromLat, fromLon, toLat, toLon, dangerousSegments
+        fromLat, fromLon, toLat, toLon, dangerousSegments, weights
       );
       console.log(`[SafestRoute] Generated ${safeWaypoints.length} safe waypoint sets`);
       
@@ -467,7 +474,7 @@ class RouteCalculator {
           );
           
           if (waypointRoute.success) {
-            const safetyScore = this.calculateRouteSafetyScore(waypointRoute.coordinates);
+            const safetyScore = this.calculateRouteSafetyScore(waypointRoute.coordinates, weights);
             const safetyRating = Math.max(0, Math.min(10, (1 - safetyScore) * 10));
             const distance = waypointRoute.distance / 1000;
             
@@ -498,7 +505,7 @@ class RouteCalculator {
       const offsetRoutes = await this.generateOffsetRoutes(fromLat, fromLon, toLat, toLon, mode);
       for (const offsetRoute of offsetRoutes) {
         if (offsetRoute.success) {
-          const safetyScore = this.calculateRouteSafetyScore(offsetRoute.coordinates);
+          const safetyScore = this.calculateRouteSafetyScore(offsetRoute.coordinates, weights);
           const safetyRating = Math.max(0, Math.min(10, (1 - safetyScore) * 10));
           const distance = offsetRoute.distance / 1000;
           
@@ -524,7 +531,8 @@ class RouteCalculator {
     }
 
     // Select the best route based on safety (with slight preference for shorter routes)
-    const bestRoute = this.selectBestSafeRoute(candidateRoutes, fastestRoute);
+    // Pass weights so selection can adjust based on user's safety priority
+    const bestRoute = this.selectBestSafeRoute(candidateRoutes, fastestRoute, weights);
     
     console.log(`[SafestRoute] Selected route: ${bestRoute.routeType}, safety: ${bestRoute.safetyRating}/10, distance: ${bestRoute.distance}km`);
     
@@ -578,20 +586,28 @@ class RouteCalculator {
   }
 
   /**
-   * Identify dangerous segments along a route
+   * Identify dangerous segments along a route using weighted scoring
+   * @param {Array} coordinates - Route coordinates
+   * @param {Object} factorWeights - User-configurable weights for scoring
    */
-  identifyDangerousSegments(coordinates) {
+  identifyDangerousSegments(coordinates, factorWeights = null) {
     const segments = [];
     const sampledPoints = this.sampleRoutePoints(coordinates, 0.2); // Every 200m
+    const weights = factorWeights || DEFAULT_FACTOR_WEIGHTS;
     
     let inDangerousZone = false;
     let segmentStart = null;
     
     for (let i = 0; i < sampledPoints.length; i++) {
       const point = sampledPoints[i];
-      const safetyScore = csvDataLoader.getSafetyScoreForLocation(point[0], point[1]);
+      // Get raw safety data and apply weighted scoring
+      const rawScore = csvDataLoader.getSafetyScoreForLocation(point[0], point[1]);
       
-      if (safetyScore >= this.safetyThreshold) {
+      // Apply weighted scoring: higher crime weight = more likely to detect danger
+      // Raw score is primarily crime-based, so apply crime weight as multiplier
+      const weightedScore = rawScore * (weights.crime / DEFAULT_FACTOR_WEIGHTS.crime);
+      
+      if (weightedScore >= this.safetyThreshold) {
         if (!inDangerousZone) {
           segmentStart = i > 0 ? sampledPoints[i - 1] : point;
           inDangerousZone = true;
@@ -623,9 +639,11 @@ class RouteCalculator {
 
   /**
    * Generate safe waypoints to route around dangerous areas
+   * @param {Object} factorWeights - User-configurable weights for scoring
    */
-  generateSafeWaypoints(fromLat, fromLon, toLat, toLon, dangerousSegments) {
+  generateSafeWaypoints(fromLat, fromLon, toLat, toLon, dangerousSegments, factorWeights = null) {
     const waypointSets = [];
+    const weights = factorWeights || DEFAULT_FACTOR_WEIGHTS;
     
     // Calculate perpendicular direction to the main route
     const routeBearing = this.calculateBearing(fromLat, fromLon, toLat, toLon);
@@ -644,10 +662,11 @@ class RouteCalculator {
           Math.abs(offset)
         );
         
-        // Check if waypoint is actually safer
-        const waypointSafety = csvDataLoader.getSafetyScoreForLocation(waypoint[0], waypoint[1]);
+        // Check if waypoint is actually safer using weighted scoring
+        const rawScore = csvDataLoader.getSafetyScoreForLocation(waypoint[0], waypoint[1]);
+        const weightedScore = rawScore * (weights.crime / DEFAULT_FACTOR_WEIGHTS.crime);
         
-        if (waypointSafety < this.safetyThreshold) {
+        if (weightedScore < this.safetyThreshold) {
           waypointSets.push([waypoint]);
         }
       }
@@ -770,19 +789,38 @@ class RouteCalculator {
   /**
    * Select the best safe route from candidates
    */
-  selectBestSafeRoute(candidates, fastestRoute) {
+  /**
+   * Select the best safe route from candidates
+   * @param {Array} candidates - Array of route candidates
+   * @param {Object} fastestRoute - The fastest route as baseline
+   * @param {Object} factorWeights - User's factor weights for trade-off tuning
+   */
+  selectBestSafeRoute(candidates, fastestRoute, factorWeights = null) {
     if (candidates.length === 0) {
       return { ...fastestRoute, type: 'safest', routeType: 'fallback' };
     }
     
+    // Adjust distance penalty based on user's crime weight
+    // Higher crime weight = user cares more about safety = lower distance penalty
+    const weights = factorWeights || DEFAULT_FACTOR_WEIGHTS;
+    const crimeWeight = weights.crime || 0.4;
+    
+    // Scale distance penalty inversely with crime weight
+    // crime=0.4 (default) → penalty multiplier = 0.5
+    // crime=0.6 (safety focus) → penalty multiplier = 0.33
+    // crime=0.8 (max safety) → penalty multiplier = 0.25
+    const distancePenaltyMultiplier = 0.5 * (DEFAULT_FACTOR_WEIGHTS.crime / crimeWeight);
+    
     // Score each candidate: prioritize safety, penalize excessive distance
     const scoredCandidates = candidates.map(route => {
       // Safety improvement score (how much safer than fastest)
-      const safetyImprovement = fastestRoute.safetyScore - route.safetyScore;
+      // Amplify by crime weight - if user prioritizes crime, small improvements matter more
+      const rawSafetyImprovement = fastestRoute.safetyScore - route.safetyScore;
+      const safetyImprovement = rawSafetyImprovement * (crimeWeight / DEFAULT_FACTOR_WEIGHTS.crime);
       
-      // Distance penalty (how much longer)
+      // Distance penalty (how much longer) - reduced for safety-focused users
       const distanceRatio = route.distance / fastestRoute.distance;
-      const distancePenalty = Math.max(0, (distanceRatio - 1) * 0.5);
+      const distancePenalty = Math.max(0, (distanceRatio - 1) * distancePenaltyMultiplier);
       
       // Combined score: prioritize safety improvement, penalize excessive distance
       const combinedScore = safetyImprovement - distancePenalty;
