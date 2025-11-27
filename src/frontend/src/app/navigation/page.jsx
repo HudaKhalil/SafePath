@@ -46,157 +46,157 @@ function NavigationPageContent() {
 
   // Get route data from sessionStorage (stored when route was selected)
   useEffect(() => {
-	try {
-	  const storedRoute = sessionStorage.getItem(`route_${routeId}`);
-	  if (storedRoute) {
-		const route = JSON.parse(storedRoute);
-		setRouteCoordinates(route.coordinates || []);
-		setInstructions(route.instructions || []);
-	  }
-	} catch (error) {
-	  console.error("Error loading route data:", error);
-	}
+    try {
+      const storedRoute = sessionStorage.getItem(`route_${routeId}`);
+      if (storedRoute) {
+        const route = JSON.parse(storedRoute);
+        setRouteCoordinates(route.coordinates || []);
+        setInstructions(route.instructions || []);
+      }
+    } catch (error) {
+      console.error("Error loading route data:", error);
+    }
   }, [routeId]);
 
   // Start GPS tracking
   useEffect(() => {
-	if ("geolocation" in navigator) {
-	  const options = {
-		enableHighAccuracy: true,
-		timeout: 5000,
-		maximumAge: 0
-	  };
+    if ("geolocation" in navigator) {
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      };
 
-	  watchIdRef.current = navigator.geolocation.watchPosition(
-		(position) => {
-		  const { latitude, longitude, heading: deviceHeading } = position.coords;
-		  const rawPosition = [latitude, longitude];
-		  setCurrentPosition(rawPosition);
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude, heading: deviceHeading } = position.coords;
+          const rawPosition = [latitude, longitude];
+          setCurrentPosition(rawPosition);
 
-		  // Snap position to route
-		  if (routeCoordinates.length > 0) {
-			const snapped = snapToRoute(latitude, longitude);
-			
-			if (snapped && snapped.distance < 0.1) { // Within 100 meters
-			  setSnappedPosition(snapped.position);
-			  setIsOffRoute(false);
-			  
-			  // Calculate heading based on route direction
-			  if (snapped.segmentIndex < routeCoordinates.length - 1) {
-				const nextPoint = routeCoordinates[snapped.segmentIndex + 1];
-				const calculatedHeading = calculateBearing(
-				  snapped.position[0],
-				  snapped.position[1],
-				  nextPoint[0],
-				  nextPoint[1]
-				);
-				setHeading(calculatedHeading);
-			  } else if (deviceHeading !== null) {
-				setHeading(deviceHeading);
-			  }
+          // Snap position to route
+          if (routeCoordinates.length > 0) {
+            const snapped = snapToRoute(latitude, longitude);
+            
+            if (snapped && snapped.distance < 0.1) { // Within 100 meters
+              setSnappedPosition(snapped.position);
+              setIsOffRoute(false);
+              
+              // Calculate heading based on route direction
+              if (snapped.segmentIndex < routeCoordinates.length - 1) {
+                const nextPoint = routeCoordinates[snapped.segmentIndex + 1];
+                const calculatedHeading = calculateBearing(
+                  snapped.position[0],
+                  snapped.position[1],
+                  nextPoint[0],
+                  nextPoint[1]
+                );
+                setHeading(calculatedHeading);
+              } else if (deviceHeading !== null) {
+                setHeading(deviceHeading);
+              }
 
-			  // Update navigation progress
-			  updateNavigationProgress(snapped.position[0], snapped.position[1], snapped.segmentIndex);
-			} else {
-			  // Too far from route - warn user
-			  setSnappedPosition(rawPosition);
-			  setIsOffRoute(true);
+              // Update navigation progress
+              updateNavigationProgress(snapped.position[0], snapped.position[1], snapped.segmentIndex);
+            } else {
+              // Too far from route - warn user
+              setSnappedPosition(rawPosition);
+              setIsOffRoute(true);
+              
+              // Announce off-route warning (but not too frequently)
+              const now = Date.now();
+              if (now - lastAnnouncementRef.current > 10000) { // Every 10 seconds max
+                speak("You are off the planned route. Returning to route.");
+                lastAnnouncementRef.current = now;
+              }
+              
+              if (deviceHeading !== null) {
+                setHeading(deviceHeading);
+              }
+            }
+          } else {
+            setSnappedPosition(rawPosition);
+            if (deviceHeading !== null) {
+              setHeading(deviceHeading);
+            }
+          }
 
-			  // Announce off-route warning (but not too frequently)
-			  const now = Date.now();
-			  if (now - lastAnnouncementRef.current > 10000) { // Every 10 seconds max
-				speak("You are off the planned route. Returning to route.");
-				lastAnnouncementRef.current = now;
-			  }
-			  
-			  if (deviceHeading !== null) {
-				setHeading(deviceHeading);
-			  }
-			}
-		  } else {
-			setSnappedPosition(rawPosition);
-			if (deviceHeading !== null) {
-			  setHeading(deviceHeading);
-			}
-		  }
+          setIsTracking(true);
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          setIsTracking(false);
+        },
+        options
+      );
+    }
 
-		  setIsTracking(true);
-		},
-		(error) => {
-		  console.error("Geolocation error:", error);
-		  setIsTracking(false);
-		},
-		options
-	  );
-	}
-
-	return () => {
-	  if (watchIdRef.current) {
-		navigator.geolocation.clearWatch(watchIdRef.current);
-	  }
-	};
+    return () => {
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
   }, [routeCoordinates, instructions, currentInstructionIndex]);
 
   // Initialize speech synthesis
   useEffect(() => {
-	if (typeof window !== "undefined" && window.speechSynthesis) {
-	  synthesisRef.current = window.speechSynthesis;
-	}
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      synthesisRef.current = window.speechSynthesis;
+    }
   }, []);
 
   // Connect to WebSocket for hazard detection
   useEffect(() => {
-	websocketClient.connect();
-	
-	websocketClient.on('nearby_hazards', (data) => {
-	  if (data.hazards && Array.isArray(data.hazards)) {
-		setNearbyHazards(data.hazards);
-		
-		// Alert on high-risk hazards within 300m
-		const criticalHazards = data.hazards.filter(
-		  h => (h.severity === 'high' || h.severity === 'critical') && 
-			   h.distance_meters < 300
-		);
-		
-		criticalHazards.forEach(hazard => {
-		  const alertMessage = `Warning: ${hazard.hazard_type.replace('_', ' ')} ahead, ${Math.round(hazard.distance_meters)} meters away`;
-		  addHazardAlert(alertMessage, hazard.severity);
-		  speak(alertMessage);
-		});
-	  }
-	});
+    websocketClient.connect();
+    
+    websocketClient.on('nearby_hazards', (data) => {
+      if (data.hazards && Array.isArray(data.hazards)) {
+        setNearbyHazards(data.hazards);
+        
+        // Alert on high-risk hazards within 300m
+        const criticalHazards = data.hazards.filter(
+          h => (h.severity === 'high' || h.severity === 'critical') && 
+               h.distance_meters < 300
+        );
+        
+        criticalHazards.forEach(hazard => {
+          const alertMessage = `Warning: ${hazard.hazard_type.replace('_', ' ')} ahead, ${Math.round(hazard.distance_meters)} meters away`;
+          addHazardAlert(alertMessage, hazard.severity);
+          speak(alertMessage);
+        });
+      }
+    });
 
-	return () => {
-	  websocketClient.disconnect();
-	};
+    return () => {
+      websocketClient.disconnect();
+    };
   }, []);
 
   // Check for hazards along route periodically
   useEffect(() => {
-	if (currentPosition && isTracking) {
-	  const now = Date.now();
-	  
-	  // Check for hazards every 15 seconds
-	  if (now - hazardCheckRef.current > 15000) {
-		websocketClient.sendUserPosition(
-		  currentPosition[0],
-		  currentPosition[1],
-		  500 // 500m radius for navigation
-		);
-		hazardCheckRef.current = now;
-	  }
-	}
+    if (currentPosition && isTracking) {
+      const now = Date.now();
+      
+      // Check for hazards every 15 seconds
+      if (now - hazardCheckRef.current > 15000) {
+        websocketClient.sendUserPosition(
+          currentPosition[0],
+          currentPosition[1],
+          500 // 500m radius for navigation
+        );
+        hazardCheckRef.current = now;
+      }
+    }
   }, [currentPosition, isTracking]);
 
   const addHazardAlert = (message, severity) => {
-	const alert = {
-	  id: Date.now(),
-	  message,
-	  severity,
-	  timestamp: new Date()
-	};
+    const alert = {
+      id: Date.now(),
+      message,
+      severity,
+      timestamp: new Date()
+    };
 
-	setHazardAlerts(prev => [alert, ...prev.slice(0, 2)]); // Keep last 3 alerts
+    setHazardAlerts(prev => [alert, ...prev.slice(0, 2)]); // Keep last 3 alerts
 
     // Auto-dismiss after 15 seconds
     setTimeout(() => {
@@ -355,4 +355,142 @@ function NavigationPageContent() {
           nextInstructionPoint[1]
         );
         setDistanceToNextTurn(distanceToNext);
+<<<<<<< HEAD
 	
+=======
+
+        // Announce upcoming turn
+        if (distanceToNext < 0.1 && distanceToNext > 0.05) { // 50-100m
+          const nextInstruction = instructions[currentInstructionIndex + 1]?.instruction || "continue";
+          const now = Date.now();
+          if (now - lastAnnouncementRef.current > 5000) { // Don't repeat within 5 seconds
+            speak(`In ${Math.round(distanceToNext * 1000)} meters, ${nextInstruction}`);
+            lastAnnouncementRef.current = now;
+          }
+        } else if (distanceToNext < 0.05) { // Less than 50m
+          const nextInstruction = instructions[currentInstructionIndex + 1]?.instruction || "Continue straight";
+          setCurrentInstructionIndex(prev => Math.min(prev + 1, instructions.length - 1));
+          speak(nextInstruction);
+          lastAnnouncementRef.current = Date.now();
+        }
+      }
+    }
+  };
+
+  // Text-to-speech function
+  const speak = (text) => {
+    if (synthesisRef.current) {
+      synthesisRef.current.cancel(); // Cancel any ongoing speech
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      synthesisRef.current.speak(utterance);
+    }
+  };
+
+  // Format distance
+  const formatDistance = (km) => {
+    if (km < 1) {
+      return `${Math.round(km * 1000)} m`;
+    }
+    return `${km.toFixed(1)} km`;
+  };
+
+  // Get instruction icon
+  const getInstructionIcon = (instruction) => {
+    const text = instruction?.toLowerCase() || "";
+    if (text.includes("left")) return "↰";
+    if (text.includes("right")) return "↱";
+    if (text.includes("straight") || text.includes("continue")) return "↑";
+    if (text.includes("arrive")) return "🏁";
+    return "➤";
+  };
+
+  // Exit navigation
+  const exitNavigation = () => {
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+    if (synthesisRef.current) {
+      synthesisRef.current.cancel();
+    }
+    router.push("/suggested-routes");
+  };
+
+  if (!routeCoordinates.length) {
+    return (
+      <main className="flex items-center justify-center min-h-screen bg-slate-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+          <p>Loading navigation...</p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="relative h-screen w-screen overflow-hidden bg-slate-900">
+      {/* Hazard Alert Banners */}
+      {hazardAlerts.length > 0 && (
+        <div className="absolute top-0 left-0 right-0 z-50 p-4 space-y-2">
+          {hazardAlerts.map(alert => (
+            <div
+              key={alert.id}
+              className={`p-4 rounded-lg shadow-lg animate-pulse ${
+                alert.severity === 'critical' || alert.severity === 'high'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-yellow-500 text-gray-900'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-lg">{alert.message}</span>
+                <button
+                  onClick={() => setHazardAlerts(prev => prev.filter(a => a.id !== alert.id))}
+                  className="ml-4 text-2xl hover:opacity-70"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Map */}
+      <div className="absolute inset-0">
+        <Map
+          center={snappedPosition || routeCoordinates[0] || LOCATION_CONFIG.DEFAULT_CENTER}
+          zoom={18}
+          routes={[
+            {
+              id: routeId,
+              color: routeType === "fastest" ? "#3b82f6" : "#10b981",
+              coordinates: routeCoordinates,
+            },
+          ]}
+          height="100vh"
+          showUserLocation={true}
+          userLocation={snappedPosition}
+          userHeading={heading}
+          followUser={true}
+          hazards={nearbyHazards}
+          markers={[
+            // Starting point marker
+            routeCoordinates.length > 0 && {
+              position: routeCoordinates[0],
+              color: "#10b981",
+              type: "from",
+              popup: <div className="text-sm"><strong>Start</strong></div>
+            },
+            // Destination marker
+            routeCoordinates.length > 0 && {
+              position: routeCoordinates[routeCoordinates.length - 1],
+              color: "#ef4444",
+              type: "to",
+              popup: <div className="text-sm"><strong>Destination</strong></div>
+            }
+          ].filter(Boolean)}
+        />
+      </div>
+>>>>>>> 3195118 (feat: enhance navigation with distance-based voice turn prompts in frontend-navigation)
