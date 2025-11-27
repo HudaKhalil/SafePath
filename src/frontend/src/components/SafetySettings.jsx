@@ -79,14 +79,75 @@ const SAFETY_PRESETS = {
 
 const STORAGE_KEY = 'safepath_safety_preferences';
 
+// Default preset for new users - "crime" provides better route differentiation
+const DEFAULT_PRESET = 'crime';
+
+const WEIGHT_FACTORS = ['crime', 'lighting', 'collision', 'hazard'];
+
+const sanitizePresetId = (presetId) => {
+  if (presetId === 'custom') return 'custom';
+  return SAFETY_PRESETS[presetId] ? presetId : DEFAULT_PRESET;
+};
+
+const clampToUnit = (value) => {
+  const numeric = Number.isFinite(value) ? value : 0;
+  if (numeric < 0) return 0;
+  if (numeric > 1) return 1;
+  return numeric;
+};
+
+const toPercentageWeights = (weights) => {
+  const normalized = WEIGHT_FACTORS.map((factor) => clampToUnit(weights?.[factor] ?? 0));
+  const total = normalized.reduce((sum, val) => sum + val, 0);
+  if (!total) {
+    const base = Math.floor(100 / WEIGHT_FACTORS.length);
+    let remainder = 100;
+    const fallback = {};
+    WEIGHT_FACTORS.forEach((factor, index) => {
+      const value = index === WEIGHT_FACTORS.length - 1 ? remainder : base;
+      fallback[factor] = value;
+      remainder -= value;
+    });
+    return fallback;
+  }
+
+  let remaining = 100;
+  const percentageWeights = {};
+  WEIGHT_FACTORS.forEach((factor, index) => {
+    const share = normalized[index] / total;
+    const rounded = index === WEIGHT_FACTORS.length - 1 ? remaining : Math.round(share * 100);
+    percentageWeights[factor] = rounded;
+    remaining -= rounded;
+  });
+  return percentageWeights;
+};
+
+const getPresetPercentages = (presetId) => {
+  if (presetId === 'custom') {
+    return toPercentageWeights(SAFETY_PRESETS[DEFAULT_PRESET].weights);
+  }
+  const weights = SAFETY_PRESETS[presetId]?.weights || SAFETY_PRESETS[DEFAULT_PRESET].weights;
+  return toPercentageWeights(weights);
+};
+
 // Load preferences from localStorage
 const loadPreferences = () => {
-  if (typeof window === 'undefined') return { preset: 'balanced', customWeights: null };
+  if (typeof window === 'undefined') return { preset: DEFAULT_PRESET, customWeights: null };
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : { preset: 'balanced', customWeights: null };
+    if (!saved) {
+      return { preset: DEFAULT_PRESET, customWeights: null };
+    }
+
+    const parsed = JSON.parse(saved);
+    const preset = sanitizePresetId(parsed?.preset);
+    const customWeights = preset === 'custom' && typeof parsed?.customWeights === 'object'
+      ? parsed.customWeights
+      : null;
+
+    return { preset, customWeights };
   } catch {
-    return { preset: 'balanced', customWeights: null };
+    return { preset: DEFAULT_PRESET, customWeights: null };
   }
 };
 
@@ -94,7 +155,14 @@ const loadPreferences = () => {
 const savePreferences = (prefs) => {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    const preset = sanitizePresetId(prefs?.preset);
+    const payload = {
+      preset,
+      customWeights: preset === 'custom' && typeof prefs?.customWeights === 'object'
+        ? prefs.customWeights
+        : null
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (e) {
     console.warn('Failed to save safety preferences:', e);
   }
@@ -103,10 +171,10 @@ const savePreferences = (prefs) => {
 // Get current factor weights based on preferences
 export const getSafetyWeights = () => {
   const prefs = loadPreferences();
-  if (prefs.customWeights) {
+  if (prefs.preset === 'custom' && prefs.customWeights) {
     return prefs.customWeights;
   }
-  return SAFETY_PRESETS[prefs.preset]?.weights || SAFETY_PRESETS.balanced.weights;
+  return SAFETY_PRESETS[prefs.preset]?.weights || SAFETY_PRESETS[DEFAULT_PRESET].weights;
 };
 
 // Get current preset ID
@@ -122,36 +190,32 @@ export const getPresetName = (presetId) => {
 };
 
 export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChange }) {
-  const [selectedPreset, setSelectedPreset] = useState('balanced');
+  const [selectedPreset, setSelectedPreset] = useState(DEFAULT_PRESET);
   const [showCustom, setShowCustom] = useState(false);
-  const [customWeights, setCustomWeights] = useState({
-    crime: 40,
-    lighting: 20,
-    collision: 25,
-    hazard: 15
-  });
+  const [customWeights, setCustomWeights] = useState(getPresetPercentages(DEFAULT_PRESET));
 
   // Load saved preferences on mount
   useEffect(() => {
     const prefs = loadPreferences();
     setSelectedPreset(prefs.preset);
-    if (prefs.customWeights) {
-      setCustomWeights({
-        crime: Math.round(prefs.customWeights.crime * 100),
-        lighting: Math.round(prefs.customWeights.lighting * 100),
-        collision: Math.round(prefs.customWeights.collision * 100),
-        hazard: Math.round(prefs.customWeights.hazard * 100)
-      });
+    if (prefs.preset === 'custom' && prefs.customWeights) {
+      setCustomWeights(toPercentageWeights(prefs.customWeights));
       setShowCustom(true);
+    } else {
+      setCustomWeights(getPresetPercentages(prefs.preset));
+      setShowCustom(false);
     }
   }, [isOpen]);
 
   const handlePresetSelect = (presetId) => {
-    setSelectedPreset(presetId);
+    const safePreset = sanitizePresetId(presetId);
+    setSelectedPreset(safePreset);
     setShowCustom(false);
-    const prefs = { preset: presetId, customWeights: null };
+    setCustomWeights(getPresetPercentages(safePreset));
+    const prefs = { preset: safePreset, customWeights: null };
     savePreferences(prefs);
-    onSettingsChange?.(SAFETY_PRESETS[presetId].weights, presetId);
+    const weights = SAFETY_PRESETS[safePreset]?.weights || SAFETY_PRESETS[DEFAULT_PRESET].weights;
+    onSettingsChange?.(weights, safePreset);
   };
 
   const handleCustomWeightChange = (factor, value) => {
@@ -159,15 +223,37 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
     setCustomWeights(newWeights);
   };
 
+  const handleCustomToggle = () => {
+    setShowCustom((prev) => {
+      const next = !prev;
+      if (next && selectedPreset !== 'custom') {
+        setCustomWeights(getPresetPercentages(selectedPreset));
+      }
+      return next;
+    });
+  };
+
   const applyCustomWeights = () => {
     // Normalize to sum to 100
     const total = customWeights.crime + customWeights.lighting + customWeights.collision + customWeights.hazard;
-    const normalized = {
-      crime: customWeights.crime / total,
-      lighting: customWeights.lighting / total,
-      collision: customWeights.collision / total,
-      hazard: customWeights.hazard / total
-    };
+
+    let normalized;
+    if (!total) {
+      const evenShare = 1 / WEIGHT_FACTORS.length;
+      normalized = {
+        crime: evenShare,
+        lighting: evenShare,
+        collision: evenShare,
+        hazard: evenShare
+      };
+    } else {
+      normalized = {
+        crime: customWeights.crime / total,
+        lighting: customWeights.lighting / total,
+        collision: customWeights.collision / total,
+        hazard: customWeights.hazard / total
+      };
+    }
     
     const prefs = { preset: 'custom', customWeights: normalized };
     savePreferences(prefs);
@@ -177,12 +263,7 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
   };
 
   const resetToDefault = () => {
-    setSelectedPreset('balanced');
-    setShowCustom(false);
-    setCustomWeights({ crime: 40, lighting: 20, collision: 25, hazard: 15 });
-    const prefs = { preset: 'balanced', customWeights: null };
-    savePreferences(prefs);
-    onSettingsChange?.(SAFETY_PRESETS.balanced.weights, 'balanced');
+    handlePresetSelect(DEFAULT_PRESET);
   };
 
   if (!isOpen) return null;
@@ -292,7 +373,7 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
 
         {/* Custom Weights Toggle */}
         <button
-          onClick={() => setShowCustom(!showCustom)}
+          onClick={handleCustomToggle}
           className="w-full p-3 rounded-xl text-left transition-all duration-200 border-2 flex items-center justify-between"
           style={{
             backgroundColor: showCustom 
@@ -562,7 +643,7 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
 
 // Settings Button Component (to use in the route panel)
 export function SafetySettingsButton({ onClick, isDark, currentPreset: externalPreset }) {
-  const [currentPreset, setCurrentPreset] = useState('balanced');
+  const [currentPreset, setCurrentPreset] = useState(DEFAULT_PRESET);
 
   useEffect(() => {
     // If external preset is provided, use it; otherwise load from storage
