@@ -354,9 +354,6 @@ export default function NavigationPage() {
           nextInstructionPoint[1]
         );
         setDistanceToNextTurn(distanceToNext);
-<<<<<<< HEAD
-	
-=======
 
         // Announce upcoming turn
         if (distanceToNext < 0.1 && distanceToNext > 0.05) { // 50-100m
@@ -492,4 +489,148 @@ export default function NavigationPage() {
           ].filter(Boolean)}
         />
       </div>
->>>>>>> 3195118 (feat: enhance navigation with distance-based voice turn prompts in frontend-navigation)
+
+      {/* Top Bar - Current Instruction */}
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-6">
+            {hasArrived ? (
+              <div className="text-center">
+                <div className="text-6xl mb-2">🏁</div>
+                <h2 className="text-2xl font-bold text-green-600 mb-2">
+                  You have arrived!
+                </h2>
+                <button
+                  onClick={exitNavigation}
+                  className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Exit Navigation
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="text-5xl">
+                    {getInstructionIcon(instructions[currentInstructionIndex]?.instruction)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-2xl font-bold text-slate-800">
+                      {instructions[currentInstructionIndex]?.instruction || "Follow the route"}
+                    </div>
+                    {distanceToNextTurn > 0 && (
+                      <div className="text-lg text-blue-600 font-semibold mt-1">
+                        In {formatDistance(distanceToNextTurn)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Route Info Bar */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                  <div className="flex items-center gap-6">
+                    <div>
+                      <div className="text-sm text-gray-500">Remaining</div>
+                      <div className="text-lg font-bold text-slate-800">
+                        {formatDistance(totalDistanceRemaining)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">ETA</div>
+                      <div className="text-lg font-bold text-slate-800">
+                        {estimatedTimeRemaining} min
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Progress</div>
+                      <div className="text-lg font-bold text-blue-600">
+                        {routeProgress}%
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={exitNavigation}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium"
+                  >
+                    Exit
+                  </button>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${routeProgress}%` }}
+                  ></div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* GPS Status Indicator */}
+      {!isTracking && (
+        <div className="absolute top-24 left-4 bg-yellow-500 text-white px-4 py-2 rounded-lg shadow-lg z-10">
+          <div className="flex items-center gap-2">
+            <div className="animate-pulse">📡</div>
+            <span>Searching for GPS signal...</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Off-Route Warning */}
+      {isOffRoute && isTracking && (
+        <div className="absolute top-24 left-4 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg z-10 animate-pulse">
+          <div className="flex items-center gap-2">
+            <div>⚠️</div>
+            <span>Off Route - Returning to path</span>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Panel - Upcoming Instructions */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4">
+        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-4 max-h-48 overflow-y-auto">
+          <h3 className="font-bold text-slate-800 mb-3 text-sm">Upcoming Directions</h3>
+          <div className="space-y-2">
+            {instructions.slice(currentInstructionIndex, currentInstructionIndex + 5).map((instruction, idx) => (
+              <div
+                key={idx}
+                className={`flex items-center gap-3 p-2 rounded-lg ${
+                  idx === 0 ? "bg-blue-50 border border-blue-200" : "bg-gray-50"
+                }`}
+              >
+                <div className="text-2xl">
+                  {getInstructionIcon(instruction.instruction)}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-slate-700">
+                    {instruction.instruction}
+                  </div>
+                  {instruction.distance && (
+                    <div className="text-xs text-gray-500">
+                      {formatDistance(instruction.distance / 1000)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Safety Badge */}
+      <div className="absolute top-24 right-4 z-10">
+        <div
+          className={`px-4 py-2 rounded-full shadow-lg font-bold text-white ${
+            routeSafety >= 7 ? "bg-green-600" : routeSafety >= 5 ? "bg-yellow-600" : "bg-red-600"
+          }`}
+        >
+          Safety: {routeSafety}/10
+        </div>
+      </div>
+    </main>
+  );
+}
+
