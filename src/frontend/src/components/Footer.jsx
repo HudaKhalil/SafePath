@@ -1,103 +1,126 @@
+'use client'
+
 import Link from "next/link";
-import { Github } from "lucide-react";
+import { Github, Mail } from "lucide-react";
+import { useState, useEffect } from 'react';
 
 export default function Footer() {
+  const currentYear = new Date().getFullYear();
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <footer className="bg-primary-dark text-white py-12">
-      <div className="container mx-auto px-6">
-        <div className="grid md:grid-cols-4 gap-8">
-          {/* Logo and Description */}
-          <div className="md:col-span-2">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 flex items-center justify-center">
-                <img
-                  src="/logo.png"
-                  alt="SafePath Logo"
-                  className="w-10 h-10 object-contain"
-                />
-              </div>
-              <div className="text-white font-bold text-lg">SafePath</div>
-            </div>
-            <p className="text-gray-400 text-sm leading-relaxed max-w-md">
-              Empowering safer journeys through intelligent routing, community
-              insights, and real-time hazard awareness.
-            </p>
-            <div className="flex items-center gap-4 mt-6">
-              <a
-                href="https://github.com/KaranJoseph12/SafePath.git"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="GitHub"
-                className="inline-flex items-center justify-center h-10 w-10 rounded-full
-             text-text-secondary hover:text-accent focus:outline-none
-             focus:ring-2 focus:ring-accent/40 transition"
-              >
-                <Github className="h-5 w-5" />
-              </a>
-            </div>
+    <footer 
+      className="hidden md:block py-3"
+      style={{ 
+        backgroundColor: '#0f172a'
+      }}
+    >
+      <div className="container mx-auto px-4 md:px-6 max-w-4xl">
+        {/* Centered Layout */}
+        <div className="flex flex-col items-center text-center space-y-2">
+          
+          {/* Social Links - Centered at top */}
+          <div className="flex items-center justify-center gap-4">
+            <a
+              href="https://github.com/KaranJoseph12/SafePath.git"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub Repository"
+              className="inline-flex items-center justify-center h-10 w-10 rounded-full transition-all"
+              style={{ 
+                backgroundColor: isDark ? '#334155' : '#ffffff',
+                color: isDark ? '#94a3b8' : '#0f172a'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#06d6a0';
+                e.currentTarget.style.color = '#ffffff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDark ? '#334155' : '#ffffff';
+                e.currentTarget.style.color = isDark ? '#94a3b8' : '#0f172a';
+              }}
+            >
+              <Github className="h-5 w-5" />
+            </a>
+            
+            <a
+              href="mailto:support@safepath.app"
+              aria-label="Email Support"
+              className="inline-flex items-center justify-center h-10 w-10 rounded-full transition-all"
+              style={{ 
+                backgroundColor: isDark ? '#334155' : '#ffffff',
+                color: isDark ? '#94a3b8' : '#0f172a'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#06d6a0';
+                e.currentTarget.style.color = '#ffffff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDark ? '#334155' : '#ffffff';
+                e.currentTarget.style.color = isDark ? '#94a3b8' : '#0f172a';
+              }}
+            >
+              <Mail className="h-5 w-5" />
+            </a>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h4 className="text-white font-semibold mb-4">Quick Links</h4>
-            <div className="space-y-3">
-              <Link
-                href="/suggested-routes"
-                className="block text-gray-400 hover:text-accent transition-colors text-sm"
-              >
-                Suggested Routes
-              </Link>
-              <Link
-                href="/hazard-reporting"
-                className="block text-gray-400 hover:text-accent transition-colors text-sm"
-              >
-                Report Hazard
-              </Link>
-              <Link
-                href="/find-buddy"
-                className="block text-gray-400 hover:text-accent transition-colors text-sm"
-              >
-                Find Buddy
-              </Link>
-              <Link
-                href="#"
-                className="block text-gray-400 hover:text-accent transition-colors text-sm"
-              >
-                Safety Tips
-              </Link>
-            </div>
+          {/* Navigation Links - Horizontal centered */}
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link
+              href="/privacy"
+              className="text-sm transition-colors px-2"
+              style={{ color: isDark ? '#06d6a0' : '#94a3b8' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
+              onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#06d6a0' : '#94a3b8'}
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              href="/terms"
+              className="text-sm transition-colors px-2"
+              style={{ color: isDark ? '#06d6a0' : '#94a3b8' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
+              onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#06d6a0' : '#94a3b8'}
+            >
+              Terms of Use
+            </Link>
+            <a
+              href="mailto:support@safepath.app"
+              className="text-sm transition-colors px-2"
+              style={{ color: isDark ? '#06d6a0' : '#94a3b8' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
+              onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#06d6a0' : '#94a3b8'}
+            >
+              Support
+            </a>
+            <Link
+              href="/about"
+              className="text-sm transition-colors px-2"
+              style={{ color: isDark ? '#06d6a0' : '#94a3b8' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
+              onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#06d6a0' : '#94a3b8'}
+            >
+              About
+            </Link>
           </div>
 
-          {/* Legal */}
-          <div>
-            <h4 className="text-white font-semibold mb-4">Legal</h4>
-            <div className="space-y-3">
-              <Link
-                href="#"
-                className="block text-gray-400 hover:text-accent transition-colors text-sm"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                href="#"
-                className="block text-gray-400 hover:text-accent transition-colors text-sm"
-              >
-                Terms of Service
-              </Link>
-              <Link
-                href="#"
-                className="block text-gray-400 hover:text-accent transition-colors text-sm"
-              >
-                Contact Us
-              </Link>
-              <Link
-                href="#"
-                className="block text-gray-400 hover:text-accent transition-colors text-sm"
-              >
-                Support
-              </Link>
-            </div>
-          </div>
+          {/* Copyright - Centered at bottom */}
+          <p className="text-sm" style={{ color: '#64748b' }}>
+            © {currentYear} SafePath
+          </p>
         </div>
       </div>
     </footer>

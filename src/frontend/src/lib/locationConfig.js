@@ -1,26 +1,27 @@
 // Location configuration for SafePath app
 export const LOCATION_CONFIG = {
-  // London coordinates
-  DEFAULT_CENTER: [51.5074, -0.1278],
+  // Default center (Dublin, Ireland - more central for IE/UK coverage)
+  DEFAULT_CENTER: [53.3498, -6.2603], // Dublin
   DEFAULT_ZOOM: 13,
   
-  // London bounding box for map restrictions and geocoding
+  // Extended bounding box covering UK and Ireland
   BOUNDING_BOX: {
-    north: 51.691874,
-    south: 51.286760,
-    east: 0.334015,
-    west: -0.510375
+    north: 55.0,    // North Scotland
+    south: 49.5,    // South England
+    east: 2.0,      // East England  
+    west: -11.0     // West Ireland
   },
   
-  // Nominatim viewbox for London area
-  VIEWBOX: '-0.510375,51.286760,0.334015,51.691874',
+  // Nominatim viewbox for UK & Ireland area (optional, can be removed)
+  VIEWBOX: '-11.0,49.5,2.0,55.0',
   
-  // Country code for geocoding
-  COUNTRY_CODE: 'gb',
+  // Country codes for geocoding (IE + UK)
+  COUNTRY_CODE: null, // Remove restriction to allow global search
+  COUNTRY_CODES: ['ie', 'gb'], // For specific UK/IE filtering if needed
   
-  // City information
-  CITY: 'London',
-  COUNTRY: 'United Kingdom'
+  // App information
+  CITY: 'Dublin',
+  COUNTRY: 'Ireland'
 };
 
 // Helper function to check if coordinates are within London bounds

@@ -17,11 +17,11 @@ const Btn = ({ className = "", children }) => (
 export default function RouteButtons() {
   return (
     <div className="grid grid-cols-2 gap-5">
-      <Btn className="bg-sp-safe hover:opacity-95 active:translate-y-[1px] focus-visible:ring-sp-safe/60">
+      <Btn className="bg-sp-safe hover:opacity-95 active:translate-y-px focus-visible:ring-sp-safe/60">
         <ShieldCheck />
         <span className="text-lg font-semibold">Go Safe</span>
       </Btn>
-      <Btn className="bg-sp-fast hover:opacity-95 active:translate-y-[1px] focus-visible:ring-sp-fast/60">
+      <Btn className="bg-sp-fast hover:opacity-95 active:translate-y-px focus-visible:ring-sp-fast/60">
         <Zap />
         <span className="text-lg font-semibold">Go Fast</span>
       </Btn>

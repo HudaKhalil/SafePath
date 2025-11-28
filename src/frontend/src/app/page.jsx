@@ -1,14 +1,43 @@
-// PATH: app/page.jsx
+'use client'
+
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import Image from "next/image";
-import Link from "next/link";
+import Cookies from 'js-cookie';
 
 function Section({ className = "", ...props }) {
   return <section className={`relative ${className}`} {...props} />;
 }
 
 export default function Home() {
+  const router = useRouter();
+  const [isDark, setIsDark] = useState(false);
+
+  // Track dark mode changes
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const handleProtectedAction = (e, path) => {
+    e.preventDefault();
+    const token = Cookies.get('auth_token');
+    
+    if (!token) {
+      // Not authenticated, redirect to login
+      router.push('/auth/login');
+    } else {
+      // Authenticated, navigate to requested page
+      router.push(path);
+    }
+  };
   return (
-    <main className="min-h-screen bg-primary-dark text-text-primary">
+    <main style={{ backgroundColor: isDark ? 'transparent' : '#ffffff' }}>
       {/* HERO */}
       <Section className="overflow-hidden">
         {/* decorative gradient blob */}
@@ -21,61 +50,59 @@ export default function Home() {
           }}
         />
 
-        <div className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-14 sm:py-20 lg:py-28 animate-fadeIn">
-          <div className="grid items-center gap-8 sm:gap-10 lg:gap-14 lg:grid-cols-12">
+        <div className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12 animate-fadeIn">
+          <div className="grid items-center gap-6 sm:gap-8 lg:gap-10 lg:grid-cols-12">
             {/* Artwork card */}
             <div className="lg:col-span-7 order-1">
-              <div className="rounded-2xl p-[6px] sm:p-2 bg-white/90 shadow-lg ring-1 ring-white/30">
-                <div className="relative h-56 sm:h-72 md:h-96 lg:h-[30rem] rounded-xl overflow-hidden bg-transparent">
-                  <Image
-                    src="/app-hero.png"
-                    alt="SafePath — your guide to a safer journey"
-                    fill
-                    priority
-                    className="object-contain"
-                    sizes="(min-width: 1024px) 720px, (min-width: 768px) 640px, 100vw"
-                  />
-                </div>
+              <div className="relative h-56 sm:h-72 md:h-96 lg:h-[30rem] overflow-hidden bg-transparent">
+                <Image
+                  src="/app-hero.png"
+                  alt="SafePath — your guide to a safer journey"
+                  fill
+                  priority
+                  className="object-contain"
+                  sizes="(min-width: 1024px) 720px, (min-width: 768px) 640px, 100vw"
+                />
               </div>
             </div>
 
             {/* Copy + CTAs */}
             <div className="lg:col-span-5 order-2 text-center lg:text-left">
-              <p className="inline-flex items-center gap-2 rounded-full glass-effect px-3 py-1 text-xs sm:text-sm">
-                <span aria-hidden></span> Safer journeys for walkers & cyclists
-              </p>
-
-              <h1 className="mt-5 md:mt-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
                 Find Your Safer Way
               </h1>
-              <h2 className="hero-subtitle -mt-1 sm:-mt-2">
-                Built for Walkers &amp; Cyclists
+              <h2 className="hero-subtitle mt-2 sm:mt-3">
+                Safer journeys for walkers &amp; cyclists
               </h2>
 
-              <p className="mt-4 max-w-xl lg:max-w-none mx-auto lg:mx-0 text-base sm:text-lg md:text-xl text-text-secondary leading-relaxed">
+              <p className="mt-3 max-w-xl lg:max-w-none mx-auto lg:mx-0 text-sm sm:text-base md:text-lg leading-relaxed" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
                 Discover the safest routes in any city with real-time hazard
                 data, community insights, and intelligent routing for
                 pedestrians and cyclists.
               </p>
 
-              <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:gap-4 lg:justify-start justify-center">
-                <Link
-                  href="/suggested-routes"
-                  className="btn-primary inline-flex items-center gap-2 justify-center"
+              <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row gap-3 sm:gap-4 lg:justify-start justify-center">
+                <button
+                  onClick={(e) => handleProtectedAction(e, '/suggested-routes')}
+                  className="btn-primary inline-flex items-center gap-2 justify-center text-lg px-6 py-3 rounded-lg"
+                  title="Plan a safe journey"
                 >
                   Go Safe
-                </Link>
-                <Link
-                  href="/report-hazards"
-                  className="btn-hazard inline-flex items-center gap-2 justify-center"
+                </button>
+                <button
+                  onClick={(e) => handleProtectedAction(e, '/report-hazards')}
+                  className="inline-flex items-center gap-2 justify-center text-lg px-6 py-3 rounded-lg font-semibold transition-all duration-200"
+                  style={{
+                    backgroundColor: '#f87171',
+                    color: '#ffffff'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#ef4444'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f87171'}
+                  title="Help others: report a hazard here"
                 >
                   Report Hazard
-                </Link>
+                </button>
               </div>
-
-              <p className="mt-3 sm:mt-4 text-[11px] sm:text-xs text-text-secondary">
-                Choose safest • fastest — switch anytime
-              </p>
             </div>
           </div>
         </div>

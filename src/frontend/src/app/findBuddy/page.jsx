@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ProtectedRoute from '../../components/auth/ProtectedRoute';
 import BuddyHeader from '../../components/BuddyHeader';
 import ModeFilterChips from '../../components/ModeFilterChips';
@@ -8,6 +8,7 @@ import ShareLocationToggle from '../../components/ShareLocationToggle';
 import BuddyMapView from '../../components/BuddyMapView';
 import BottomSheet from '../../components/BottomSheet';
 import EnhancedBuddyCard from '../../components/EnhancedBuddyCard';
+import { buddyService } from '../../lib/services';
 
 // Mock buddy data
 const mockBuddies = [
@@ -122,11 +123,105 @@ export default function FindBuddy() {
     time: 'now',
     context: null
   });
+  const [buddies, setBuddies] = useState([]);
   const [filteredBuddies, setFilteredBuddies] = useState(mockBuddies);
   const [notificationCount, setNotificationCount] = useState(2);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // User location (London default)
   const userLocation = [51.5074, -0.1278];
+
+  // Avatar colors for buddy cards
+  const avatarColors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#ABEBC6'
+  ];
+
+  // Fetch buddies from API
+  useEffect(() => {
+    if (!isLocationSharing) {
+      setBuddies([]);
+      setFilteredBuddies([]);
+      return;
+    }
+
+    const fetchBuddies = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Convert filter modes to API format
+        const apiModes = filters.modes.map(mode => {
+          if (mode === 'walk') return 'walking';
+          if (mode === 'cycle') return 'cycling';
+          return mode;
+        });
+
+        const response = await buddyService.getNearbyBuddies({
+          lat: userLocation[0],
+          lon: userLocation[1],
+          radius: 5,
+          modes: apiModes.join(','),
+          status: 'available'
+        });
+
+        if (response.success && response.data.buddies) {
+          // Transform API data to match UI format
+          const transformedBuddies = response.data.buddies.map((buddy, index) => {
+            // Get initials from username
+            const nameParts = buddy.username.split('_').map(part => part.charAt(0).toUpperCase());
+            const initials = nameParts.slice(0, 2).join('');
+            
+            // Determine mode from preferred_modes
+            const hasWalking = buddy.preferred_modes.includes('walking') || buddy.preferred_modes.includes('running');
+            const hasCycling = buddy.preferred_modes.includes('cycling');
+            const mode = hasCycling ? 'cycling' : 'walking';
+
+            return {
+              id: buddy.id,
+              name: buddy.username.replace('_', ' '),
+              initials: initials,
+              latitude: userLocation[0] + (Math.random() - 0.5) * 0.01, // Mock location near user
+              longitude: userLocation[1] + (Math.random() - 0.5) * 0.01,
+              distance: Math.round(buddy.distance_km * 1000), // Convert to meters
+              mode: mode,
+              pace: 'Medium pace',
+              routeOverlap: { 
+                distance: buddy.distance_km < 1 ? (buddy.distance_km * 1000).toFixed(0) : buddy.distance_km.toFixed(1), 
+                unit: buddy.distance_km < 1 ? 'm' : 'km' 
+              },
+              rating: buddy.rating,
+              ridesCount: buddy.total_ratings,
+              verified: buddy.rating >= 4.5,
+              availability: 'Available now',
+              status: buddy.availability_status === 'available' ? 'online' : 'offline',
+              avatarColor: avatarColors[index % avatarColors.length],
+              bio: buddy.bio
+            };
+          });
+
+          setBuddies(transformedBuddies);
+          setFilteredBuddies(transformedBuddies);
+        } else {
+          // Fallback to mock data
+          console.warn('API returned no buddies, using mock data');
+          setBuddies(mockBuddies);
+          setFilteredBuddies(mockBuddies);
+        }
+      } catch (error) {
+        console.error('Error fetching buddies:', error);
+        setError(error.message);
+        // Fallback to mock data on error
+        setBuddies(mockBuddies);
+        setFilteredBuddies(mockBuddies);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBuddies();
+  }, [isLocationSharing, filters.modes, userLocation[0], userLocation[1]]);
 
   // Handle filter changes
   const handleFilterChange = (newFilters) => {
@@ -183,7 +278,7 @@ export default function FindBuddy() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-primary-dark flex flex-col overflow-hidden">
+      <div className="min-h-screen bg-white flex flex-col overflow-hidden">
         {/* Header */}
         <BuddyHeader
         buddyCount={displayedBuddies.length}
@@ -192,14 +287,110 @@ export default function FindBuddy() {
         onSettingsClick={handleSettingsClick}
       />
 
-      {/* Mode Filter Chips */}
-      <ModeFilterChips
-        onFilterChange={handleFilterChange}
-        initialFilters={filters}
-      />
+      {/* Mode Filter Chips and Share Location Toggle */}
+      <div className="px-4 py-3 border-b bg-gray-50 border-gray-200">
+        <div className="flex items-center justify-between gap-4">
+          {/* Filter Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => {
+                const newModes = filters.modes.includes('walk') ? filters.modes.filter(m => m !== 'walk') : [...filters.modes, 'walk'];
+                if (newModes.length > 0) handleFilterChange({ ...filters, modes: newModes });
+              }}
+              className="w-12 h-12 rounded-full flex items-center justify-center transition-all"
+              style={filters.modes.includes('walk') ? {
+                backgroundColor: '#1e293b',
+                color: '#ffffff'
+              } : {
+                backgroundColor: '#e2e8f0',
+                color: '#94a3b8'
+              }}
+              title="Who Walk"
+            >
+              <svg className="w-6 h-6 pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M13.5 5.5c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+              </svg>
+            </button>
+            
+            <button
+              onClick={() => {
+                const newModes = filters.modes.includes('cycle') ? filters.modes.filter(m => m !== 'cycle') : [...filters.modes, 'cycle'];
+                if (newModes.length > 0) handleFilterChange({ ...filters, modes: newModes });
+              }}
+              className="w-12 h-12 rounded-full flex items-center justify-center transition-all"
+              style={filters.modes.includes('cycle') ? {
+                backgroundColor: '#1e293b',
+                color: '#ffffff'
+              } : {
+                backgroundColor: '#e2e8f0',
+                color: '#94a3b8'
+              }}
+              title="Who Cycle"
+            >
+              <svg className="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18.5" cy="17.5" r="3.5"/>
+                <circle cx="5.5" cy="17.5" r="3.5"/>
+                <circle cx="15" cy="5" r="1"/>
+                <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+              </svg>
+            </button>
+            
+            <div className="text-gray-400 text-lg">|</div>
+            
+            <button
+              onClick={() => handleFilterChange({ ...filters, time: 'now' })}
+              className="px-4 py-2.5 rounded-full text-base font-medium transition-all whitespace-nowrap flex items-center gap-1.5"
+              style={filters.time === 'now' ? {
+                backgroundColor: '#1e293b',
+                color: '#ffffff'
+              } : {
+                backgroundColor: '#e2e8f0',
+                color: '#94a3b8'
+              }}
+              title="Available right now"
+            >
+              Now
+            </button>
+            
+            <button
+              onClick={() => handleFilterChange({ ...filters, time: 'later' })}
+              className="px-4 py-2.5 rounded-full text-base font-medium transition-all whitespace-nowrap flex items-center gap-1.5"
+              style={filters.time === 'later' ? {
+                backgroundColor: '#1e293b',
+                color: '#ffffff'
+              } : {
+                backgroundColor: '#e2e8f0',
+                color: '#94a3b8'
+              }}
+              title="Scheduled trips later"
+            >
+              Later
+            </button>
+          </div>
+          
+          {/* Right side - Status and Toggle */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Buddies Available Status */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 border border-green-200">
+              <span className="text-green-600 text-sm">✓</span>
+              <span className="text-xs md:text-sm text-gray-900 font-medium whitespace-nowrap">
+                {displayedBuddies.length} {displayedBuddies.length === 1 ? 'buddy' : 'buddies'} available now
+              </span>
+            </div>
+            
+            {/* Share Location Toggle */}
+            <ShareLocationToggle
+              initialState={isLocationSharing}
+              buddyCount={displayedBuddies.length}
+              distance={5}
+              onChange={handleLocationToggle}
+            />
+          </div>
+        </div>
+      </div>
 
-      {/* Map Area - 55-60% of viewport height */}
-      <div className="relative px-4" style={{ height: '55vh' }}>
+      {/* Map Area - Extends to bottom sheet */}
+      <div className="relative px-4 pb-[200px]" style={{ height: 'calc(100vh - 200px)' }}>
         <BuddyMapView
           userLocation={userLocation}
           buddies={displayedBuddies}
@@ -210,14 +401,6 @@ export default function FindBuddy() {
           zoom={14}
         />
       </div>
-
-      {/* Share Location Toggle */}
-      <ShareLocationToggle
-        initialState={isLocationSharing}
-        buddyCount={displayedBuddies.length}
-        distance={5}
-        onChange={handleLocationToggle}
-      />
 
       {/* Bottom Sheet with Buddy List - 40-45% */}
       <BottomSheet
@@ -239,13 +422,13 @@ export default function FindBuddy() {
             ))
           ) : (
             <div className="text-center py-12">
-              <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <p className="text-text-primary font-medium mb-2">No buddies found</p>
-              <p className="text-sm text-text-secondary">
+              <p className="text-gray-900 font-medium mb-2">No buddies found</p>
+              <p className="text-sm text-gray-600">
                 {isLocationSharing 
                   ? 'Try adjusting your filters or check back later'
                   : 'Turn on location sharing to find buddies nearby'}

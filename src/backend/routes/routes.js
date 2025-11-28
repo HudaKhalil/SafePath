@@ -296,7 +296,7 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
 // Find routes between two points
 router.post('/find', authenticateToken, async (req, res) => {
   try {
-    const { fromLat, fromLon, toLat, toLon, mode = 'walking' } = req.body;
+    const { fromLat, fromLon, toLat, toLon, mode = 'walking', userPreferences = null } = req.body;
 
     if (!fromLat || !fromLon || !toLat || !toLon) {
       return res.status(400).json({
@@ -305,13 +305,19 @@ router.post('/find', authenticateToken, async (req, res) => {
       });
     }
 
+    // Log user preferences if provided
+    if (userPreferences) {
+      console.log('[Routes API] User safety preferences:', userPreferences.factorWeights);
+    }
+
     // Use route calculator to get both fastest and safest routes
     const result = await routeCalculator.calculateRoutes(
       parseFloat(fromLat),
       parseFloat(fromLon),
       parseFloat(toLat),
       parseFloat(toLon),
-      mode
+      mode,
+      userPreferences
     );
 
     if (!result.success) {

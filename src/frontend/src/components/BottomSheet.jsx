@@ -92,9 +92,14 @@ export default function BottomSheet({
   return (
     <div
       ref={sheetRef}
-      className="fixed bottom-0 left-0 right-0 bg-primary-dark/95 backdrop-blur-md border-t border-white/10 rounded-t-3xl shadow-2xl transition-all duration-300 ease-out z-[999]"
+      className="fixed bottom-0 right-0 backdrop-blur-md rounded-t-3xl shadow-2xl transition-all duration-300 ease-out z-[999]"
       style={{
         height: `${currentHeight}px`,
+        width: '100%',
+        maxWidth: '480px',
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+        borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
       }}
     >
       {/* Drag Handle */}
@@ -106,7 +111,7 @@ export default function BottomSheet({
         onMouseDown={handleMouseDown}
       >
         {/* Handle bar */}
-        <div className="w-12 h-1 bg-white/30 rounded-full mx-auto mb-2"></div>
+        <div className="w-12 h-1 rounded-full mx-auto mb-2" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}></div>
         
         {/* Header row */}
         <div className="px-4 flex items-center justify-between">
@@ -114,20 +119,28 @@ export default function BottomSheet({
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleSheet}
-                className="p-1 hover:bg-white/10 rounded transition-colors"
+                className="p-1 rounded transition-colors"
+                style={{ color: '#94a3b8' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 aria-label={isExpanded ? 'Collapse' : 'Expand'}
               >
                 {isExpanded ? (
-                  <ChevronDown className="w-5 h-5 text-text-secondary" />
+                  <ChevronDown className="w-5 h-5" />
                 ) : (
-                  <ChevronUp className="w-5 h-5 text-text-secondary" />
+                  <ChevronUp className="w-5 h-5" />
                 )}
               </button>
-              <h2 className="text-base md:text-lg font-bold text-text-primary">
+              <h2 
+                className="text-base md:text-lg font-bold transition-colors cursor-pointer" 
+                style={{ color: '#f8fafc' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#f8fafc'}
+              >
                 Buddies nearby ({buddyCount})
               </h2>
             </div>
-            <p className="text-xs text-text-secondary ml-8">{sortText}</p>
+            <p className="text-xs ml-8" style={{ color: '#94a3b8' }}>{sortText}</p>
           </div>
         </div>
       </div>

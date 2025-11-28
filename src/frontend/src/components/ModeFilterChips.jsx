@@ -40,23 +40,38 @@ export default function ModeFilterChips({
   };
 
   const chipBaseClass = "px-3 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5";
-  const activeClass = "bg-accent text-black";
-  const inactiveClass = "bg-white/10 text-text-secondary hover:bg-white/20";
 
   return (
-    <div className="px-4 py-3 bg-primary-dark/50 border-b border-white/10">
+    <div className="px-4 py-3 border-b" style={{
+      backgroundColor: 'var(--bg-card)',
+      borderColor: 'var(--border-color)'
+    }}>
       {/* Mode chips */}
       <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-1 scrollbar-hide">
         <button
           onClick={() => toggleMode('walk')}
-          className={`${chipBaseClass} ${selectedModes.includes('walk') ? activeClass : inactiveClass}`}
+          className={chipBaseClass}
+          style={selectedModes.includes('walk') ? {
+            backgroundColor: 'var(--color-accent)',
+            color: 'var(--color-text-on-accent)'
+          } : {
+            backgroundColor: 'var(--bg-icon)',
+            color: 'var(--color-text-primary)'
+          }}
         >
           <User className="w-4 h-4" />
           <span>Walk</span>
         </button>
         <button
           onClick={() => toggleMode('cycle')}
-          className={`${chipBaseClass} ${selectedModes.includes('cycle') ? activeClass : inactiveClass}`}
+          className={chipBaseClass}
+          style={selectedModes.includes('cycle') ? {
+            backgroundColor: 'var(--color-accent)',
+            color: 'var(--color-text-on-accent)'
+          } : {
+            backgroundColor: 'var(--bg-icon)',
+            color: 'var(--color-text-primary)'
+          }}
         >
           <Bike className="w-4 h-4" />
           <span>Cycle</span>
@@ -68,30 +83,58 @@ export default function ModeFilterChips({
         {/* Time */}
         <button
           onClick={() => selectTime('now')}
-          className={`${chipBaseClass} ${selectedTime === 'now' ? activeClass : inactiveClass}`}
+          className={chipBaseClass}
+          style={selectedTime === 'now' ? {
+            backgroundColor: 'var(--color-accent)',
+            color: 'var(--color-text-on-accent)'
+          } : {
+            backgroundColor: 'var(--bg-icon)',
+            color: 'var(--color-text-primary)'
+          }}
         >
           Now
         </button>
         <button
           onClick={() => selectTime('later')}
-          className={`${chipBaseClass} ${selectedTime === 'later' ? activeClass : inactiveClass}`}
+          className={chipBaseClass}
+          style={selectedTime === 'later' ? {
+            backgroundColor: 'var(--color-accent)',
+            color: 'var(--color-text-on-accent)'
+          } : {
+            backgroundColor: 'var(--bg-icon)',
+            color: 'var(--color-text-primary)'
+          }}
         >
           Later
         </button>
 
         {/* Divider */}
-        <div className="w-px h-6 bg-white/20 mx-1"></div>
+        <div className="w-px h-6 mx-1" style={{ backgroundColor: 'var(--border-color)' }}></div>
 
         {/* Context */}
         <button
           onClick={() => selectContext('home-work')}
-          className={`${chipBaseClass} ${selectedContext === 'home-work' ? activeClass : inactiveClass}`}
+          className={chipBaseClass}
+          style={selectedContext === 'home-work' ? {
+            backgroundColor: 'var(--color-accent)',
+            color: 'var(--color-text-on-accent)'
+          } : {
+            backgroundColor: 'var(--bg-icon)',
+            color: 'var(--color-text-primary)'
+          }}
         >
           Home ↔ Work
         </button>
         <button
           onClick={() => selectContext('custom')}
-          className={`${chipBaseClass} ${selectedContext === 'custom' ? activeClass : inactiveClass}`}
+          className={chipBaseClass}
+          style={selectedContext === 'custom' ? {
+            backgroundColor: 'var(--color-accent)',
+            color: 'var(--color-text-on-accent)'
+          } : {
+            backgroundColor: 'var(--bg-icon)',
+            color: 'var(--color-text-primary)'
+          }}
         >
           Custom route
         </button>

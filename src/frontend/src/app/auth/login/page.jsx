@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { authService } from '../../../lib/services';
 
 export default function Login() {
+  console.log('🔄 Login component rendering/re-rendering');
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
@@ -13,26 +14,40 @@ export default function Login() {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // Check if user is already logged in
+  // Mark component as mounted - DISABLED to prevent redirects
   useEffect(() => {
-    if (authService.isLoggedIn()) {
-      router.push('/');
-    }
-  }, [router]);
+    setMounted(true);
+    // Temporarily disable auto-redirect to debug
+    // if (authService.isLoggedIn()) {
+    //   router.push('/');
+    // }
+  }, []);
+
+  // Track dark mode changes
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    console.log('📝 Field changed:', name, '=', value);
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+    // Clear all errors when user starts typing
+    if (errors[name] || errors.general) {
+      console.log('🗑️ Clearing errors because user is typing');
+      setErrors({});
     }
   };
 
@@ -49,19 +64,31 @@ export default function Login() {
       newErrors.password = 'Password is required';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    console.log('🔵 handleSubmit called');
+    console.log('Current formData:', formData);
+    console.log('Current errors:', errors);
     
     if (!validateForm()) {
+      console.log('❌ Validation failed');
       return;
     }
 
+    console.log('✅ Validation passed, starting login...');
     setIsLoading(true);
-    setErrors({});
+    // Don't clear errors here - let them persist until we get a new result
 
     try {
       const loginData = {
@@ -76,58 +103,75 @@ export default function Login() {
       console.log('Login result:', result);
 
       if (result.success) {
-        console.log('Login successful, redirecting...');
-        // Add a small delay to see any console messages
+        console.log('✅ Login successful, redirecting...');
+        // Keep loading state while redirecting
         setTimeout(() => {
+          console.log('🔄 Executing redirect now');
           window.location.href = '/';
         }, 100);
       } else {
-        console.log('Login failed:', result.message);
-        setErrors({ general: result.message || 'Login failed' });
+        console.log('❌ Login failed:', result.message);
+        const errorMsg = result.message || 'Login failed';
+        console.log('Setting errors to:', errorMsg);
+        setErrors({ general: errorMsg });
+        setIsLoading(false);
+        console.log('Should show error now');
       }
     } catch (error) {
-      console.error('Login error caught:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error constructor:', error.constructor.name);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config?.url,
-        stack: error.stack,
-        code: error.code,
-        errno: error.errno
-      });
+      console.error('Login error:', error);
       
-      // Show error in UI as well as console
+      // Determine error message
       let errorMessage = 'Login failed. Please try again.';
       
-      // Check for network errors
-      if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error') || !error.response) {
-        errorMessage = 'Cannot connect to server. Please ensure the backend is running on port 5001.';
+      if (!error.response) {
+        // Network error or backend not running
+        errorMessage = error.message || 'Cannot connect to server. Please ensure the backend is running on port 5001.';
+      } else if (error.response?.status === 401 || error.response?.status === 400) {
+        // Invalid credentials
+        errorMessage = error.response.data?.message || 'Invalid email or password';
       } else if (error.response?.data?.message) {
+        // Other API errors
         errorMessage = error.response.data.message;
       } else if (error.message) {
+        // Generic error with message
         errorMessage = error.message;
       }
       
-      if (error.response?.data?.errors) {
+      console.log('Setting error message:', errorMessage);
+      
+      // Handle field-specific validation errors
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
         const fieldErrors = {};
         error.response.data.errors.forEach(err => {
           fieldErrors[err.path || err.param] = err.msg || err.message;
         });
-        setErrors(fieldErrors);
+        if (Object.keys(fieldErrors).length > 0) {
+          setErrors(fieldErrors);
+        } else {
+          setErrors({ general: errorMessage });
+        }
       } else {
-        setErrors({ general: errorMessage });
+        const errorState = { general: errorMessage };
+        console.log('❌ Setting error state:', errorState);
+        setErrors(errorState);
+        console.log('🔴 DO NOT CLEAR FORM - KEEP FORM DATA');
       }
-    } finally {
+      
+      // Keep loading state false and errors visible
       setIsLoading(false);
+      
+      // Log after state update attempt
+      setTimeout(() => {
+        console.log('📊 After 100ms - errors:', errors, 'formData:', formData);
+      }, 100);
     }
+    
+    console.log('🔵 handleSubmit completed');
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="flex-1 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: isDark ? 'transparent' : '#f1f5f9' }}>
+      <div className="max-w-md w-full space-y-6 rounded-2xl p-8 shadow-2xl dark:border dark:border-white/20" style={{ backgroundColor: 'var(--bg-card)' }}>
         <div>
           <div className="flex justify-center">
             <div className="w-16 h-16 flex items-center justify-center">
@@ -138,19 +182,19 @@ export default function Login() {
               />
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
-            Sign in to your account
+          <h2 className="mt-4 text-center text-2xl font-extrabold" style={{ color: isDark ? '#ffffff' : '#0f172a' }}>
+            Log in
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-300">
+          <p className="mt-1 text-center text-base" style={{ color: isDark ? '#ffffff' : '#0f172a' }}>
             Welcome back to SafePath!
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
+        <div className="mt-4 space-y-4">
+          <div className="space-y-3">
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="email" className="block text-lg font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
                 Email Address
               </label>
               <input
@@ -161,7 +205,8 @@ export default function Login() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 dark:px-4 dark:py-3 border border-gray-300 dark:border-[#06d6a0]/30 rounded-md dark:rounded-lg focus:outline-none focus:ring-2 focus:ring-[#06d6a0] focus:border-[#06d6a0] sm:text-sm text-gray-900 dark:text-[#06d6a0] placeholder-gray-500 dark:placeholder-[#06d6a0]/60 transition-all"
+                style={{ backgroundColor: 'var(--bg-card)' }}
                 placeholder="Enter your email address"
               />
               {errors.email && (
@@ -171,7 +216,7 @@ export default function Login() {
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="password" className="block text-lg font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
                 Password
               </label>
               <input
@@ -182,7 +227,8 @@ export default function Login() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 text-white bg-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent focus:z-10 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 dark:px-4 dark:py-3 border border-gray-300 dark:border-[#06d6a0]/30 rounded-md dark:rounded-lg focus:outline-none focus:ring-2 focus:ring-[#06d6a0] focus:border-[#06d6a0] sm:text-sm text-gray-900 dark:text-[#06d6a0] placeholder-gray-500 dark:placeholder-[#06d6a0]/60 transition-all"
+                style={{ backgroundColor: 'var(--bg-card)' }}
                 placeholder="Enter your password"
               />
               {errors.password && (
@@ -200,25 +246,63 @@ export default function Login() {
           {/* Submit Button */}
           <div>
             <button
-              type="submit"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔵 Button clicked');
+                handleSubmit(e);
+              }}
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-accent hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-lg font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--color-accent)',
+                color: 'var(--color-text-on-accent)'
+              }}
             >
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading ? 'Logging In...' : 'Log In'}
             </button>
           </div>
 
           {/* Sign Up Link */}
           <div className="text-center">
-            <p className="text-sm text-gray-300">
+            <p className="text-sm" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
               Don't have an account?{' '}
-              <Link href="/auth/signup" className="font-medium text-accent hover:text-accent/80 transition-colors">
+              <Link 
+                href="/auth/signup" 
+                className="font-medium underline transition-colors"
+                style={{ color: isDark ? '#06d6a0' : '#0f172a' }}
+                onMouseEnter={(e) => e.target.style.color = isDark ? '#ffffff' : '#059669'}
+                onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#0f172a'}
+              >
                 Sign up here
               </Link>
             </p>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

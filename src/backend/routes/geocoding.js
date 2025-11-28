@@ -5,7 +5,7 @@ const router = express.Router();
 // Geocoding service using Nominatim (OpenStreetMap)
 router.get('/search', async (req, res) => {
   try {
-    const { q, limit = 5, countrycode = 'gb' } = req.query;
+    const { q, limit = 5, countrycode } = req.query;
     
     if (!q || q.length < 3) {
       return res.status(400).json({
@@ -20,12 +20,15 @@ router.get('/search', async (req, res) => {
       format: 'json',
       q: q,
       limit: limit,
-      countrycodes: countrycode,
-      addressdetails: 1,
-      bounded: 1,
-      // Focus on London area - viewbox: west,south,east,north
-      viewbox: '-0.510375,51.286760,0.334015,51.691874'
+      addressdetails: 1
+      // No country code restriction - allow global search
+      // No bounded viewbox - allow worldwide results
     };
+    
+    // Only add countrycode if explicitly provided
+    if (countrycode) {
+      params.countrycodes = countrycode;
+    }
 
     const response = await axios.get(nominatimUrl, { params });
     

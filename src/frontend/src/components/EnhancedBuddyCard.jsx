@@ -52,7 +52,7 @@ export default function EnhancedBuddyCard({
   const modeColor = mode === 'cycling' ? 'text-green-400' : 'text-blue-400';
 
   return (
-    <div className={`bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4 hover:bg-white/10 transition-all ${cardOpacity}`}>
+    <div className={`bg-white border border-gray-200 rounded-2xl p-4 hover:shadow-md transition-all ${cardOpacity}`}>
       {/* Top Row - Avatar and Info */}
       <div className="flex items-start gap-3 mb-3">
         {/* Avatar */}
@@ -63,11 +63,11 @@ export default function EnhancedBuddyCard({
         {/* Name, Distance, and Status */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-base font-bold text-text-primary truncate">
+            <h3 className="text-base font-bold text-gray-900 truncate">
               {name}
             </h3>
-            <span className="text-xs text-text-secondary">·</span>
-            <span className="text-xs text-text-secondary whitespace-nowrap">
+            <span className="text-xs text-gray-500">·</span>
+            <span className="text-xs text-gray-600 whitespace-nowrap">
               {formatDistance(distance)}
             </span>
           </div>
@@ -75,9 +75,9 @@ export default function EnhancedBuddyCard({
           {/* Mode and Pace */}
           <div className="flex items-center gap-2 text-sm mb-1">
             <ModeIcon className={`w-4 h-4 ${modeColor}`} />
-            <span className="text-text-secondary capitalize">{mode}</span>
-            <span className="text-xs text-text-secondary">·</span>
-            <span className="text-text-secondary">{pace}</span>
+            <span className="text-gray-600 capitalize">{mode}</span>
+            <span className="text-xs text-gray-500">·</span>
+            <span className="text-gray-600">{pace}</span>
           </div>
 
           {/* Route Overlap */}
@@ -88,7 +88,7 @@ export default function EnhancedBuddyCard({
           )}
 
           {/* Rating, Rides, Verified */}
-          <div className="flex items-center gap-2 text-xs text-text-secondary flex-wrap">
+          <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
             <div className="flex items-center gap-1">
               <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
               <span>{rating}</span>
@@ -110,7 +110,7 @@ export default function EnhancedBuddyCard({
 
       {/* Availability */}
       {availability && status === 'online' && (
-        <div className="flex items-center gap-1.5 text-xs text-text-secondary mb-3">
+        <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-3">
           <Clock className="w-3.5 h-3.5" />
           <span>{availability}</span>
         </div>
@@ -118,12 +118,12 @@ export default function EnhancedBuddyCard({
 
       {/* Status Messages */}
       {status === 'offline' && (
-        <div className="text-xs text-text-secondary mb-3">
+        <div className="text-xs text-gray-600 mb-3">
           Currently offline
         </div>
       )}
       {status === 'out-of-range' && (
-        <div className="text-xs text-text-secondary mb-3">
+        <div className="text-xs text-gray-600 mb-3">
           Out of range · Request still valid
         </div>
       )}
@@ -133,18 +133,18 @@ export default function EnhancedBuddyCard({
         <button
           onClick={() => onAskToJoin(buddy)}
           disabled={status === 'offline'}
-          className={`
-            flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all
-            ${status === 'offline' 
-              ? 'bg-white/5 text-text-secondary cursor-not-allowed' 
-              : 'bg-accent text-black hover:bg-accent/90 active:scale-95'}
-          `}
+          className="flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all"
+          style={status === 'offline' 
+            ? { backgroundColor: '#f3f4f6', color: '#6b7280', cursor: 'not-allowed' }
+            : { backgroundColor: '#06d6a0', color: '#0f172a' }}
+          onMouseEnter={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#059669')}
+          onMouseLeave={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#06d6a0')}
         >
           Ask to join
         </button>
         <button
           onClick={() => onViewProfile(buddy)}
-          className="px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/10 rounded-lg transition-all"
+          className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
         >
           View profile
         </button>
