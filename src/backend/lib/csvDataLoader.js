@@ -340,6 +340,133 @@ class CsvDataLoader {
     return this.loaded;
   }
 
+  /**
+   * Calculate real hazard density from database hazards
+   * @param {number} latitude 
+   * @param {number} longitude 
+   * @param {number} radiusKm - Search radius in kilometers (default 0.5km)
+   * @returns {Promise<number>} - Hazard density score 0-1
+   */
+  async calculateHazardDensity(latitude, longitude, radiusKm = 0.5) {
+    try {
+      const db = require('../config/database');
+      
+      // Query hazards within radius using PostGIS
+      const query = `
+        SELECT 
+          id,
+          hazard_type,
+          severity,
+          metadata,
+          ST_Distance(
+            location::geography,
+            ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
+          ) / 1000 as distance_km
+        FROM hazards
+        WHERE 
+          status = 'active'
+          AND ST_DWithin(
+            location::geography,
+            ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography,
+            $3
+          )
+        ORDER BY distance_km ASC
+      `;
+      
+      const result = await db.query(query, [
+        latitude,
+        longitude,
+        radiusKm * 1000 // Convert km to meters
+      ]);
+      
+      if (!result.rows || result.rows.length === 0) {
+        return 0.1; // Low baseline hazard if no reports
+      }
+      
+      console.log(`[HazardDensity] Found ${result.rows.length} hazard(s) within ${radiusKm}km of [${latitude.toFixed(4)}, ${longitude.toFixed(4)}]`);
+      
+      // Calculate weighted hazard score based on:
+      // 1. Number of hazards
+      // 2. Severity levels
+      // 3. Distance (closer = higher impact)
+      // 4. Priority and traffic impact
+      
+      const severityWeights = {
+        'critical': 3.0, // Critical severity - immediate danger
+        'high': 2.5,     // High severity - serious hazard
+        'medium': 1.2,   // Medium severity - moderate concern
+        'low': 0.5       // Low severity - minor issue
+      };
+      
+      let totalScore = 0;
+      result.rows.forEach(hazard => {
+        // Distance decay: closer hazards have more impact
+        const distanceFactor = Math.max(0, 1 - (hazard.distance_km / radiusKm));
+        
+        // Severity weight - default to 'high' if unknown
+        const severityWeight = severityWeights[hazard.severity] || severityWeights['high'];
+        
+        // Parse metadata for additional factors
+        let metadata = {};
+        try {
+          metadata = typeof hazard.metadata === 'string' ? JSON.parse(hazard.metadata) : (hazard.metadata || {});
+        } catch (e) {
+          metadata = {};
+        }
+        
+        // Traffic impact bonus from metadata
+        const trafficBonus = metadata.affectsTraffic ? 0.3 : 0;
+        
+        // Combined hazard impact (simplified without priority)
+        const hazardImpact = (severityWeight + trafficBonus) * distanceFactor;
+        totalScore += hazardImpact;
+        
+        console.log(`    - ${hazard.hazard_type} (${hazard.severity}): distance=${hazard.distance_km.toFixed(3)}km, impact=${hazardImpact.toFixed(3)}`);
+      });
+      
+      // Normalize to 0-1 scale
+      // Assume 3+ high-severity hazards in area = maximum danger (1.0)
+      const normalizedScore = Math.min(1.0, totalScore / 3.0);
+      
+      console.log(`[HazardDensity] Total score: ${totalScore.toFixed(3)}, Normalized: ${normalizedScore.toFixed(3)}`);
+      
+      return normalizedScore;
+      
+    } catch (error) {
+      console.error('Error calculating hazard density:', error);
+      // Fallback to estimated value if database query fails
+      return 0.2;
+    }
+  }
+
+  // Stub functions for collision and lighting (return baseline values)
+  // These would be implemented with real data sources in production
+  getCollisionDensity(latitude, longitude) {
+    // Default to low collision risk (no real data available)
+    // In production, this would query collision database
+    return 0.2;
+  }
+
+  getLightingIndex(latitude, longitude) {
+    // Default to moderate lighting (no real data available)
+    // In production, this would query street lighting database
+    return 0.3;
+  }
+
+  // Stub functions for collision and lighting (return baseline values)
+  // These would be implemented with real data sources in production
+  getCollisionDensity(latitude, longitude) {
+    // Default to low collision risk (no real data available)
+    // In production, this would query collision database
+    return 0.2;
+  }
+
+  getLightingIndex(latitude, longitude) {
+    // Default to moderate lighting (no real data available)
+    // In production, this would query street lighting database
+    return 0.3;
+  }
+
   getStats() {
     return {
       totalRecords: this.crimeData.length,
