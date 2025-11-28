@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { geocodingService } from "../../lib/services";
+import { geocodingService, hazardsService } from "../../lib/services";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
 import RoutesSheet from "../../components/RoutesSheet";
@@ -75,6 +75,7 @@ export default function SuggestedRoutes() {
   const [showSafetySettings, setShowSafetySettings] = useState(false);
   const [safetyWeights, setSafetyWeights] = useState(null);
   const [currentSafetyPreset, setCurrentSafetyPreset] = useState('balanced');
+  const [hazards, setHazards] = useState([]);
 
   const desktopPanelViewportHeight = 'calc(100vh - 96px)';
   const mobileComparisonViewportHeight = 'calc(100vh - 140px)';
@@ -95,6 +96,25 @@ export default function SuggestedRoutes() {
       setError("Failed to fetch suggested routes");
     } finally {
       setBackendLoading(false);
+    }
+  };
+
+  const loadHazardsForArea = async (lat, lng, radius = 5000) => {
+    try {
+      console.log(`Loading hazards for area: lat=${lat}, lng=${lng}, radius=${radius}`);
+      const response = await hazardsService.getNearbyHazards(lat, lng, { radius, limit: 50 });
+      console.log('Hazards API response:', response);
+      if (response.success) {
+        const hazardsData = response.data?.hazards || [];
+        setHazards(hazardsData);
+        console.log(`Loaded ${hazardsData.length} hazards in area:`, hazardsData);
+      } else {
+        console.warn('Failed to load hazards:', response);
+        setHazards([]);
+      }
+    } catch (error) {
+      console.error('Error loading hazards:', error);
+      setHazards([]);
     }
   };
 
@@ -129,6 +149,19 @@ export default function SuggestedRoutes() {
       }, 4000);
     }
   }, [routes.length, backendRoutes.length]);
+
+  // Load hazards when fromCoords or toCoords change
+  useEffect(() => {
+    if (fromCoords || toCoords) {
+      const lat = fromCoords ? fromCoords[0] : (toCoords ? toCoords[0] : null);
+      const lng = fromCoords ? fromCoords[1] : (toCoords ? toCoords[1] : null);
+      if (lat && lng) {
+        loadHazardsForArea(lat, lng, 5000);
+      }
+    } else if (userLocation) {
+      loadHazardsForArea(userLocation[0], userLocation[1], 5000);
+    }
+  }, [fromCoords, toCoords, userLocation]);
 
   // Whenever transport mode changes, just clear preview info text
   useEffect(() => {
@@ -336,11 +369,14 @@ export default function SuggestedRoutes() {
        // Auto-select fastest route to show on map
        setSelectedRouteId('fastest');
      } else {
-       setError(result.message || "Failed to find routes");
+       // Show specific error message from backend
+       const errorMsg = result.error || result.message || "Failed to find routes";
+       setError(errorMsg);
+       console.warn('Route calculation failed:', errorMsg);
      }
    } catch (error) {
      console.error("Route finding error:", error);
-     setError("Failed to find routes. Please try again.");
+     setError(error.message || "Failed to find routes. Please try again.");
    } finally {
      setLoading(false);
    }
@@ -758,7 +794,7 @@ export default function SuggestedRoutes() {
               key={routes.length > 0 ? 'routes-active' : 'routes-empty'}
               title="Plan Your Route"
               subtitle="Find the safest path"
-              initialExpanded={routes.length > 0}
+              initialExpanded={false}
               minHeight={160}
               collapsedHeight={112}
               contentMinHeight={360}
@@ -1035,6 +1071,7 @@ export default function SuggestedRoutes() {
                         path: r.path?.coordinates || [],
                       })),
                     ]}
+                    hazards={hazards.filter(h => h.latitude && h.longitude)}
                     height="100%"
                     fromCoords={fromCoords}
                     toCoords={toCoords}
@@ -1232,17 +1269,23 @@ export default function SuggestedRoutes() {
         {/* Mobile Route Cards - Below Map */}
         {routes.length > 0 && (
           <section
-            className="md:hidden max-w-6xl mx-auto py-6 rounded-2xl shadow-lg mt-6"
+            className="md:hidden max-w-6xl mx-auto rounded-2xl shadow-lg mt-4 mb-24"
             style={{
-              backgroundColor: isDark ? '#1e293b' : '#ffffff',
-              maxHeight: mobileComparisonViewportHeight,
-              overflowY: 'auto'
+              backgroundColor: isDark ? '#1e293b' : '#ffffff'
             }}
           >
-            <h2 className="text-xl font-bold text-center mb-4 px-4" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
-              Route Comparison
-            </h2>
-            <div className="space-y-4 px-4">
+            <div className="sticky top-0 z-10 py-4 px-4 border-b" style={{ 
+              backgroundColor: isDark ? '#1e293b' : '#ffffff',
+              borderColor: isDark ? '#334155' : '#e5e7eb'
+            }}>
+              <h2 className="text-xl font-bold text-center" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                Route Comparison
+              </h2>
+              <p className="text-xs text-center mt-1" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                Tap a route to view on map • Scroll for analysis
+              </p>
+            </div>
+            <div className="space-y-3 px-4 py-4 pb-24">
               {routes.map((route) => (
                 <div
                   key={route.id}
@@ -1319,21 +1362,51 @@ export default function SuggestedRoutes() {
               ))}
 
               {routes.length === 2 && (
-                <div className="rounded-lg p-3 mb-12" style={{ 
-                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
-                  border: `1px solid ${isDark ? '#3b82f6' : '#bfdbfe'}`
+                <div className="rounded-xl p-4 mt-4 mb-12 shadow-lg border-2" style={{ 
+                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
+                  borderColor: isDark ? '#3b82f6' : '#bfdbfe'
                 }}>
-                  <h4 className="font-bold mb-2 text-base" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>Route Analysis</h4>
-                  <div className="text-sm space-y-1" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
-                    <p>
-                      • Safest is {Math.abs(((routes[1].distance - routes[0].distance) / routes[0].distance) * 100).toFixed(0)}% {routes[1].distance >= routes[0].distance ? 'longer' : 'shorter'}
-                      {routes[1].safetyRating > routes[0].safetyRating && ` with better safety (${routes[1].safetyRating.toFixed(1)} vs ${routes[0].safetyRating.toFixed(1)})`}
-                    </p>
-                    {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) >= 0.5 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5" style={{ color: isDark ? '#60a5fa' : '#1e40af' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 12l2 2 4-4"/>
+                      <circle cx="12" cy="12" r="10"/>
+                    </svg>
+                    <h4 className="font-bold text-lg" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>
+                      Route Analysis
+                    </h4>
+                  </div>
+                  <div className="space-y-2.5 text-sm" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
+                    <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                      <span className="shrink-0">📏</span>
                       <p>
-                        • Time difference: {(Math.round(Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) * 2) / 2).toFixed(1)} min
+                        <strong>Distance:</strong> Safest is {Math.abs(((routes[1].distance - routes[0].distance) / routes[0].distance) * 100).toFixed(0)}% {routes[1].distance >= routes[0].distance ? 'longer' : 'shorter'} than fastest
                       </p>
+                    </div>
+                    
+                    {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) >= 0.5 && (
+                      <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                        <span className="shrink-0">⏱️</span>
+                        <p>
+                          <strong>Time difference:</strong> {(Math.round(Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) * 2) / 2).toFixed(1)} minutes
+                        </p>
+                      </div>
                     )}
+                    
+                    {routes[1].safetyRating > routes[0].safetyRating && (
+                      <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                        <span className="shrink-0">🛡️</span>
+                        <p>
+                          <strong>Safety improvement:</strong> Safest route scores {routes[1].safetyRating.toFixed(1)}/10 vs {routes[0].safetyRating.toFixed(1)}/10
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                      <span className="shrink-0">📊</span>
+                      <p>
+                        Based on crime data, lighting conditions & hazard reports
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

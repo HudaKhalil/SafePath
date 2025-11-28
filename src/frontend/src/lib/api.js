@@ -29,7 +29,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Check if backend is not reachable
+    if (!error.response) {
+      console.error('❌ Backend server is not reachable. Make sure it is running on', API_BASE_URL);
+      error.message = 'Backend server is not running. Please start the backend server on port 5001.';
+    } else if (error.response?.status === 401) {
       // Token expired or invalid
       Cookies.remove('auth_token');
       window.location.href = '/auth/login';

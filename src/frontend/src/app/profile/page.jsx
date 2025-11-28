@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { authService } from '../../lib/services'
 import ProtectedRoute from '../../components/auth/ProtectedRoute'
 import { useRouter } from 'next/navigation'
+import ImageUpload from '../../components/ImageUpload'
 
 export default function Profile() {
   const router = useRouter()
@@ -102,7 +103,7 @@ export default function Profile() {
   }
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target
+    const { name, value, type, checked} = e.target
     
     if (name.startsWith('preferences.')) {
       const prefName = name.split('.')[1]
@@ -132,6 +133,40 @@ export default function Profile() {
           emergencyContact: validatePhone(value)
         }))
       }
+    }
+  }
+
+  const handleImageUpload = async (file) => {
+    try {
+      setError('');
+      const response = await authService.uploadProfilePicture(file);
+      if (response.success) {
+        await loadProfile();
+        setSuccess('Profile picture updated successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+      }
+      return response;
+    } catch (error) {
+      console.error('Image upload error:', error);
+      setError(error.message || 'Failed to upload image');
+      throw error;
+    }
+  }
+
+  const handleImageDelete = async () => {
+    try {
+      setError('');
+      const response = await authService.deleteProfilePicture();
+      if (response.success) {
+        await loadProfile();
+        setSuccess('Profile picture deleted successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+      }
+      return response;
+    } catch (error) {
+      console.error('Image delete error:', error);
+      setError(error.message || 'Failed to delete image');
+      throw error;
     }
   }
 
@@ -305,21 +340,21 @@ export default function Profile() {
               transition: 'all 0.3s ease'
             }}>
               {/* Profile Header */}
-              <div className="p-4 flex items-center gap-4" style={{ backgroundColor: '#0f172a' }}>
-                <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#059669' }}>
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    viewBox="0 0 24 24" 
-                    fill="currentColor"
-                    className="w-8 h-8"
-                    style={{ color: '#0f172a' }}
-                  >
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                  </svg>
+              <div className="p-3 flex items-center" style={{ backgroundColor: '#0f172a', gap: editing ? '8px' : '16px' }}>
+                <div className="flex-shrink-0">
+                  <ImageUpload 
+                    currentImage={user?.profile_picture}
+                    onUpload={handleImageUpload}
+                    onDelete={handleImageDelete}
+                    isDark={isDark}
+                    editing={editing}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-bold truncate" style={{ color: '#ffffff' }}>{user?.name || 'User'}</h2>
-                  <p className="text-sm truncate" style={{ color: '#cbd5e1' }}>
+                  <h2 className="text-lg sm:text-xl font-bold break-words" style={{ color: '#ffffff', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                    {user?.name || 'User'}
+                  </h2>
+                  <p className="text-xs sm:text-sm break-words" style={{ color: '#cbd5e1', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                     Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}
                   </p>
                 </div>
@@ -399,7 +434,7 @@ export default function Profile() {
                           Safety Preferences
                         </h3>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2.5">
                         <div>
                           <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
                             <span style={{ opacity: 0.8, marginRight: '6px' }}>➤</span>
@@ -451,24 +486,6 @@ export default function Profile() {
                               </div>
                             )}
                           </div>
-                        </div>
-                        <div>
-                          <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
-                            Safety Priority
-                          </label>
-                          <span 
-                            className="inline-block px-3 py-1 rounded-full text-sm font-semibold capitalize mt-1 relative group cursor-help"
-                            style={{
-                              backgroundColor: (user?.safety_priority || 'high') === 'high' ? '#06d6a0' : (user?.safety_priority || 'high') === 'medium' ? '#f59e0b' : '#ef4444',
-                              color: '#0f172a'
-                            }}
-                            title={(user?.safety_priority || 'high') === 'high' ? 'Safe over Fast' : (user?.safety_priority || 'high') === 'medium' ? 'Balanced' : 'Fast over Safe'}
-                          >
-                            {user?.safety_priority || 'high'}
-                            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
-                              {(user?.safety_priority || 'high') === 'high' ? 'Safe over Fast' : (user?.safety_priority || 'high') === 'medium' ? 'Balanced' : 'Fast over Safe'}
-                            </span>
-                          </span>
                         </div>
                         <div>
                           <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
@@ -623,7 +640,7 @@ export default function Profile() {
                     {/* Preferences */}
                     <div className="border-t" style={{ borderColor: isDark ? '#334155' : '#e5e7eb', paddingTop: '10px', marginTop: '10px' }}>
                       <h3 className="text-xl font-semibold" style={{ color: isDark ? '#f8fafc' : '#0f172a', marginBottom: '10px' }}>Safety Preferences</h3>
-                      <div className="grid md:grid-cols-3 gap-2.5">
+                      <div className="grid md:grid-cols-2 gap-2.5">
                         <div>
                           <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
                             <span style={{ opacity: 0.8, marginRight: '6px' }}>➤</span>
@@ -686,29 +703,6 @@ export default function Profile() {
                               </div>
                             </button>
                           </div>
-                        </div>
-                        <div>
-                          <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
-                            Safety Priority
-                          </label>
-                          <select
-                            name="preferences.safetyPriority"
-                            value={formData.preferences.safetyPriority}
-                            onChange={handleInputChange}
-                            className="w-full p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
-                            style={{
-                              backgroundColor: isDark ? '#334155' : '#ffffff',
-                              borderColor: isDark ? '#475569' : '#e5e7eb',
-                              color: isDark ? '#f8fafc' : '#0f172a',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
-                            onBlur={(e) => e.target.style.transform = 'scale(1)'}
-                          >
-                            <option value="high">High - Safe over Fast</option>
-                            <option value="medium">Medium - Balanced</option>
-                            <option value="low">Low - Fast over Safe</option>
-                          </select>
                         </div>
                         <div>
                           <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>

@@ -24,15 +24,15 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
       let result;
       try {
         result = await geocodingService.searchLocations(query, { 
-          limit: 5, 
-          countrycode: LOCATION_CONFIG.COUNTRY_CODE
+          limit: 5
+          // No country code restriction - allow global search
         });
       } catch (backendError) {
         console.log('Backend geocoding failed, using direct Nominatim:', backendError.message);
         // Fallback to direct Nominatim search
         result = await geocodingService.searchNominatim(query, { 
-          limit: 5, 
-          countrycode: LOCATION_CONFIG.COUNTRY_CODE
+          limit: 5
+          // No country code restriction - allow global search
         });
       }
 
@@ -96,13 +96,13 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
           let result;
           try {
             result = await geocodingService.searchLocations(value, { 
-              limit: 1, 
-              countrycode: LOCATION_CONFIG.COUNTRY_CODE
+              limit: 1
+              // No country code restriction - allow global search
             });
           } catch (backendError) {
             result = await geocodingService.searchNominatim(value, { 
-              limit: 1, 
-              countrycode: LOCATION_CONFIG.COUNTRY_CODE
+              limit: 1
+              // No country code restriction - allow global search
             });
           }
 
@@ -209,7 +209,7 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
             style={{
               width: '28px',
               height: '28px',
-              backgroundColor: '#ef4444',
+              backgroundColor: '#eab308',
               borderRadius: '50% 50% 50% 0',
               transform: 'rotate(-45deg)',
               border: '2px solid white',

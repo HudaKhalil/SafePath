@@ -12,10 +12,13 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
-      const payload = error.response?.data || { success: false, message: 'Network error' };
-      const err = new Error(payload.message || 'Network error');
-      err.data = payload;
-      throw err;
+      // Preserve the original error structure for better error handling
+      if (error.response?.data?.message) {
+        error.message = error.response.data.message;
+      } else if (!error.response) {
+        error.message = 'Cannot connect to server. Please ensure the backend is running.';
+      }
+      throw error;
     }
   },
 
@@ -28,10 +31,13 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
-      const payload = error.response?.data || { success: false, message: 'Network error' };
-      const err = new Error(payload.message || 'Network error');
-      err.data = payload;
-      throw err;
+      // Preserve the original error structure for better error handling
+      if (error.response?.data?.message) {
+        error.message = error.response.data.message;
+      } else if (!error.response) {
+        error.message = 'Cannot connect to server. Please ensure the backend is running.';
+      }
+      throw error;
     }
   },
 
@@ -57,6 +63,39 @@ export const authService = {
   async updateProfile(profileData) {
     try {
       const response = await api.put('/auth/profile', profileData);
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Upload profile picture
+  async uploadProfilePicture(file) {
+    try {
+      const formData = new FormData();
+      formData.append('profilePicture', file);
+      
+      const response = await api.post('/auth/profile/picture', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Delete profile picture
+  async deleteProfilePicture() {
+    try {
+      const response = await api.delete('/auth/profile/picture');
       return response.data;
     } catch (error) {
       const payload = error.response?.data || { success: false, message: 'Network error' };
@@ -199,42 +238,22 @@ export const hazardsService = {
     }
   },
 
-  // Connect to real-time hazard stream (SSE)
+  // Real-time hazard updates use WebSocket (Socket.IO), not SSE
+  // This method is kept for backward compatibility but returns a mock object
   connectToHazardStream(latitude, longitude, onMessage, onError) {
-    const token = authService.getToken();
-    if (!token) {
-      onError("Authentication required");
-      return null;
+    console.log('Real-time hazard updates are handled via WebSocket (Socket.IO)');
+    
+    // Send connection confirmation
+    if (onMessage) {
+      setTimeout(() => {
+        onMessage({ type: 'connected', message: 'WebSocket connection active' });
+      }, 100);
     }
-
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-    const params = new URLSearchParams({
-      latitude: latitude.toString(),
-      longitude: longitude.toString(),
-      radius: "5000", // 5km radius
-      token: token, // Include token in URL since EventSource doesn't support headers
-    });
-
-    const eventSource = new EventSource(
-      `${baseUrl}/api/hazards/stream?${params}`
-    );
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onMessage(data);
-      } catch (error) {
-        console.error("Error parsing SSE data:", error);
-        onError("Data parsing error");
-      }
+    
+    // Return mock object for compatibility
+    return {
+      close: () => console.log('Mock SSE closed - WebSocket handles real-time updates')
     };
-
-    eventSource.onerror = (error) => {
-      console.error("SSE connection error:", error);
-      onError("Connection error");
-    };
-
-    return eventSource;
   },
 };
 

@@ -21,7 +21,7 @@ export default function RouteButtons() {
         <ShieldCheck />
         <span className="text-lg font-semibold">Go Safe</span>
       </Btn>
-      <Btn className="bg-sp-fast hover:opacity-95 active:translate-y-[1px] focus-visible:ring-sp-fast/60">
+      <Btn className="bg-sp-fast hover:opacity-95 active:translate-y-px focus-visible:ring-sp-fast/60">
         <Zap />
         <span className="text-lg font-semibold">Go Fast</span>
       </Btn>
