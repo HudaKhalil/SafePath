@@ -30,7 +30,7 @@
 :root {
   /* BUTTONS, TEXT, ICONS will be same in both modes */
   --color-accent: #06d6a0;
-  --color-accent-light: #4ade80;
+  --color-accent-light: #6ff8a1;
   --color-accent-dark: #059669;
   --color-text-on-accent: #0f172a;
   --color-hazard: #f59e0b;
@@ -40,6 +40,7 @@
   --color-danger: #ef4444;
   --color-danger-light: #f87171;
   --color-success: #06d6a0;
+  --from-to-label-color: #0f172a;
 }
 
 /* DEFAULT LIGHT MODE COLORS (no class needed) */
@@ -58,6 +59,7 @@
   --color-text-primary: #f8fafc;
   --color-text-secondary: #94a3b8;
   --border-color: rgba(255, 255, 255, 0.2);
+  --from-to-label-color: #06d6a0;
 }
 
 html, body {

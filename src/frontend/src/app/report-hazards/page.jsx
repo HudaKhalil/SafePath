@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { hazardsService } from '../../lib/services'
 import ProtectedRoute from '../../components/auth/ProtectedRoute'
@@ -10,8 +10,8 @@ const Map = dynamic(() => import('../../components/Map'), { ssr: false })
 
 export default function HazardReporting() {
   const [hazards, setHazards] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [userLocation, setUserLocation] = useState(null)
+  const [loading, setLoading] = useState(false) // Start false, only set true when fetching hazards
+  const [userLocation, setUserLocation] = useState([51.5074, -0.1278]) // Default location immediately
   const [showReportForm, setShowReportForm] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [error, setError] = useState('')
@@ -51,39 +51,38 @@ export default function HazardReporting() {
     weatherRelated: false
   })
 
-  useEffect(() => {
-    getUserLocation()
-  }, [])
-
-  useEffect(() => {
-    if (userLocation) {
-      loadRecentHazards()
-      connectToRealTimeUpdates()
-    }
-    
-    return () => {
-      disconnectFromRealTimeUpdates()
-    }
-  }, [userLocation])
-
+  // Define all callbacks first before useEffect
   const getUserLocation = () => {
+    const startTime = performance.now()
+    console.log('⏱️ Getting user location in background...')
+    
     if (navigator.geolocation) {
+      // Get location in background without blocking UI
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const location = [position.coords.latitude, position.coords.longitude]
-          setUserLocation(location)
+          console.log(`✓ Real location obtained in ${(performance.now() - startTime).toFixed(0)}ms:`, location)
+          setUserLocation(location) // This will trigger reload of hazards with real location
         },
         (error) => {
-          console.error('Error getting location:', error)
-          setUserLocation([51.5074, -0.1278])
+          console.log(`ℹ️ Using default location (geolocation ${error.message.toLowerCase()})`)
+          // Keep default location, no need to set again
+        },
+        {
+          timeout: 3000, // Reduced to 3 seconds
+          enableHighAccuracy: false,
+          maximumAge: 300000
         }
       )
-    } else {
-      setUserLocation([51.5074, -0.1278])
     }
   }
 
-  const loadRecentHazards = async () => {
+  const loadRecentHazards = useCallback(async () => {
+    if (!userLocation) return
+    
+    const startTime = performance.now()
+    console.log('⏱️ Loading hazards...')
+    
     try {
       setLoading(true)
       const response = await hazardsService.getNearbyHazards(
@@ -91,6 +90,8 @@ export default function HazardReporting() {
         userLocation[1], 
         { radius: 10000, limit: 20 }
       )
+      console.log(`✓ Hazards loaded in ${(performance.now() - startTime).toFixed(0)}ms:`, response.data?.hazards?.length || 0, 'hazards')
+      
       if (response.success) {
         setHazards(response.data?.hazards || [])
       } else {
@@ -104,34 +105,9 @@ export default function HazardReporting() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userLocation])
 
-  const connectToRealTimeUpdates = () => {
-    if (userLocation && !eventSourceRef.current) {
-      try {
-        eventSourceRef.current = hazardsService.connectToHazardStream(
-          userLocation[0],
-          userLocation[1],
-          handleRealTimeMessage,
-          handleRealTimeError
-        )
-        setIsConnected(true)
-      } catch (error) {
-        console.error('Failed to connect to real-time updates:', error)
-        setIsConnected(false)
-      }
-    }
-  }
-
-  const disconnectFromRealTimeUpdates = () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-      eventSourceRef.current = null
-      setIsConnected(false)
-    }
-  }
-
-  const handleRealTimeMessage = (data) => {
+  const handleRealTimeMessage = useCallback((data) => {
     console.log('Real-time hazard update:', data)
     
     if (data.type === 'connected') {
@@ -144,18 +120,72 @@ export default function HazardReporting() {
         setHazards(prev => [data.hazard, ...prev.slice(0, 19)])
       }
     }
-  }
+  }, [])
 
-  const handleRealTimeError = (error) => {
+  const handleRealTimeError = useCallback((error) => {
     console.error('Real-time connection error:', error)
     setIsConnected(false)
-    
-    setTimeout(() => {
-      if (userLocation) {
-        connectToRealTimeUpdates()
+  }, [])
+
+  const connectToRealTimeUpdates = useCallback(() => {
+    if (userLocation && !eventSourceRef.current) {
+      const startTime = performance.now()
+      console.log('⏱️ Connecting to real-time stream...')
+      
+      try {
+        eventSourceRef.current = hazardsService.connectToHazardStream(
+          userLocation[0],
+          userLocation[1],
+          handleRealTimeMessage,
+          handleRealTimeError
+        )
+        console.log(`✓ Real-time stream connected in ${(performance.now() - startTime).toFixed(0)}ms`)
+        setIsConnected(true)
+      } catch (error) {
+        console.error('Failed to connect to real-time updates:', error)
+        setIsConnected(false)
       }
-    }, 5000)
-  }
+    }
+  }, [userLocation, handleRealTimeMessage, handleRealTimeError])
+
+  const disconnectFromRealTimeUpdates = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+      setIsConnected(false)
+    }
+  }, [])
+
+  // useEffect hooks after all callbacks are defined
+  useEffect(() => {
+    console.log('🚀 Report Hazards page mounted')
+    const mountTime = performance.now()
+    getUserLocation()
+    
+    // Log when page is fully interactive
+    const timer = setTimeout(() => {
+      console.log(`📊 Page fully loaded in ${(performance.now() - mountTime).toFixed(0)}ms`)
+    }, 100)
+    
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    if (userLocation) {
+      // Load hazards first
+      loadRecentHazards()
+      
+      // Connect to real-time updates after a short delay to not block initial render
+      const timer = setTimeout(() => {
+        connectToRealTimeUpdates()
+      }, 500) // Increased delay to 500ms
+      
+      return () => {
+        clearTimeout(timer)
+        disconnectFromRealTimeUpdates()
+      }
+    }
+  }, [userLocation?.[0], userLocation?.[1], loadRecentHazards, connectToRealTimeUpdates, disconnectFromRealTimeUpdates])
 
   const removeAlert = (alertId) => {
     setRealTimeAlerts(prev => prev.filter(alert => alert.id !== alertId))
@@ -253,38 +283,38 @@ export default function HazardReporting() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen">
+      <div className="min-h-screen pt-5">
         {/*WHITE IN LIGHT MODE, DARK IN DARK MODE */}
-        <section className="relative overflow-hidden py-20" style={{ 
+        <section className="relative overflow-hidden py-4 md:py-3" style={{ 
   background: isLightMode ? '#ffffff' : 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%)'
 }}>
-          <div className="container mx-auto px-6 text-center">
-            <h1 className="text-5xl md:text-6xl font-bold mb-2">
+          <div className="container mx-auto px-4 md:px-6 text-center">
+            <h1 className="text-3xl md:text-3xl font-bold mb-2">
               <span style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>Report a </span>
               <span style={{ color: '#06d6a0' }}>Hazard</span>
             </h1>
-            <p className="text-xl mb-12" style={{ 
+            <p className="text-lg md:text-xl mb-1" style={{ 
               color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
             }}>
-              Help keep London safe by reporting hazards and incidents in your area
+              Help keep community safe by reporting hazards and incidents in your area
             </p>
 
-            <div className="flex justify-center gap-12 mb-8">
+            <div className="flex justify-center gap-6 md:gap-12">
               <div className="text-center">
                 <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>{Array.isArray(hazards) ? hazards.length : 0}+</div>
-                <div className="text-sm" style={{ 
+                <div className="text-base" style={{ 
                   color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
                 }}>Reports Filed</div>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>95%</div>
-                <div className="text-sm" style={{ 
+                <div className="text-base" style={{ 
                   color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
                 }}>Response Rate</div>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>24h</div>
-                <div className="text-sm" style={{ 
+                <div className="text-base" style={{ 
                   color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
                 }}>Avg Response</div>
               </div>
@@ -301,7 +331,6 @@ export default function HazardReporting() {
           />
         ))}
 
-      
         {toast && (
           <Toast 
             message={toast.message} 
@@ -310,47 +339,41 @@ export default function HazardReporting() {
           />
         )}
 
-     
-<section className="py-16" style={{ backgroundColor: isLightMode ? '#ffffff' : '#0f172a' }}>          <div className="container mx-auto px-6">
-            <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-              <div className="border-2 rounded-2xl p-8" style={{ 
-                backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
-                borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
-              }}>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-500">⚠️</span>
-                    <h3 className="text-xl font-bold" style={{ 
-                      color: isLightMode ? '#0f172a' : '#ffffff' 
-                    }}>Submit Hazard Report</h3>
+<section className="relative min-h-[calc(100vh-80px)] mt-4 pb-8" style={{ backgroundColor: isLightMode ? '#ffffff' : '#0f172a' }}>
+          {/* Side Panel */}
+          <div 
+            className="fixed left-0 top-20 bottom-0 z-50 w-full md:w-96 transition-transform duration-300 shadow-2xl"
+            style={{
+              transform: showReportForm ? 'translateX(0)' : 'translateX(-100%)',
+            }}
+          >
+            <div className="h-full overflow-y-auto">
+              <div className="p-4">
+                <div className="border-2 rounded-2xl p-4 md:p-6" style={{ 
+                  backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
+                  borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
+                }}>
+                  <div className="mb-4">
+                    <h3 className="text-2xl font-bold" style={{ 
+                      color: isLightMode ? '#0f172a' : '#06d6a0' 
+                    }}>Report a Hazard</h3>
+                    <p className="text-sm mt-1" style={{ 
+                      color: isLightMode ? '#64748b' : '#06d6a0' 
+                    }}>Help keep London safe</p>
                   </div>
-                  <button
-                    onClick={() => setShowReportForm(!showReportForm)}
-                    className="px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-                    style={{
-                      backgroundColor: '#06d6a0',
-                      color: '#0f172a'
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
-                  >
-                    {showReportForm ? 'Cancel' : 'Report'}
-                  </button>
-                </div>
                 
                 {showReportForm ? (
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                  <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ 
+                      <label className="flex items-center gap-2 text-base font-medium mb-2" style={{ 
                         color: isLightMode ? '#0f172a' : '#ffffff' 
                       }}>
-                        <span className="text-gray-400">📋</span>
-                        Hazard Type *
+                        <span className="font-bold">Hazard Type</span> *
                       </label>
                       <select 
                         value={formData.type}
                         onChange={(e) => setFormData({...formData, type: e.target.value})}
-                        className="w-full p-3 rounded-lg border focus:outline-none focus:ring-2"
+                        className="w-full p-3 rounded-lg border focus:outline-none focus:ring-2 text-lg"
                         style={{ 
                           backgroundColor: '#ffffff',
                           color: '#0f172a',
@@ -375,11 +398,10 @@ export default function HazardReporting() {
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ 
+                      <label className="flex items-center gap-2 text-base font-medium mb-2" style={{ 
                         color: isLightMode ? '#0f172a' : '#ffffff' 
                       }}>
-                        <span className="text-gray-400">⚡</span>
-                        Severity Level *
+                        <span className="font-bold">Severity Level</span> *
                       </label>
                       <div className="flex gap-4 flex-wrap">
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -391,9 +413,12 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, severity: e.target.value})}
                             className="text-accent" 
                           />
-                          <span className="text-sm" style={{ 
-                            color: isLightMode ? '#475569' : '#e5e7eb' 
-                          }}>Low Risk</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-4 h-4 rounded-full bg-yellow-300"></span>
+                            <span className="text-lg" style={{ 
+                              color: isLightMode ? '#475569' : '#06d6a0' 
+                            }}>Low Risk</span>
+                          </span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
@@ -404,9 +429,12 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, severity: e.target.value})}
                             className="text-accent" 
                           />
-                          <span className="text-sm" style={{ 
-                            color: isLightMode ? '#475569' : '#e5e7eb' 
-                          }}>Medium Risk</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-4 h-4 rounded-full bg-amber-500"></span>
+                            <span className="text-lg" style={{ 
+                              color: isLightMode ? '#475569' : '#06d6a0' 
+                            }}>Medium Risk</span>
+                          </span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
@@ -417,9 +445,12 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, severity: e.target.value})}
                             className="text-accent" 
                           />
-                          <span className="text-sm" style={{ 
-                            color: isLightMode ? '#475569' : '#e5e7eb' 
-                          }}>🔴 High Risk</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-4 h-4 rounded-full bg-red-500"></span>
+                            <span className="text-lg" style={{ 
+                              color: isLightMode ? '#475569' : '#06d6a0' 
+                            }}>High Risk</span>
+                          </span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input 
@@ -430,19 +461,18 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, severity: e.target.value})}
                             className="text-accent" 
                           />
-                          <span className="text-sm" style={{ 
-                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          <span className="text-lg" style={{ 
+                            color: isLightMode ? '#475569' : '#06d6a0' 
                           }}>🆘 Critical</span>
                         </label>
                       </div>
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-3" style={{ 
+                      <label className="flex items-center gap-2 text-base font-medium mb-2" style={{ 
                         color: isLightMode ? '#0f172a' : '#ffffff' 
                       }}>
-                        <span className="text-gray-400">⚙️</span>
-                        Additional Information
+                        <span className="font-bold">Additional Information</span>
                       </label>
                       <div className="space-y-2">
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -452,8 +482,8 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, affectsTraffic: e.target.checked})}
                             className="text-accent rounded" 
                           />
-                          <span className="text-sm" style={{ 
-                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          <span className="text-lg" style={{ 
+                            color: isLightMode ? '#475569' : '#06d6a0' 
                           }}>🚦 Affects Traffic Flow</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -463,25 +493,24 @@ export default function HazardReporting() {
                             onChange={(e) => setFormData({...formData, weatherRelated: e.target.checked})}
                             className="text-accent rounded" 
                           />
-                          <span className="text-sm" style={{ 
-                            color: isLightMode ? '#475569' : '#e5e7eb' 
+                          <span className="text-lg" style={{ 
+                            color: isLightMode ? '#475569' : '#06d6a0' 
                           }}>🌦️ Weather Related</span>
                         </label>
                       </div>
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ 
+                      <label className="flex items-center gap-2 text-base font-medium mb-2" style={{ 
                         color: isLightMode ? '#0f172a' : '#ffffff' 
                       }}>
-                        <span className="text-gray-400">📝</span>
-                        Description *
+                        <span className="font-bold">Report Details</span> *
                       </label>
                       <textarea 
                         value={formData.description}
                         onChange={(e) => setFormData({...formData, description: e.target.value})}
                         placeholder="Describe the hazard in detail. Include when you noticed it, any immediate dangers, and any other relevant information..."
-                        className="w-full p-3 rounded-lg border focus:outline-none focus:ring-2" 
+                        className="w-full p-3 rounded-lg border focus:outline-none focus:ring-2 text-lg" 
                         style={{ 
                           backgroundColor: '#ffffff',
                           color: '#0f172a',
@@ -490,12 +519,12 @@ export default function HazardReporting() {
                         rows={4}
                         required
                       />
-                      <div className="text-xs mt-1" style={{ color: '#9ca3af' }}>Minimum 20 characters</div>
+                      <div className="text-sm mt-1" style={{ color: '#9ca3af' }}>Minimum 20 characters</div>
                     </div>
 
                     {selectedLocation && (
                       <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-green-800 text-sm">
+                        <p className="text-green-800 text-lg">
                           📍 Location selected: {selectedLocation[0].toFixed(6)}, {selectedLocation[1].toFixed(6)}
                         </p>
                       </div>
@@ -503,7 +532,7 @@ export default function HazardReporting() {
 
                     {!selectedLocation && (
                       <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-yellow-800 text-sm">
+                        <p className="text-yellow-800 text-lg">
                           ⚠️ Please click on the map to select the hazard location first
                         </p>
                       </div>
@@ -512,14 +541,14 @@ export default function HazardReporting() {
                     <div className="flex gap-4">
                       <button
                         type="submit"
-                        className={`flex-1 font-bold py-3 px-6 rounded-lg transition-all duration-200 ${
+                        className={`font-bold py-3 px-8 rounded-lg transition-all duration-200 ${
                           selectedLocation || (formData.latitude && formData.longitude)
                             ? '' 
                             : 'cursor-not-allowed'
                         }`}
                         style={{
-                          backgroundColor: selectedLocation || (formData.latitude && formData.longitude) ? '#06d6a0' : '#4b5563',
-                          color: selectedLocation || (formData.latitude && formData.longitude) ? '#0f172a' : '#9ca3af'
+                          backgroundColor: selectedLocation || (formData.latitude && formData.longitude) ? '#06d6a0' : '#9ca3af',
+                          color: '#0f172a'
                         }}
                         onMouseEnter={(e) => {
                           if (selectedLocation || (formData.latitude && formData.longitude)) {
@@ -533,7 +562,7 @@ export default function HazardReporting() {
                         }}
                         disabled={!selectedLocation && !(formData.latitude && formData.longitude)}
                       >
-                        ✅ Submit Report
+                        Submit Report
                       </button>
                       <button 
                         type="button" 
@@ -552,11 +581,11 @@ export default function HazardReporting() {
                         }}
                         className="font-semibold py-3 px-6 rounded-lg transition-all duration-200"
                         style={{
-                          backgroundColor: '#374151',
-                          color: '#e5e7eb'
+                          backgroundColor: '#06d6a0',
+                          color: '#0f172a'
                         }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = '#374151'}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
                       >
                         Cancel
                       </button>
@@ -573,24 +602,87 @@ export default function HazardReporting() {
                     }}>Select a location on the map and fill out the hazard details</p>
                   </div>
                 )}
+                </div>
               </div>
+            </div>
+          </div>
 
-             
-              <div className="space-y-8">
+          {/* Toggle Button */}
+          <button
+            onClick={() => setShowReportForm(!showReportForm)}
+            className="absolute left-4 top-4 z-20 transition-all duration-200"
+            style={{
+              backgroundColor: 'transparent',
+            }}
+          >
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg" style={{
+              backgroundColor: isLightMode ? '#0f172a' : '#06d6a0',
+              border: `2px solid ${isLightMode ? '#0f172a' : '#06d6a0'}`
+            }}>
+              <svg 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke={isLightMode ? '#ffffff' : '#0f172a'} 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className="w-5 h-5 transition-transform duration-200"
+                style={{
+                  transform: showReportForm ? 'rotate(180deg)' : 'rotate(0deg)'
+                }}
+              >
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+              <span className="font-medium text-base" style={{ 
+                color: isLightMode ? '#ffffff' : '#0f172a' 
+              }}>
+                {showReportForm ? 'Close' : 'Report Hazard'}
+              </span>
+            </div>
+          </button>
+
+          {/* Main Map Area */}
+          <div className="min-h-screen">
+            <div className="space-y-4 p-4">
               
-                <div className="border-2 rounded-2xl p-6" style={{ 
+                <div className="border-2 rounded-2xl p-2 md:p-3" style={{ 
                   backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
                   borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
                 }}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-blue-400">🗺️</span>
-                    <h3 className="text-xl font-bold" style={{ 
-                      color: isLightMode ? '#0f172a' : '#ffffff' 
-                    }}>Hazard Map</h3>
+                  <div className="flex items-center justify-end mb-3">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const londonCenter = [51.5074, -0.1278];
+                        setUserLocation(londonCenter);
+                        loadRecentHazards();
+                        const span = e.currentTarget.querySelector('.london-text');
+                        if (span) {
+                          span.textContent = '✓ Set to London';
+                          setTimeout(() => {
+                            span.textContent = 'Set to London';
+                          }, 1500);
+                        }
+                      }}
+                      className="text-sm transition-all duration-200 flex items-center gap-1.5 focus:outline-none"
+                      style={{
+                        backgroundColor: 'transparent',
+                        color: isLightMode ? '#1e293b' : '#06d6a0',
+                        border: 'none',
+                        padding: 0,
+                        outline: 'none'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = isLightMode ? '#06d6a0' : '#ffffff'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = isLightMode ? '#1e293b' : '#06d6a0'}
+                      title="Set current location to London for testing"
+                    >
+                      <span className="text-base">🇬🇧</span>
+                      <span className="font-medium london-text hover:underline">Set to London</span>
+                    </button>
                   </div>
                   
                   {showReportForm && (
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="mb-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-blue-800 text-sm">
                         📍 Click on the map to select the hazard location
                       </p>
@@ -601,7 +693,7 @@ export default function HazardReporting() {
                     center={userLocation || [51.5074, -0.1278]}
                     zoom={13}
                     hazards={hazards.filter(h => h.latitude && h.longitude)}
-                    height="400px"
+                    height="650px"
                     onMapClick={showReportForm ? handleMapClick : null}
                     markers={[
                       ...(userLocation && userLocation[0] && userLocation[1] ? [{
@@ -621,8 +713,8 @@ export default function HazardReporting() {
                 </div>
 
              
-                <div className="border-2 border-gray-200 rounded-2xl p-6" style={{ backgroundColor: '#ffffff' }}>
-                  <div className="flex items-center gap-2 mb-4">
+                <div className="border-2 border-gray-200 rounded-2xl p-4 md:p-5" style={{ backgroundColor: '#ffffff' }}>
+                  <div className="flex items-center gap-2 mb-3">
                     <span className="text-green-600">📊</span>
                     <h3 className="text-xl font-bold" style={{ color: '#0f172a' }}>Recent Reports in Your Area</h3>
                   </div>
@@ -632,7 +724,7 @@ export default function HazardReporting() {
                       <p className="text-gray-600">No hazards reported in your area.</p>
                     </div>
                   ) : (
-                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                    <div className="space-y-2.5 max-h-96 overflow-y-auto">
                       {hazards.slice(0, 8).map((hazard) => {
                         const hazardEmojis = {
                           construction: '🚧',
@@ -708,18 +800,17 @@ export default function HazardReporting() {
                     </div>
                   )}
                 </div>
-              </div>
             </div>
           </div>
         </section>
 
         {/* EMERGENCY SITUATIONS */}
-        <section className="py-12" style={{ backgroundColor: '#ffffff' }}>
-          <div className="container mx-auto px-6">
-            <div className="max-w-4xl mx-auto bg-red-50 border-2 border-red-200 rounded-2xl p-8">
-              <div className="text-center mb-8">
-                <div className="text-4xl mb-4">⚠️</div>
-                <h3 className="text-2xl font-bold text-red-800 mb-2">Emergency Situations</h3>
+        <section className="py-8 md:py-10" style={{ backgroundColor: '#ffffff' }}>
+          <div className="container mx-auto px-4 md:px-6">
+            <div className="max-w-5xl mx-auto bg-red-50 border-2 border-red-200 rounded-2xl p-4 md:p-6">
+              <div className="text-center mb-6">
+                <div className="text-3xl md:text-4xl mb-3">⚠️</div>
+                <h3 className="text-xl md:text-2xl font-bold text-red-800 mb-2">Emergency Situations</h3>
                 <p className="text-red-700">
                   If you're witnessing an immediate danger or emergency situation, please contact emergency services directly instead of using this form.
                 </p>

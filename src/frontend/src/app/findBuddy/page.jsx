@@ -10,14 +10,7 @@ import BottomSheet from '../../components/BottomSheet';
 import EnhancedBuddyCard from '../../components/EnhancedBuddyCard';
 import { buddyService } from '../../lib/services';
 
-// Avatar colors for buddy cards
-const avatarColors = [
-  'bg-teal-500', 'bg-cyan-500', 'bg-green-500', 
-  'bg-blue-500', 'bg-purple-500', 'bg-pink-500',
-  'bg-indigo-500', 'bg-orange-500'
-];
-
-// Mock buddy data (fallback)
+// Mock buddy data
 const mockBuddies = [
   {
     id: 1,
@@ -131,26 +124,19 @@ export default function FindBuddy() {
     context: null
   });
   const [buddies, setBuddies] = useState([]);
-  const [filteredBuddies, setFilteredBuddies] = useState([]);
-  const [notificationCount, setNotificationCount] = useState(0);
+  const [filteredBuddies, setFilteredBuddies] = useState(mockBuddies);
+  const [notificationCount, setNotificationCount] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [userLocation, setUserLocation] = useState([51.5074, -0.1278]); // Default: London
 
-  // Get user's current location
-  useEffect(() => {
-    if (navigator.geolocation && isLocationSharing) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation([position.coords.latitude, position.coords.longitude]);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          // Keep default location
-        }
-      );
-    }
-  }, [isLocationSharing]);
+  // User location (London default)
+  const userLocation = [51.5074, -0.1278];
+
+  // Avatar colors for buddy cards
+  const avatarColors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#ABEBC6'
+  ];
 
   // Fetch buddies from API
   useEffect(() => {
@@ -237,122 +223,220 @@ export default function FindBuddy() {
     fetchBuddies();
   }, [isLocationSharing, filters.modes, userLocation[0], userLocation[1]]);
 
+  // Handle filter changes
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
-    // API fetch will be triggered by useEffect when filters change
+    
+    // Filter buddies based on selected modes
+    const filtered = mockBuddies.filter(buddy => {
+      const modeMatch = newFilters.modes.includes(buddy.mode === 'cycling' ? 'cycle' : 'walk');
+      const statusMatch = buddy.status === 'online'; // Only show online buddies
+      return modeMatch && statusMatch;
+    });
+    
+    setFilteredBuddies(filtered);
   };
 
+  // Handle location sharing toggle
   const handleLocationToggle = (isSharing) => {
     setIsLocationSharing(isSharing);
-    if (!isSharing) {
-      setBuddies([]);
-      setFilteredBuddies([]);
-    }
   };
 
+  // Handle buddy actions
   const handleAskToJoin = (buddy) => {
     console.log('Ask to join:', buddy);
+    // TODO: Implement request logic
   };
 
   const handleViewProfile = (buddy) => {
     console.log('View profile:', buddy);
+    // TODO: Implement profile view
   };
 
   const handleBuddyClick = (buddy) => {
     console.log('Buddy clicked on map:', buddy);
+    // TODO: Highlight buddy card or show quick info
   };
 
   const handleNotificationClick = () => {
     console.log('Notifications clicked');
+    // TODO: Show notifications/requests sheet
   };
 
   const handleSettingsClick = () => {
     console.log('Settings clicked');
+    // TODO: Show privacy & buddy settings sheet
   };
 
   const handleFilterClick = () => {
     console.log('Advanced filters clicked');
+    // TODO: Show advanced filters modal
   };
 
+  // Get buddies to display (filtered by location sharing)
   const displayedBuddies = isLocationSharing ? filteredBuddies : [];
 
   return (
     <ProtectedRoute>
-<div className="min-h-screen bg-[#f8fafc] dark:bg-[#0f172a] flex flex-col overflow-hidden">        <BuddyHeader
-          buddyCount={displayedBuddies.length}
-          notificationCount={notificationCount}
-          onNotificationClick={handleNotificationClick}
-          onSettingsClick={handleSettingsClick}
-        />
+      <div className="min-h-screen bg-white flex flex-col overflow-hidden">
+        {/* Header */}
+        <BuddyHeader
+        buddyCount={displayedBuddies.length}
+        notificationCount={notificationCount}
+        onNotificationClick={handleNotificationClick}
+        onSettingsClick={handleSettingsClick}
+      />
 
-        <ModeFilterChips
-          onFilterChange={handleFilterChange}
-          initialFilters={filters}
-        />
-
-        <div className="relative px-4" style={{ height: '55vh' }}>
-          <BuddyMapView
-            userLocation={userLocation}
-            buddies={displayedBuddies}
-            selectedRoute={null}
-            isLocationSharing={isLocationSharing}
-            onBuddyClick={handleBuddyClick}
-            onFilterClick={handleFilterClick}
-            zoom={14}
-          />
-        </div>
-
-        <ShareLocationToggle
-          initialState={isLocationSharing}
-          buddyCount={displayedBuddies.length}
-          distance={5}
-          onChange={handleLocationToggle}
-        />
-
-        <BottomSheet
-          buddyCount={displayedBuddies.length}
-          sortText="Sorted by best route match"
-          initialExpanded={false}
-          minHeight={180}
-          maxHeight={500}
-        >
-          <div className="space-y-3 pb-24">
-            {isLoading ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                  <svg className="w-8 h-8 text-gray-500 dark:text-text-secondary animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </div>
-                <p className="text-gray-900 dark:text-text-primary font-medium mb-2">Finding buddies...</p>
-                <p className="text-sm text-gray-600 dark:text-text-secondary">Searching nearby for available buddies</p>
-              </div>
-            ) : displayedBuddies.length > 0 ? (
-              displayedBuddies.map((buddy) => (
-                <EnhancedBuddyCard
-                  key={buddy.id}
-                  buddy={buddy}
-                  onAskToJoin={handleAskToJoin}
-                  onViewProfile={handleViewProfile}
-                />
-              ))
-            ) : (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gray-500 dark:text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-                <p className="text-gray-900 dark:text-text-primary font-medium mb-2">No buddies found</p>
-                <p className="text-sm text-gray-600 dark:text-text-secondary">
-                  {isLocationSharing 
-                    ? 'Try adjusting your filters or check back later'
-                    : 'Turn on location sharing to find buddies nearby'}
-                </p>
-              </div>
-            )}
+      {/* Mode Filter Chips and Share Location Toggle */}
+      <div className="px-4 py-3 border-b bg-gray-50 border-gray-200">
+        <div className="flex items-center justify-between gap-4">
+          {/* Filter Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => {
+                const newModes = filters.modes.includes('walk') ? filters.modes.filter(m => m !== 'walk') : [...filters.modes, 'walk'];
+                if (newModes.length > 0) handleFilterChange({ ...filters, modes: newModes });
+              }}
+              className="w-12 h-12 rounded-full flex items-center justify-center transition-all"
+              style={filters.modes.includes('walk') ? {
+                backgroundColor: '#1e293b',
+                color: '#ffffff'
+              } : {
+                backgroundColor: '#e2e8f0',
+                color: '#94a3b8'
+              }}
+              title="Who Walk"
+            >
+              <svg className="w-6 h-6 pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M13.5 5.5c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+              </svg>
+            </button>
+            
+            <button
+              onClick={() => {
+                const newModes = filters.modes.includes('cycle') ? filters.modes.filter(m => m !== 'cycle') : [...filters.modes, 'cycle'];
+                if (newModes.length > 0) handleFilterChange({ ...filters, modes: newModes });
+              }}
+              className="w-12 h-12 rounded-full flex items-center justify-center transition-all"
+              style={filters.modes.includes('cycle') ? {
+                backgroundColor: '#1e293b',
+                color: '#ffffff'
+              } : {
+                backgroundColor: '#e2e8f0',
+                color: '#94a3b8'
+              }}
+              title="Who Cycle"
+            >
+              <svg className="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18.5" cy="17.5" r="3.5"/>
+                <circle cx="5.5" cy="17.5" r="3.5"/>
+                <circle cx="15" cy="5" r="1"/>
+                <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+              </svg>
+            </button>
+            
+            <div className="text-gray-400 text-lg">|</div>
+            
+            <button
+              onClick={() => handleFilterChange({ ...filters, time: 'now' })}
+              className="px-4 py-2.5 rounded-full text-base font-medium transition-all whitespace-nowrap flex items-center gap-1.5"
+              style={filters.time === 'now' ? {
+                backgroundColor: '#1e293b',
+                color: '#ffffff'
+              } : {
+                backgroundColor: '#e2e8f0',
+                color: '#94a3b8'
+              }}
+              title="Available right now"
+            >
+              Now
+            </button>
+            
+            <button
+              onClick={() => handleFilterChange({ ...filters, time: 'later' })}
+              className="px-4 py-2.5 rounded-full text-base font-medium transition-all whitespace-nowrap flex items-center gap-1.5"
+              style={filters.time === 'later' ? {
+                backgroundColor: '#1e293b',
+                color: '#ffffff'
+              } : {
+                backgroundColor: '#e2e8f0',
+                color: '#94a3b8'
+              }}
+              title="Scheduled trips later"
+            >
+              Later
+            </button>
           </div>
-        </BottomSheet>
+          
+          {/* Right side - Status and Toggle */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Buddies Available Status */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 border border-green-200">
+              <span className="text-green-600 text-sm">✓</span>
+              <span className="text-xs md:text-sm text-gray-900 font-medium whitespace-nowrap">
+                {displayedBuddies.length} {displayedBuddies.length === 1 ? 'buddy' : 'buddies'} available now
+              </span>
+            </div>
+            
+            {/* Share Location Toggle */}
+            <ShareLocationToggle
+              initialState={isLocationSharing}
+              buddyCount={displayedBuddies.length}
+              distance={5}
+              onChange={handleLocationToggle}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Map Area - Extends to bottom sheet */}
+      <div className="relative px-4 pb-[200px]" style={{ height: 'calc(100vh - 200px)' }}>
+        <BuddyMapView
+          userLocation={userLocation}
+          buddies={displayedBuddies}
+          selectedRoute={null}
+          isLocationSharing={isLocationSharing}
+          onBuddyClick={handleBuddyClick}
+          onFilterClick={handleFilterClick}
+          zoom={14}
+        />
+      </div>
+
+      {/* Bottom Sheet with Buddy List - 40-45% */}
+      <BottomSheet
+        buddyCount={displayedBuddies.length}
+        sortText="Sorted by best route match"
+        initialExpanded={false}
+        minHeight={180}
+        maxHeight={500}
+      >
+        <div className="space-y-3 pb-24">
+          {displayedBuddies.length > 0 ? (
+            displayedBuddies.map((buddy) => (
+              <EnhancedBuddyCard
+                key={buddy.id}
+                buddy={buddy}
+                onAskToJoin={handleAskToJoin}
+                onViewProfile={handleViewProfile}
+              />
+            ))
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <p className="text-gray-900 font-medium mb-2">No buddies found</p>
+              <p className="text-sm text-gray-600">
+                {isLocationSharing 
+                  ? 'Try adjusting your filters or check back later'
+                  : 'Turn on location sharing to find buddies nearby'}
+              </p>
+            </div>
+          )}
+        </div>
+      </BottomSheet>
       </div>
     </ProtectedRoute>
   );
