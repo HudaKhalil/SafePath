@@ -1,149 +1,385 @@
-# SafePath — Safety-Aware Routing
+<div align="center">
+  <h1>SafePath</h1>
+  <h4>Safety Routing System</h4>
+</div>
+<div align="center">
+  
+<img src="./src/frontend/public/logo.png" alt="SafePath Logo" width="100" height="100">
 
-SafePath helps people choose safer walking or cycling routes. Alongside the fastest route, the app shows alternative routes that consider simple safety signals from public data and basic user reports. 
+**Navigate safely with real-time hazard detection and intelligent route planning**
 
----
+[![Next.js](https://img.shields.io/badge/Next.js-15.5-black?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-LTS-339933?logo=node.js)](https://nodejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-316192?logo=postgresql)](https://www.postgresql.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## 1) Problem and Goal
+[Features](#-features) • [Demo](#-demo) • [Installation](#-installation) • [Architecture](#-architecture) • [Contributing](#-contributing)
 
-Most navigation tools optimise for speed/distance and rarely consider risk on street segments (for example, incident hotspots, poorly lit streets, hazardous junctions). SafePath adds a lightweight safety layer so users can compare Fastest vs Safer vs Safest options and make informed choices.
-
-Goals
-- Offer at least three route options per origin–destination query (Fastest, Safer, Safest).
-- Use open data to compute a simple safety score for segments and surface risk cues.
-- Gather basic user hazard reports to iteratively improve safety signals.
-
----
-
-## 2) Target Users
-
-- Students and young commuters  
-- International residents and visitors  
-- Daily urban walkers and cyclists  
-- Local councils and planners  
-- Community-oriented users who prefer to travel with others for safety and motivation
+</div>
 
 ---
 
-## 3) MVP Scope
+## Table of Contents
 
-- Web app (desktop and mobile-web friendly) focused on Manhattan  
-- O/D input returns three route options visible on a map  
-- Segment-level safety scoring from public data; simple risk cues on the map  
-- Basic hazard reporting form for users
+- [Overview](#overview)
+- [Key Features](#features)
+- [Technology Stack](#technology-stack)
+- [System Architecture](#architecture)
+- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [API Documentation](#api-documentation)
+- [Safety Routing Engine](#safety-routing-engine)
+- [Real-Time Features](#real-time-features)
+- [Screenshots](#screenshots)
+- [Contributing](#contributing)
+---
+
+##  Overview
+
+**SafePath** is a cutting-edge web application that revolutionizes urban navigation by prioritizing user safety. Using advanced algorithms, real-time hazard data, and community-driven insights, SafePath calculates the safest routes for pedestrians and cyclists while avoiding dangerous areas, active hazards, and high-crime zones.
+
+### Why SafePath?
+
+- **Safety First**: Routes are optimized for safety, not just speed
+- **Real-Time Updates**: Live hazard notifications via WebSocket connections
+- **Intelligent Routing**: Rule-based safety scoring system with multi-factor analysis
+- **Community-Driven**: User-reported hazards and buddy system for shared journeys
+- **Comprehensive Data**: Integrates UK crime statistics, collision data, and lighting analysis
 
 ---
 
-## 4) System Architecture (current choices)
+##  Features
 
-Frontend
-- React.js with Leaflet.js and OpenStreetMap tiles (no API key required)
+###  **Intelligent Route Planning**
+- Multi-factor safety scoring algorithm
+- Dual route comparison (Safest vs. Fastest)
+- Customizable safety preferences (crime, collisions, lighting, hazards)
+- Real-time route adjustment based on active hazards
+- Interactive map with dangerous segment highlighting
 
-Backend / API
-- Python Flask REST API  
-- Routing/graphs: OSMnx + NetworkX  
-- Optional caching: Redis  
-- Future scoring pipeline: scikit-learn (simple model)
+###  **Real-Time Hazard System**
+- Live hazard reporting with geolocation
+- WebSocket-powered instant notifications
+- Hazard categories: Construction, Road damage, Flooding, Violence, Suspicious activity
+- Severity levels: Low, Medium, High, Critical
+- Automatic hazard proximity alerts during navigation
 
-Database
-- PostgreSQL + PostGIS for geospatial data and user hazard reports
+###  **Buddy System**
+- Find nearby walking/cycling companions
+- Shared route preferences
+- Location sharing toggle
+- Availability scheduling
+- In-app buddy matching
 
-Rationale
-- React + Leaflet keeps the prototype lightweight and fast to iterate.
-- Flask + PostGIS supports geospatial queries with minimal overhead.
-- OSMnx/NetworkX accelerate graph building/routing on open data.
+###  **Data-Driven Safety Analysis**
+- UK Police crime data integration (2024-08 to present)
+- Historical crime pattern analysis
+- Collision density mapping
+- Street lighting coverage assessment
+- Dynamic safety score calculation
 
----
+###  **Security & Authentication**
+- JWT-based authentication
+- Secure password hashing (bcrypt)
+- Protected routes and API endpoints
+- Profile picture management
+- Session management with cookies
 
-## 5) Data Sources
-
-- NYC Open Data: crime/incident and collision datasets  
-- OpenStreetMap via OSMnx: street network and attributes  
-- Optional contextual signals: weather where available  
-- In-app user hazard reports (basic form)
-
-Note: Store only small samples in `data/`. Keep large or frequently changing datasets external and link to the source.
-
----
-
-## 6) Safety Score (baseline concept)
-
-- Aggregate incident/collision counts to segments or nearby buffers.  
-- Normalise by segment length and optionally time-of-day buckets.  
-- Compose a simple score (for example, a weighted sum) and expose it as a per-segment risk cue in the UI.  
-- Iterate using expert feedback and user reports.
-
-This is intentionally simple for the MVP; refine weighting and signals during evaluation sprints.
-
----
-
-## 7) Features (first cut)
-
-- Map UI with three route options (Fastest, Safer, Safest)  
-- Route details: inline risk cues (for example, incident density)  
-- Hazard reporting: quick form tied to location  
-- Placeholder panel for real-time alerts and simple rerouting (later sprint)
+###  **Modern UI/UX**
+- Fully responsive design (mobile-first)
+- Dark/Light mode support
+- Interactive Leaflet maps
+- Real-time toast notifications
+- Smooth animations and transitions
+- Progressive Web App (PWA) ready
 
 ---
 
-## 8) Evaluation Plan
+##  Technology Stack
 
-Quantitative
-- Historical validation: compare our Safer/Safest against a baseline on NYC data  
-- Algorithm performance: response time, reliability, and simple scalability checks  
-- Score validation: correlation with expert judgement and incident data  
-- Route quality: safety-efficiency trade-offs and coverage across neighbourhoods
+### Frontend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Next.js** | 15.5.4 | React framework with SSR/SSG |
+| **React** | 19.2.0 | UI component library |
+| **Tailwind CSS** | 4.x | Utility-first CSS framework |
+| **Leaflet** | 1.9.4 | Interactive map rendering |
+| **React Leaflet** | 5.0.0 | React bindings for Leaflet |
+| **Socket.IO Client** | 4.8.1 | Real-time communication |
+| **Axios** | 1.6.2 | HTTP client |
+| **Lucide React** | 0.545.0 | Icon library |
+| **Next Themes** | 0.4.6 | Dark mode management |
 
-Qualitative
-- Expert feedback (urban planning / road safety)  
-- Literature/benchmark comparison  
-- Case studies contrasting high- vs low-risk routes across NYC
-
-Use evaluation results to tune weights in the short term and plan feature improvements in the medium term.
-
----
-
-## 9) Success Criteria (MVP)
-
-- Processes at least 95% of route requests successfully  
-- Under 3 seconds average response time (local dev conditions)  
-- At least 70% user satisfaction in early trials  
-- Clear preference patterns and readiness to expand beyond Manhattan
-
----
-
-## 10) Project Management
-
-- Method: SCRUM with short, regular sprints (two weeks typical)  
-- Rituals: daily stand-ups; sprint planning; sprint reviews and retrospectives  
-- Tooling: Jira for sprint boards, backlog and task ownership; WhatsApp/Teams for comms
-
-Indicative sprints
-- Sprints 1–2: data pipeline and baseline routing  
-- Sprints 3–4: safety scoring and frontend integration  
-- Sprints 5–6: validation and optimisation, plus staging deploy
+### Backend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Node.js** | LTS | JavaScript runtime |
+| **Express** | 4.18.2 | Web framework |
+| **PostgreSQL** | 16+ | Primary database |
+| **Socket.IO** | 4.8.1 | WebSocket server |
+| **JWT** | 9.0.2 | Authentication tokens |
+| **Bcrypt** | 2.4.3 | Password hashing |
+| **Multer** | 2.0.2 | File upload handling |
+| **Helmet** | 7.1.0 | Security middleware |
+| **CSV Parser** | 3.2.0 | Crime data processing |
 
 ---
 
-## 11) Security, Privacy, and Misuse
+##  Architecture
 
-- Avoid exposing exact sensitive points in public UI; aggregate where possible  
-- Keep personal data out of logs and exports  
-- Consider request throttling and basic abuse monitoring  
-- Keep any presence/matching features strictly opt-in with clear controls  
-- Provide a simple reporting path for harmful content
+### System Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLIENT LAYER                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  Next.js App │  │  React Pages │  │  Components  │       │
+│  │  (Frontend)  │  │  & Routes    │  │  & Hooks     │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    COMMUNICATION LAYER                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  REST API    │  │  WebSocket   │  │  Socket.IO   │       │
+│  │  (Axios)     │  │  Connection  │  │  Real-time   │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      SERVER LAYER                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  Express.js  │  │  Middleware  │  │  Routes      │       │
+│  │  Server      │  │  (Auth/CORS) │  │  (/api/*)    │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     BUSINESS LOGIC LAYER                    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  Route       │  │  Safety      │  │  Hazard      │       │
+│  │  Calculator  │  │  Scoring     │  │  Detection   │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       DATA LAYER                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  PostgreSQL  │  │  CSV Data    │  │  File System │       │
+│  │  Database    │  │  (Crime)     │  │  (Uploads)   │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow
+
+```mermaid
+graph TD
+    A[User Interface] -->|Request Route| B[Route API]
+    B -->|Calculate| C[Route Calculator]
+    C -->|Query| D[Crime Data Loader]
+    C -->|Query| E[Hazard Database]
+    D -->|Safety Score| C
+    E -->|Active Hazards| C
+    C -->|Scored Routes| B
+    B -->|Response| A
+    E -->|WebSocket| F[Socket.IO Server]
+    F -->|Real-time Update| A
+```
 
 ---
 
-## 12) Local Development — Setup and Run
+##  Getting Started
 
-Prerequisites
-- Node.js 18+  
-- Python 3.10+  
-- PostgreSQL 14+ with PostGIS  
-- Git installed
+### Prerequisites
 
-Clone
+- **Node.js** (v18+ recommended)
+- **PostgreSQL** (v16+)
+- **Git**
+- **npm** or **pnpm** or **yarn**
+
+### Installation
+
+#### 1. Clone the Repository
+
 ```bash
-git clone https://github.com/<org-or-user>/<repo>.git
-cd <repo>
+git clone https://github.com/KaranJoseph12/SafePath
+cd SafePath
+```
+
+#### 2. Install Dependencies
+
+**Frontend:**
+```bash
+cd src/frontend
+npm install
+# or
+pnpm install
+```
+
+**Backend:**
+```bash
+cd ../backend
+npm install
+```
+
+#### 3. Environment Configuration
+
+**Backend (.env):**
+```env
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
+
+# Database Configuration (PostgreSQL)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=safety_routing
+DB_USER=your_username
+DB_PASSWORD=your_password
+
+# Authentication
+JWT_SECRET=your-super-secure-jwt-secret-key-change-this
+BCRYPT_SALT_ROUNDS=10
+
+# File Upload
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE=5242880
+```
+
+**Frontend (.env.local):**
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000/api
+NEXT_PUBLIC_WS_URL=http://localhost:5000
+```
+
+#### 4. Database Setup
+
+```bash
+cd src/backend
+
+# Run migrations
+node migrations/run-migrations.js
+
+#### 5. Load Crime Data
+
+The backend includes UK crime data from August 2024 onwards:
+
+```bash
+# Crime data is automatically loaded from:
+# src/backend/crimedata/2024-08/*.csv
+# src/backend/crimedata/2024-09/*.csv
+# ...etc
+```
+
+#### 6. Start the Application
+
+**Terminal 1 - Backend:**
+```bash
+cd src/backend
+npm run dev
+# Server runs on http://localhost:5000
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd src/frontend
+npm run dev
+# App runs on http://localhost:3000
+```
+
+#### 7. Access the Application
+
+Open your browser and navigate to:
+```
+http://localhost:3000
+```
+
+---
+
+##  Project Structure
+
+```
+SafePath_Deploy/
+├── src/
+│   ├── frontend/                    # Next.js frontend application
+│   │   ├── public/                  # Static assets
+│   │   │   ├── logo.png
+│   │   │   └── ...
+│   │   ├── src/
+│   │   │   ├── app/                 # Next.js app router pages
+│   │   │   │   ├── auth/           # Authentication pages
+│   │   │   │   │   ├── login/
+│   │   │   │   │   └── signup/
+│   │   │   │   ├── findBuddy/      # Buddy system page
+│   │   │   │   ├── navigation/      # Turn-by-turn navigation
+│   │   │   │   ├── profile/         # User profile
+│   │   │   │   ├── report-hazards/  # Hazard reporting
+│   │   │   │   ├── suggested-routes/ # Route planning
+│   │   │   │   ├── page.jsx         # Home page
+│   │   │   │   ├── layout.jsx       # Root layout
+│   │   │   │   └── globals.css      # Global styles
+│   │   │   ├── components/          # Reusable React components
+│   │   │   │   ├── auth/
+│   │   │   │   ├── BottomNav.jsx
+│   │   │   │   ├── BuddyCard.jsx
+│   │   │   │   ├── HazardAlert.jsx
+│   │   │   │   ├── Map.jsx
+│   │   │   │   ├── Navbar.jsx
+│   │   │   │   ├── RoutePanel.jsx
+│   │   │   │   ├── SafetySettings.jsx
+│   │   │   │   └── Toast.jsx
+│   │   │   └── lib/                 # Utility functions
+│   │   │       ├── api.js          # Axios instance
+│   │   │       ├── services.js     # API service layer
+│   │   │       └── locationConfig.js
+│   │   ├── package.json
+│   │   ├── next.config.ts
+│   │   ├── tailwind.config.js
+│   │   └── tsconfig.json
+│   │
+│   └── backend/                     # Express.js backend API
+│       ├── config/
+│       │   ├── database.js         # PostgreSQL configuration
+│       │   └── database-sqlite.js  # SQLite configuration
+│       ├── crimedata/              # UK Police crime statistics
+│       │   ├── 2024-08/
+│       │   ├── 2024-09/
+│       │   ├── 2024-10/
+│       │   └── ...
+│       ├── lib/
+│       │   ├── api.js              # External API integrations
+│       │   ├── csvDataLoader.js    # Crime data processor
+│       │   ├── routeCalculator.js  # Safety routing engine
+│       │   ├── services.js         # Business logic
+│       │   └── websocketService.js # Real-time communication
+│       ├── middleware/
+│       │   ├── auth.js             # JWT authentication
+│       │   └── upload.js           # File upload handling
+│       ├── migrations/
+│       │   ├── 001_initial_schema.sql
+│       │   ├── 002_profile_pictures.sql
+│       │   ├── 003_hazards_optimizations.sql
+│       │   └── run-migrations.js
+│       ├── routes/
+│       │   ├── auth.js             # Authentication endpoints
+│       │   ├── buddies.js          # Buddy system endpoints
+│       │   ├── geocoding.js        # Location services
+│       │   ├── hazards.js          # Hazard reporting endpoints
+│       │   └── routes.js           # Route calculation endpoints
+│       ├── uploads/                # User-uploaded files
+│       │   ├── hazards/
+│       │   └── profiles/
+│       ├── server.js               # Express server entry point
+│       ├── package.json
+│       └── .env
+│
+├── SAFETY_ROUTING_ENGINE_DOCUMENTATION.md
+├── BUDDY_IMPLEMENTATION.md
+├── README.md                       # This file
+└── LICENSE
+```
+
+---
