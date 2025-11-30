@@ -1,18 +1,27 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import { geocodingService } from "../../lib/services";
+import { useRouter, useSearchParams } from "next/navigation";
+import { geocodingService, hazardsService } from "../../lib/services";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
 import RoutesSheet from "../../components/RoutesSheet";
 import SafetySettings, { SafetySettingsButton, getSafetyWeights, getCurrentPreset, getPresetName } from "../../components/SafetySettings";
 import { LOCATION_CONFIG } from "../../lib/locationConfig";
 
+const normalizeCoordinates = (lat, lon) => {
+  const parsedLat = typeof lat === 'string' ? parseFloat(lat) : lat;
+  const parsedLon = typeof lon === 'string' ? parseFloat(lon) : lon;
+  if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLon)) {
+    return null;
+  }
+  return [parsedLat, parsedLon];
+};
+
 const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
-export default function SuggestedRoutes() {
+function SuggestedRoutesContent() {
   const [mapKey, setMapKey] = useState(0);
   const [mapCenter, setMapCenter] = useState(null);
   const [isDark, setIsDark] = useState(false);
@@ -44,6 +53,7 @@ export default function SuggestedRoutes() {
     router.push(url);
   };
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState(null);
@@ -66,6 +76,10 @@ export default function SuggestedRoutes() {
   const [showSafetySettings, setShowSafetySettings] = useState(false);
   const [safetyWeights, setSafetyWeights] = useState(null);
   const [currentSafetyPreset, setCurrentSafetyPreset] = useState('balanced');
+  const [hazards, setHazards] = useState([]);
+
+  const desktopPanelViewportHeight = 'calc(100vh - 96px)';
+  const mobileComparisonViewportHeight = 'calc(100vh - 140px)';
 
   const fetchBackendRoutes = async () => {
     setBackendLoading(true);
@@ -86,12 +100,107 @@ export default function SuggestedRoutes() {
     }
   };
 
+  const loadHazardsForArea = async (lat, lng, radius = 5000) => {
+    try {
+      console.log(`Loading hazards for area: lat=${lat}, lng=${lng}, radius=${radius}`);
+      const response = await hazardsService.getNearbyHazards(lat, lng, { radius, limit: 50 });
+      console.log('Hazards API response:', response);
+      if (response.success) {
+        const hazardsData = response.data?.hazards || [];
+        setHazards(hazardsData);
+        console.log(`Loaded ${hazardsData.length} hazards in area:`, hazardsData);
+      } else {
+        console.warn('Failed to load hazards:', response);
+        setHazards([]);
+      }
+    } catch (error) {
+      console.error('Error loading hazards:', error);
+      setHazards([]);
+    }
+  };
+
   useEffect(() => {
     getUserLocation();
     // Load saved safety weights and preset
     setSafetyWeights(getSafetyWeights());
     setCurrentSafetyPreset(getCurrentPreset());
-  }, []);
+    
+    // Parse URL parameters for pre-filled route
+    const fromLat = searchParams.get('fromLat');
+    const fromLng = searchParams.get('fromLng');
+    const fromAddress = searchParams.get('fromAddress');
+    const toLat = searchParams.get('toLat');
+    const toLng = searchParams.get('toLng');
+    const toAddress = searchParams.get('toAddress');
+    const mode = searchParams.get('mode');
+    
+    // Set transport mode if provided
+    if (mode === 'walk' || mode === 'walking') {
+      setTransportMode('walking');
+    } else if (mode === 'cycle' || mode === 'cycling') {
+      setTransportMode('cycling');
+    }
+    
+    // Populate from location (current location)
+    if (fromLat && fromLng) {
+      const fromCoordinates = normalizeCoordinates(fromLat, fromLng);
+      if (fromCoordinates) {
+        setFromCoords(fromCoordinates);
+        
+        // Always fetch the actual address from coordinates
+        geocodingService.getAddressFromCoords(fromLat, fromLng).then(response => {
+          if (response.success && response.data?.display_name) {
+            console.log('From address fetched:', response.data.display_name);
+            setFromLocation(response.data.display_name);
+          } else {
+            console.log('Failed to fetch from address, using fallback');
+            setFromLocation('Current Location');
+          }
+        }).catch((error) => {
+          console.error('Error fetching from address:', error);
+          setFromLocation('Current Location');
+        });
+      }
+    }
+    
+    // Populate to location (destination)
+    if (toLat && toLng) {
+      const toCoordinates = normalizeCoordinates(toLat, toLng);
+      if (toCoordinates) {
+        setToCoords(toCoordinates);
+        // Use provided address or reverse geocode
+        if (toAddress) {
+          setToLocation(decodeURIComponent(toAddress));
+        } else {
+          geocodingService.getAddressFromCoords(toLat, toLng).then(response => {
+            if (response.success && response.data?.display_name) {
+              setToLocation(response.data.display_name);
+            }
+          });
+        }
+      }
+    }
+    
+    // Center map to show both locations if both are provided
+    if (fromLat && fromLng && toLat && toLng) {
+      const fromCoordinates = normalizeCoordinates(fromLat, fromLng);
+      const toCoordinates = normalizeCoordinates(toLat, toLng);
+      if (fromCoordinates && toCoordinates) {
+        // Calculate center point between from and to
+        const centerLat = (fromCoordinates[0] + toCoordinates[0]) / 2;
+        const centerLng = (fromCoordinates[1] + toCoordinates[1]) / 2;
+        setMapCenter([centerLat, centerLng]);
+        setMapZoom(13);
+      }
+    } else if (toLat && toLng) {
+      // If only destination, center on it
+      const toCoordinates = normalizeCoordinates(toLat, toLng);
+      if (toCoordinates) {
+        setMapCenter(toCoordinates);
+        setMapZoom(15);
+      }
+    }
+  }, [searchParams]);
 
   // Track dark mode changes
   useEffect(() => {
@@ -118,10 +227,34 @@ export default function SuggestedRoutes() {
     }
   }, [routes.length, backendRoutes.length]);
 
+  // Load hazards when fromCoords or toCoords change
+  useEffect(() => {
+    if (fromCoords || toCoords) {
+      const lat = fromCoords ? fromCoords[0] : (toCoords ? toCoords[0] : null);
+      const lng = fromCoords ? fromCoords[1] : (toCoords ? toCoords[1] : null);
+      if (lat && lng) {
+        loadHazardsForArea(lat, lng, 5000);
+      }
+    } else if (userLocation) {
+      loadHazardsForArea(userLocation[0], userLocation[1], 5000);
+    }
+  }, [fromCoords, toCoords, userLocation]);
+
   // Whenever transport mode changes, just clear preview info text
   useEffect(() => {
     setPreviewRouteInfo(null);
   }, [transportMode]);
+
+  // Handle transport mode change - clears comparison routes and resets to preview
+  const handleTransportModeChange = (newMode) => {
+    if (newMode === transportMode) return; // No change needed
+    
+    // Clear comparison routes and reset to preview mode
+    setRoutes([]);
+    setSelectedRouteId(null);
+    setShowRoutePanel(false);
+    setTransportMode(newMode);
+  };
 
   const handlePreviewRouteInfo = (summary) => {
     if (!summary || !summary.distanceKm || !summary.durationMin) return;
@@ -155,25 +288,31 @@ export default function SuggestedRoutes() {
   const handleFromLocationChange = (value, locationData) => {
     setFromLocation(value);
     if (locationData) {
-      const coords = [locationData.lat, locationData.lon];
-      setFromCoords(coords);
-      // Center map on selected location and zoom in
-      setMapCenter(coords);
-      setMapZoom(15);
-      setMapKey((prev) => prev + 1);
+      const coords = normalizeCoordinates(locationData.lat, locationData.lon);
+      if (coords) {
+        setFromCoords(coords);
+        setMapCenter(coords);
+        setMapZoom(15);
+        setMapKey((prev) => prev + 1);
+        return;
+      }
     }
+    setFromCoords(null);
   };
 
   const handleToLocationChange = (value, locationData) => {
     setToLocation(value);
     if (locationData) {
-      const coords = [locationData.lat, locationData.lon];
-      setToCoords(coords);
-      // Center map on selected location and zoom in
-      setMapCenter(coords);
-      setMapZoom(15);
-      setMapKey((prev) => prev + 1);
+      const coords = normalizeCoordinates(locationData.lat, locationData.lon);
+      if (coords) {
+        setToCoords(coords);
+        setMapCenter(coords);
+        setMapZoom(15);
+        setMapKey((prev) => prev + 1);
+        return;
+      }
     }
+    setToCoords(null);
   };
 
 
@@ -266,7 +405,7 @@ export default function SuggestedRoutes() {
            id: 'fastest',
            name: 'Fastest Route',
            type: 'fastest',
-           color: '#FFBF00', // Amber for fastest
+           color: '#a78bfa', // Light purple for fastest
            coordinates: fastest.coordinates || [],
            distance: fastest.distance,
            estimatedTime: fastest.time,
@@ -307,11 +446,14 @@ export default function SuggestedRoutes() {
        // Auto-select fastest route to show on map
        setSelectedRouteId('fastest');
      } else {
-       setError(result.message || "Failed to find routes");
+       // Show specific error message from backend
+       const errorMsg = result.error || result.message || "Failed to find routes";
+       setError(errorMsg);
+       console.warn('Route calculation failed:', errorMsg);
      }
    } catch (error) {
      console.error("Route finding error:", error);
-     setError("Failed to find routes. Please try again.");
+     setError(error.message || "Failed to find routes. Please try again.");
    } finally {
      setLoading(false);
    }
@@ -461,7 +603,7 @@ export default function SuggestedRoutes() {
             }`}
             style={{ 
               width: '420px',
-              height: 'calc(100vh - 5rem)',
+              height: desktopPanelViewportHeight,
               boxShadow: '4px 0 12px rgba(0, 0, 0, 0.15)'
             }}
           >
@@ -496,10 +638,10 @@ export default function SuggestedRoutes() {
               {/* Title and Subtitle */}
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold mb-1" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+                  <h2 className="text-xl md:text-2xl font-bold mb-1" style={{ color: isDark ? '#ffffff' : '#1e293b' }}>
                     Plan Your Route
                   </h2>
-                  <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                  <p className="text-base" style={{ color: isDark ? '#ffffff' : '#64748b' }}>
                     Find the safest path
                   </p>
                 </div>
@@ -556,7 +698,7 @@ export default function SuggestedRoutes() {
                   {/* Walk/Cycle mode buttons */}
                   <button
                     type="button"
-                    onClick={() => setTransportMode("walking")}
+                    onClick={() => handleTransportModeChange("walking")}
                     className="relative group transition-all duration-200"
                     title="Walking"
                   >
@@ -580,7 +722,7 @@ export default function SuggestedRoutes() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTransportMode("cycling")}
+                    onClick={() => handleTransportModeChange("cycling")}
                     className="relative group transition-all duration-200"
                     title="Cycling"
                   >
@@ -618,26 +760,28 @@ export default function SuggestedRoutes() {
                     setMapCenter(londonCenter);
                     setMapZoom(13);
                     setMapKey((prev) => prev + 1);
-                    const originalText = e.target.textContent;
-                    e.target.textContent = '✓ Set to London';
-                    e.target.style.backgroundColor = '#10b981';
-                    setTimeout(() => {
-                      e.target.textContent = originalText;
-                      e.target.style.backgroundColor = '#06d6a0';
-                    }, 1500);
+                    const span = e.currentTarget.querySelector('.london-text');
+                    if (span) {
+                      span.textContent = '✓ Set to London';
+                      setTimeout(() => {
+                        span.textContent = 'Set to London';
+                      }, 1500);
+                    }
                   }}
-                  className="text-sm px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 border shadow-md"
+                  className="text-base transition-all duration-200 flex items-center gap-1.5 focus:outline-none"
                   style={{
-                    backgroundColor: '#06d6a0',
-                    color: '#0f172a',
-                    borderColor: '#059669'
+                    backgroundColor: 'transparent',
+                    color: isDark ? '#06d6a0' : '#1e293b',
+                    border: 'none',
+                    padding: 0,
+                    outline: 'none'
                   }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
+                  onMouseEnter={(e) => e.currentTarget.style.color = isDark ? '#ffffff' : '#06d6a0'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#06d6a0' : '#1e293b'}
                   title="Set current location to London for testing"
                 >
-                  <span className="text-base">🇬🇧</span>
-                  <span className="font-medium">Set to London</span>
+                  <span className="text-lg">🇬🇧</span>
+                  <span className="font-medium london-text hover:underline">Set to London</span>
                 </button>
               </div>
               <form onSubmit={handleFindRoutes} className="space-y-3">
@@ -693,8 +837,12 @@ export default function SuggestedRoutes() {
                       </div>
                     </div>
                     <div className="mt-2 pt-2 border-t text-center" style={{ borderColor: isDark ? '#475569' : '#e5e7eb' }}>
-                      <p className="text-xs flex items-center justify-center gap-1" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
-                        <span>ℹ️</span>
+                      <p className="text-xs flex items-center justify-center gap-1.5" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/>
+                          <path d="M12 16v-4"/>
+                          <path d="M12 8h.01"/>
+                        </svg>
                         <span>Preview route via OSM</span>
                       </p>
                     </div>
@@ -720,11 +868,13 @@ export default function SuggestedRoutes() {
           {/* Mobile Routes Sheet - visible on mobile only */}
           <div className="md:hidden">
             <RoutesSheet
+              key={routes.length > 0 ? 'routes-active' : 'routes-empty'}
               title="Plan Your Route"
               subtitle="Find the safest path"
               initialExpanded={false}
               minHeight={160}
-              maxHeight={520}
+              collapsedHeight={112}
+              contentMinHeight={360}
               settingsButton={
                 <button
                   onClick={() => setShowSafetySettings(true)}
@@ -773,7 +923,7 @@ export default function SuggestedRoutes() {
                     )}
                     <button
                       type="button"
-                      onClick={() => setTransportMode("walking")}
+                      onClick={() => handleTransportModeChange("walking")}
                       className="relative group transition-all duration-200"
                       title="Walking"
                     >
@@ -798,7 +948,7 @@ export default function SuggestedRoutes() {
                     
                     <button
                       type="button"
-                      onClick={() => setTransportMode("cycling")}
+                      onClick={() => handleTransportModeChange("cycling")}
                       className="relative group transition-all duration-200"
                       title="Cycling"
                     >
@@ -837,26 +987,28 @@ export default function SuggestedRoutes() {
                       setMapCenter(londonCenter);
                       setMapZoom(13);
                       setMapKey((prev) => prev + 1);
-                      const originalText = e.target.textContent;
-                      e.target.textContent = '✓ Set to London';
-                      e.target.style.backgroundColor = '#10b981';
-                      setTimeout(() => {
-                        e.target.textContent = originalText;
-                        e.target.style.backgroundColor = '#06d6a0';
-                      }, 1500);
+                      const span = e.currentTarget.querySelector('.london-text');
+                      if (span) {
+                        span.textContent = '✓ Set to London';
+                        setTimeout(() => {
+                          span.textContent = 'Set to London';
+                        }, 1500);
+                      }
                     }}
-                    className="text-sm px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 border shadow-md"
+                    className="text-base transition-all duration-200 flex items-center gap-1.5 focus:outline-none"
                     style={{
-                      backgroundColor: '#06d6a0',
-                      color: '#0f172a',
-                      borderColor: '#059669'
+                      backgroundColor: 'transparent',
+                      color: isDark ? '#06d6a0' : '#1e293b',
+                      border: 'none',
+                      padding: 0,
+                      outline: 'none'
                     }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
+                    onMouseEnter={(e) => e.currentTarget.style.color = isDark ? '#ffffff' : '#06d6a0'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#06d6a0' : '#1e293b'}
                     title="Set current location to London for testing"
                   >
-                    <span className="text-base">🇬🇧</span>
-                    <span className="font-medium">Set to London</span>
+                    <span className="text-lg">🇬🇧</span>
+                    <span className="font-medium london-text hover:underline">Set to London</span>
                   </button>
                 </div>
                 <form onSubmit={handleFindRoutes} className="space-y-2">
@@ -911,8 +1063,12 @@ export default function SuggestedRoutes() {
                         </div>
                       </div>
                       <div className="mt-2 pt-2 border-t text-center" style={{ borderColor: isDark ? '#475569' : '#e5e7eb' }}>
-                        <p className="text-xs flex items-center justify-center gap-1" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
-                          <span>ℹ️</span>
+                        <p className="text-xs flex items-center justify-center gap-1.5" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 16v-4"/>
+                            <path d="M12 8h.01"/>
+                          </svg>
                           <span>Preview route via OSM</span>
                         </p>
                       </div>
@@ -992,6 +1148,7 @@ export default function SuggestedRoutes() {
                         path: r.path?.coordinates || [],
                       })),
                     ]}
+                    hazards={hazards.filter(h => h.latitude && h.longitude)}
                     height="100%"
                     fromCoords={fromCoords}
                     toCoords={toCoords}
@@ -1052,7 +1209,7 @@ export default function SuggestedRoutes() {
             }`}
             style={{ 
               width: '380px',
-              height: 'calc(100vh - 5rem)',
+              height: desktopPanelViewportHeight,
               boxShadow: '-4px 0 12px rgba(0, 0, 0, 0.15)',
               overflow: 'hidden'
             }}
@@ -1076,104 +1233,110 @@ export default function SuggestedRoutes() {
                 </h2>
               </div>
               
-              <div className="p-4 space-y-4 flex-1 pb-8">
-              {routes.map((route) => (
-                <div
-                  key={route.id}
-                  className="rounded-xl p-4 shadow-md border-2 cursor-pointer transition-all duration-200"
-                  style={{
-                    backgroundColor: isDark ? '#334155' : '#f9fafb',
-                    borderColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17',
-                    boxShadow: selectedRouteId === route.id ? `0 0 0 3px ${route.type === 'fastest' ? '#FFBF00' : '#4CBB17'}40` : undefined,
-                    transform: selectedRouteId === route.id ? 'scale(1.02)' : undefined
-                  }}
-                  onClick={() => setSelectedRouteId(route.id)}
-                >
-                  <div className="mb-3">
-                    <h3 className="text-lg font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
-                      {route.name}
-                    </h3>
-                    <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
-                      {route.type === 'fastest' ? 'Quickest path' : 'Safest path'}
-                      {selectedRouteId === route.id && ' • Showing on map'}
-                    </p>
-                  </div>
+              <div className="p-4 flex-1 pb-12">
+                <div className="space-y-4 pb-16">
+                {routes.map((route) => (
+                  <div
+                    key={route.id}
+                    className="rounded-xl p-4 shadow-md border-2 cursor-pointer transition-all duration-200"
+                    style={{
+                      backgroundColor: isDark ? '#334155' : '#f9fafb',
+                      borderColor: route.type === 'fastest' ? '#a78bfa' : '#4CBB17',
+                      boxShadow: selectedRouteId === route.id ? `0 0 0 3px ${route.type === 'fastest' ? '#a78bfa' : '#4CBB17'}40` : undefined,
+                      transform: selectedRouteId === route.id ? 'scale(1.02)' : undefined
+                    }}
+                    onClick={() => setSelectedRouteId(route.id)}
+                  >
+                    <div className="mb-3">
+                      <h3 className="text-lg font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                        {route.name}
+                      </h3>
+                      <p className="text-xs" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                        {route.type === 'fastest' ? 'Quickest path' : 'Safest path'}
+                        {selectedRouteId === route.id && ' • Showing on map'}
+                      </p>
+                    </div>
 
-                  <div className="space-y-2 mb-3">
-                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
-                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Distance</span>
-                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#FFBF00' : '#4CBB17' }}>
-                        {route.distance} km
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
-                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Time</span>
-                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#FFBF00' : '#4CBB17' }}>
-                        {route.estimatedTime} min
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
-                      <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Safety Score</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${
-                              route.safetyRating >= 7 ? 'bg-green-500' : 
-                              route.safetyRating >= 5 ? 'bg-yellow-500' : 
-                              'bg-red-500'
-                            }`}
-                            style={{ width: `${route.safetyRating * 10}%` }}
-                          />
-                        </div>
-                        <span className={`text-sm font-bold ${
-                          route.safetyRating >= 7 ? 'text-green-600' : 
-                          route.safetyRating >= 5 ? 'text-yellow-600' : 
-                          'text-red-600'
-                        }`}>
-                          {route.safetyRating.toFixed(1)}/10
+                    <div className="space-y-2 mb-3">
+                      <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                        <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Distance</span>
+                        <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#a78bfa' : '#4CBB17' }}>
+                          {route.distance} km
                         </span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                        <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Time</span>
+                        <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#a78bfa' : '#4CBB17' }}>
+                          {route.estimatedTime} min
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                        <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Safety Score</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${
+                                route.safetyRating >= 7 ? 'bg-green-500' : 
+                                route.safetyRating >= 5 ? 'bg-yellow-500' : 
+                                'bg-red-500'
+                              }`}
+                              style={{ width: `${route.safetyRating * 10}%` }}
+                            />
+                          </div>
+                          <span className={`text-sm font-bold ${
+                            route.safetyRating >= 7 ? 'text-green-600' : 
+                            route.safetyRating >= 5 ? 'text-yellow-600' : 
+                            'text-red-600'
+                          }`}>
+                            {route.safetyRating.toFixed(1)}/10
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startNavigation(route);
+                      }}
+                      className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
+                      style={{
+                        backgroundColor: route.type === 'fastest' ? '#a78bfa' : '#4CBB17',
+                        color: '#ffffff'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = route.type === 'fastest' ? '#8b5cf6' : '#3DA512'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = route.type === 'fastest' ? '#a78bfa' : '#4CBB17'}
+                    >
+                      Start {route.type === 'fastest' ? 'Fastest' : 'Safest'} Route
+                    </button>
+                  </div>
+                ))}
+                </div>
+
+                {routes.length === 2 && (
+                  <div className="sticky bottom-4">
+                    <div className="rounded-lg p-3 mx-2 shadow-md" style={{ 
+                      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
+                      border: `1px solid ${isDark ? '#3b82f6' : '#bfdbfe'}`
+                    }}>
+                      <h4 className="font-bold mb-2 text-base" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>Route Analysis</h4>
+                      <div className="text-sm space-y-1" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
+                        <p>
+                          • Safest is {Math.abs(((routes[1].distance - routes[0].distance) / routes[0].distance) * 100).toFixed(0)}% {routes[1].distance >= routes[0].distance ? 'longer' : 'shorter'}
+                          {routes[1].safetyRating > routes[0].safetyRating && ` with better safety (${routes[1].safetyRating.toFixed(1)} vs ${routes[0].safetyRating.toFixed(1)})`}
+                        </p>
+                        {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) >= 0.5 && (
+                          <p>
+                            • Time difference: {(Math.round(Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) * 2) / 2).toFixed(1)} min
+                          </p>
+                        )}
+                        <p>
+                          • Based on crime data, lighting & hazard reports
+                        </p>
                       </div>
                     </div>
                   </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startNavigation(route);
-                    }}
-                    className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
-                    style={{
-                      backgroundColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17',
-                      color: route.type === 'fastest' ? '#0f172a' : '#ffffff'
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = route.type === 'fastest' ? '#E6AC00' : '#3DA512'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = route.type === 'fastest' ? '#FFBF00' : '#4CBB17'}
-                  >
-                    Start {route.type === 'fastest' ? 'Fastest' : 'Safest'} Route
-                  </button>
-                </div>
-              ))}
-
-              {routes.length === 2 && (
-                <div className="rounded-lg p-3 mx-4 mb-4" style={{ 
-                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
-                  border: `1px solid ${isDark ? '#3b82f6' : '#bfdbfe'}`
-                }}>
-                  <h4 className="font-bold mb-2 text-sm" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>Route Analysis</h4>
-                  <div className="text-xs space-y-1" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
-                    <p>
-                      • Safest is {((routes[1].distance / routes[0].distance - 1) * 100).toFixed(0)}% longer 
-                      but {((routes[0].safetyRating / routes[1].safetyRating - 1) * 100).toFixed(0)}% safer
-                    </p>
-                    <p>
-                      • Time difference: {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime).toFixed(1)} min
-                    </p>
-                    <p>
-                      • Based on crime data, lighting & hazard reports
-                    </p>
-                  </div>
-                </div>
-              )}
+                )}
               </div>
             </div>
           </div>
@@ -1182,19 +1345,32 @@ export default function SuggestedRoutes() {
 
         {/* Mobile Route Cards - Below Map */}
         {routes.length > 0 && (
-          <section className="md:hidden max-w-6xl mx-auto py-6 rounded-2xl shadow-lg mt-6" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
-            <h2 className="text-xl font-bold text-center mb-4 px-4" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
-              Route Comparison
-            </h2>
-            <div className="space-y-4 px-4">
+          <section
+            className="md:hidden max-w-6xl mx-auto rounded-2xl shadow-lg mt-4 mb-24"
+            style={{
+              backgroundColor: isDark ? '#1e293b' : '#ffffff'
+            }}
+          >
+            <div className="sticky top-0 z-10 py-4 px-4 border-b" style={{ 
+              backgroundColor: isDark ? '#1e293b' : '#ffffff',
+              borderColor: isDark ? '#334155' : '#e5e7eb'
+            }}>
+              <h2 className="text-xl font-bold text-center" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                Route Comparison
+              </h2>
+              <p className="text-xs text-center mt-1" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                Tap a route to view on map • Scroll for analysis
+              </p>
+            </div>
+            <div className="space-y-3 px-4 py-4 pb-24">
               {routes.map((route) => (
                 <div
                   key={route.id}
                   className="rounded-xl p-4 shadow-md border-2 cursor-pointer transition-all duration-200"
                   style={{
                     backgroundColor: isDark ? '#334155' : '#f9fafb',
-                    borderColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17',
-                    boxShadow: selectedRouteId === route.id ? `0 0 0 3px ${route.type === 'fastest' ? '#FFBF00' : '#4CBB17'}40` : undefined,
+                    borderColor: route.type === 'fastest' ? '#a78bfa' : '#4CBB17',
+                    boxShadow: selectedRouteId === route.id ? `0 0 0 3px ${route.type === 'fastest' ? '#a78bfa' : '#4CBB17'}40` : undefined,
                     transform: selectedRouteId === route.id ? 'scale(1.02)' : undefined
                   }}
                   onClick={() => setSelectedRouteId(route.id)}
@@ -1212,13 +1388,13 @@ export default function SuggestedRoutes() {
                   <div className="space-y-2 mb-3">
                     <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
                       <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Distance</span>
-                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#FFBF00' : '#4CBB17' }}>
+                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#a78bfa' : '#4CBB17' }}>
                         {route.distance} km
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-2 rounded-lg" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
                       <span className="text-sm font-medium" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>Time</span>
-                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#FFBF00' : '#4CBB17' }}>
+                      <span className="text-lg font-bold" style={{ color: route.type === 'fastest' ? '#a78bfa' : '#4CBB17' }}>
                         {route.estimatedTime} min
                       </span>
                     </div>
@@ -1253,8 +1429,8 @@ export default function SuggestedRoutes() {
                     }}
                     className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
                     style={{
-                      backgroundColor: route.type === 'fastest' ? '#FFBF00' : '#4CBB17',
-                      color: route.type === 'fastest' ? '#0f172a' : '#ffffff'
+                      backgroundColor: route.type === 'fastest' ? '#a78bfa' : '#4CBB17',
+                      color: '#ffffff'
                     }}
                   >
                     Start {route.type === 'fastest' ? 'Fastest' : 'Safest'} Route
@@ -1263,19 +1439,51 @@ export default function SuggestedRoutes() {
               ))}
 
               {routes.length === 2 && (
-                <div className="rounded-lg p-3 mb-32" style={{ 
-                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
-                  border: `1px solid ${isDark ? '#3b82f6' : '#bfdbfe'}`
+                <div className="rounded-xl p-4 mt-4 mb-12 shadow-lg border-2" style={{ 
+                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
+                  borderColor: isDark ? '#3b82f6' : '#bfdbfe'
                 }}>
-                  <h4 className="font-bold mb-2 text-sm" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>Route Analysis</h4>
-                  <div className="text-xs space-y-1" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
-                    <p>
-                      • Safest is {((routes[1].distance / routes[0].distance - 1) * 100).toFixed(0)}% longer 
-                      but {((routes[0].safetyRating / routes[1].safetyRating - 1) * 100).toFixed(0)}% safer
-                    </p>
-                    <p>
-                      • Time difference: {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime).toFixed(1)} min
-                    </p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5" style={{ color: isDark ? '#60a5fa' : '#1e40af' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 12l2 2 4-4"/>
+                      <circle cx="12" cy="12" r="10"/>
+                    </svg>
+                    <h4 className="font-bold text-lg" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>
+                      Route Analysis
+                    </h4>
+                  </div>
+                  <div className="space-y-2.5 text-sm" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
+                    <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                      <span className="shrink-0">📏</span>
+                      <p>
+                        <strong>Distance:</strong> Safest is {Math.abs(((routes[1].distance - routes[0].distance) / routes[0].distance) * 100).toFixed(0)}% {routes[1].distance >= routes[0].distance ? 'longer' : 'shorter'} than fastest
+                      </p>
+                    </div>
+                    
+                    {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) >= 0.5 && (
+                      <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                        <span className="shrink-0">⏱️</span>
+                        <p>
+                          <strong>Time difference:</strong> {(Math.round(Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) * 2) / 2).toFixed(1)} minutes
+                        </p>
+                      </div>
+                    )}
+                    
+                    {routes[1].safetyRating > routes[0].safetyRating && (
+                      <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                        <span className="shrink-0">🛡️</span>
+                        <p>
+                          <strong>Safety improvement:</strong> Safest route scores {routes[1].safetyRating.toFixed(1)}/10 vs {routes[0].safetyRating.toFixed(1)}/10
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                      <span className="shrink-0">📊</span>
+                      <p>
+                        Based on crime data, lighting conditions & hazard reports
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1297,7 +1505,7 @@ export default function SuggestedRoutes() {
             }`}
             style={{ 
               width: '380px',
-              height: 'calc(100vh - 5rem)',
+              height: desktopPanelViewportHeight,
               boxShadow: '-4px 0 12px rgba(0, 0, 0, 0.15)',
               overflow: 'hidden'
             }}
@@ -1515,5 +1723,20 @@ export default function SuggestedRoutes() {
         )}
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function SuggestedRoutes() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#06d6a0] mx-auto mb-4"></div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Loading route planner...</p>
+        </div>
+      </div>
+    }>
+      <SuggestedRoutesContent />
+    </Suspense>
   );
 }
