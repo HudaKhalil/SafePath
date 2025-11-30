@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { geocodingService, hazardsService } from "../../lib/services";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
@@ -21,7 +21,7 @@ const normalizeCoordinates = (lat, lon) => {
 
 const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
-export default function SuggestedRoutes() {
+function SuggestedRoutesContent() {
   const [mapKey, setMapKey] = useState(0);
   const [mapCenter, setMapCenter] = useState(null);
   const [isDark, setIsDark] = useState(false);
@@ -53,6 +53,7 @@ export default function SuggestedRoutes() {
     router.push(url);
   };
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState(null);
@@ -123,7 +124,83 @@ export default function SuggestedRoutes() {
     // Load saved safety weights and preset
     setSafetyWeights(getSafetyWeights());
     setCurrentSafetyPreset(getCurrentPreset());
-  }, []);
+    
+    // Parse URL parameters for pre-filled route
+    const fromLat = searchParams.get('fromLat');
+    const fromLng = searchParams.get('fromLng');
+    const fromAddress = searchParams.get('fromAddress');
+    const toLat = searchParams.get('toLat');
+    const toLng = searchParams.get('toLng');
+    const toAddress = searchParams.get('toAddress');
+    const mode = searchParams.get('mode');
+    
+    // Set transport mode if provided
+    if (mode === 'walk' || mode === 'walking') {
+      setTransportMode('walking');
+    } else if (mode === 'cycle' || mode === 'cycling') {
+      setTransportMode('cycling');
+    }
+    
+    // Populate from location (current location)
+    if (fromLat && fromLng) {
+      const fromCoordinates = normalizeCoordinates(fromLat, fromLng);
+      if (fromCoordinates) {
+        setFromCoords(fromCoordinates);
+        
+        // Always fetch the actual address from coordinates
+        geocodingService.getAddressFromCoords(fromLat, fromLng).then(response => {
+          if (response.success && response.data?.display_name) {
+            console.log('From address fetched:', response.data.display_name);
+            setFromLocation(response.data.display_name);
+          } else {
+            console.log('Failed to fetch from address, using fallback');
+            setFromLocation('Current Location');
+          }
+        }).catch((error) => {
+          console.error('Error fetching from address:', error);
+          setFromLocation('Current Location');
+        });
+      }
+    }
+    
+    // Populate to location (destination)
+    if (toLat && toLng) {
+      const toCoordinates = normalizeCoordinates(toLat, toLng);
+      if (toCoordinates) {
+        setToCoords(toCoordinates);
+        // Use provided address or reverse geocode
+        if (toAddress) {
+          setToLocation(decodeURIComponent(toAddress));
+        } else {
+          geocodingService.getAddressFromCoords(toLat, toLng).then(response => {
+            if (response.success && response.data?.display_name) {
+              setToLocation(response.data.display_name);
+            }
+          });
+        }
+      }
+    }
+    
+    // Center map to show both locations if both are provided
+    if (fromLat && fromLng && toLat && toLng) {
+      const fromCoordinates = normalizeCoordinates(fromLat, fromLng);
+      const toCoordinates = normalizeCoordinates(toLat, toLng);
+      if (fromCoordinates && toCoordinates) {
+        // Calculate center point between from and to
+        const centerLat = (fromCoordinates[0] + toCoordinates[0]) / 2;
+        const centerLng = (fromCoordinates[1] + toCoordinates[1]) / 2;
+        setMapCenter([centerLat, centerLng]);
+        setMapZoom(13);
+      }
+    } else if (toLat && toLng) {
+      // If only destination, center on it
+      const toCoordinates = normalizeCoordinates(toLat, toLng);
+      if (toCoordinates) {
+        setMapCenter(toCoordinates);
+        setMapZoom(15);
+      }
+    }
+  }, [searchParams]);
 
   // Track dark mode changes
   useEffect(() => {
@@ -1646,5 +1723,20 @@ export default function SuggestedRoutes() {
         )}
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function SuggestedRoutes() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#06d6a0] mx-auto mb-4"></div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Loading route planner...</p>
+        </div>
+      </div>
+    }>
+      <SuggestedRoutesContent />
+    </Suspense>
   );
 }
