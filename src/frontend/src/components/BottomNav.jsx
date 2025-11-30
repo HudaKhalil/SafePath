@@ -6,6 +6,10 @@ import { Home, Map, AlertTriangle, ParkingCircle, Users2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 function Item({ icon: Icon, label, href, active, isDark }) {
+  const activeColor = isDark ? '#06d6a0' : '#ffffff';
+  const inactiveColor = isDark ? '#94a3b8' : '#64748b';
+  const hoverColor = isDark ? '#ffffff' : '#06d6a0';
+  
   return (
     <Link
       href={href}
@@ -14,10 +18,10 @@ function Item({ icon: Icon, label, href, active, isDark }) {
       aria-label={label}
       style={{ 
         textAlign: 'center',
-        color: active ? '#06d6a0' : (isDark ? '#94a3b8' : '#64748b')
+        color: active ? activeColor : inactiveColor
       }}
-      onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
-      onMouseLeave={(e) => e.currentTarget.style.color = active ? '#06d6a0' : (isDark ? '#94a3b8' : '#64748b')}
+      onMouseEnter={(e) => e.currentTarget.style.color = hoverColor}
+      onMouseLeave={(e) => e.currentTarget.style.color = active ? activeColor : inactiveColor}
     >
       <Icon className="h-6 w-6 mb-1" style={{ display: 'block', margin: '0 auto' }} />
       <span className="mt-0.5">{label}</span>
@@ -52,10 +56,8 @@ export default function BottomNav() {
       role="navigation"
       aria-label="Primary"
       style={{
-        background: isDark 
-          ? 'linear-gradient(180deg, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.95) 100%)' 
-          : 'rgba(255, 255, 255, 0.95)',
-        borderColor: isDark ? '#334155' : '#e2e8f0'
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        borderColor: isDark ? '#334155' : 'rgba(255, 255, 255, 0.1)'
       }}
     >
       <div className="mx-auto w-full max-w-7xl">
