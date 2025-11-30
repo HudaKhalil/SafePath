@@ -359,7 +359,7 @@ export default function HazardReporting() {
                     }}>Report a Hazard</h3>
                     <p className="text-sm mt-1" style={{ 
                       color: isLightMode ? '#64748b' : '#06d6a0' 
-                    }}>Help keep London safe</p>
+                    }}>Help keep community safe</p>
                   </div>
                 
                 {showReportForm ? (
@@ -844,6 +844,7 @@ export default function HazardReporting() {
                   <div className="text-xl font-bold text-red-600">111</div>
                   <div className="text-xs text-gray-600 mt-1">Medical advice</div>
                 </div>
+                
               </div>
             </div>
           </div>
