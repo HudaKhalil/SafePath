@@ -26,16 +26,6 @@
   background: #64748b;
 }
 
-/* Hide scrollbar for buddy cards horizontal scroll */
-.scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari and Opera */
-}
-
 /* COLORS THAT STAY THE SAME IN BOTH LIGHT AND DARK MODE */
 :root {
   /* BUTTONS, TEXT, ICONS will be same in both modes */
