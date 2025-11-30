@@ -526,8 +526,8 @@ export default function Home() {
               </div>
 
               {/* Buddy Preview Section - Desktop Only */}
-              <div className="hidden lg:block mt-4 animate-fadeIn">
-                <div className="flex items-center justify-between mb-2">
+              <div className="hidden lg:block mt-8 animate-fadeIn">
+                <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
                     Find Buddy Near Me
                   </h2>
@@ -552,11 +552,11 @@ export default function Home() {
                 <div className="space-y-2">
                   {/* Mock Buddy 1 */}
                   <div 
-                    className="rounded-lg p-2 transition-transform hover:scale-[1.01]"
+                    className="rounded-lg p-2 border shadow-sm transition-transform hover:scale-[1.01]"
                     style={{
-                      backgroundColor: isDark ? '#0f172a' : '#e2e8f0',
-                      border: isDark ? '1px solid rgba(6, 214, 160, 0.5)' : 'none',
-                      boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
+                      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                      borderColor: isDark ? 'rgba(6, 214, 160, 0.5)' : 'rgba(6, 214, 160, 0.4)',
+                      boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
                     }}
                   >
                     <div className="flex items-center gap-2">
@@ -577,11 +577,11 @@ export default function Home() {
 
                   {/* Mock Buddy 2 */}
                   <div 
-                    className="rounded-lg p-2 transition-transform hover:scale-[1.01]"
+                    className="rounded-lg p-2 border shadow-sm transition-transform hover:scale-[1.01]"
                     style={{
-                      backgroundColor: isDark ? '#0f172a' : '#e2e8f0',
-                      border: isDark ? '1px solid rgba(6, 214, 160, 0.5)' : 'none',
-                      boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
+                      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                      borderColor: isDark ? 'rgba(6, 214, 160, 0.5)' : 'rgba(6, 214, 160, 0.4)',
+                      boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
                     }}
                   >
                     <div className="flex items-center gap-2">
@@ -602,11 +602,11 @@ export default function Home() {
 
                   {/* Mock Buddy 3 */}
                   <div 
-                    className="rounded-lg p-2 transition-transform hover:scale-[1.01]"
+                    className="rounded-lg p-2 border shadow-sm transition-transform hover:scale-[1.01]"
                     style={{
-                      backgroundColor: isDark ? '#0f172a' : '#e2e8f0',
-                      border: isDark ? '1px solid rgba(6, 214, 160, 0.5)' : 'none',
-                      boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.08)'
+                      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                      borderColor: isDark ? 'rgba(6, 214, 160, 0.5)' : 'rgba(6, 214, 160, 0.4)',
+                      boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)'
                     }}
                   >
                     <div className="flex items-center gap-2">
@@ -740,7 +740,7 @@ export default function Home() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
-        </div>
+          </div>
         </div>
       </Section>
     </main>
