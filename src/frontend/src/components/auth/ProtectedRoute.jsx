@@ -35,6 +35,5 @@ export default function ProtectedRoute({ children }) {
     );
   }
 
-  // Only render children if authenticated
   return isAuthenticated ? children : null;
 }
