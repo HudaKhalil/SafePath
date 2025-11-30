@@ -2,9 +2,12 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config(); // Ensure environment variables are loaded
 const db = require('../config/database');
 const authenticateToken = require('../middleware/auth');
+const { uploadProfile, deleteImage } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -272,6 +275,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
           preferred_transport: preferences.preferred_transport || null,
           safety_priority: preferences.safety_priority || null,
           notifications: preferences.notifications !== undefined ? preferences.notifications : true,
+          profile_picture: preferences.profile_picture || null,
           location: preferences.longitude && preferences.latitude ? {
             longitude: preferences.longitude,
             latitude: preferences.latitude
@@ -480,6 +484,157 @@ router.put('/profile', authenticateToken, [
     res.status(500).json({
       success: false,
       message: 'Internal server error'
+    });
+  }
+});
+
+// Upload profile picture
+router.post('/profile/picture', authenticateToken, (req, res) => {
+  uploadProfile(req, res, async (err) => {
+    if (err) {
+      console.error('Upload error:', err);
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'Error uploading file'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    try {
+      // Get current user to find old profile picture
+      const currentUser = await db.query(
+        'SELECT preferences FROM users WHERE user_id = $1',
+        [req.user.userId]
+      );
+
+      if (currentUser.rows.length === 0) {
+        // Delete uploaded file if user not found
+        deleteImage(req.file.path);
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Parse existing preferences
+      let preferences = {};
+      if (currentUser.rows[0].preferences) {
+        try {
+          preferences = typeof currentUser.rows[0].preferences === 'string'
+            ? JSON.parse(currentUser.rows[0].preferences)
+            : currentUser.rows[0].preferences;
+        } catch (e) {
+          console.error('Error parsing preferences:', e);
+        }
+      }
+
+      // Delete old profile picture if exists
+      if (preferences.profile_picture) {
+        const oldPath = path.join(__dirname, '..', preferences.profile_picture);
+        deleteImage(oldPath);
+      }
+
+      // Update preferences with new profile picture path
+      preferences.profile_picture = `/uploads/profiles/${req.file.filename}`;
+
+      // Update database
+      const updateQuery = `
+        UPDATE users 
+        SET preferences = $1, updated_at = CURRENT_TIMESTAMP 
+        WHERE user_id = $2
+        RETURNING user_id
+      `;
+
+      await db.query(updateQuery, [JSON.stringify(preferences), req.user.userId]);
+
+      res.json({
+        success: true,
+        message: 'Profile picture uploaded successfully',
+        data: {
+          profile_picture: preferences.profile_picture,
+          filename: req.file.filename
+        }
+      });
+
+    } catch (error) {
+      console.error('Database error:', error);
+      // Delete uploaded file if database update fails
+      deleteImage(req.file.path);
+      res.status(500).json({
+        success: false,
+        message: 'Error saving profile picture'
+      });
+    }
+  });
+});
+
+// Delete profile picture
+router.delete('/profile/picture', authenticateToken, async (req, res) => {
+  try {
+    // Get current user
+    const currentUser = await db.query(
+      'SELECT preferences FROM users WHERE user_id = $1',
+      [req.user.userId]
+    );
+
+    if (currentUser.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Parse preferences
+    let preferences = {};
+    if (currentUser.rows[0].preferences) {
+      try {
+        preferences = typeof currentUser.rows[0].preferences === 'string'
+          ? JSON.parse(currentUser.rows[0].preferences)
+          : currentUser.rows[0].preferences;
+      } catch (e) {
+        console.error('Error parsing preferences:', e);
+      }
+    }
+
+    if (!preferences.profile_picture) {
+      return res.status(404).json({
+        success: false,
+        message: 'No profile picture to delete'
+      });
+    }
+
+    // Delete file
+    const filePath = path.join(__dirname, '..', preferences.profile_picture);
+    deleteImage(filePath);
+
+    // Remove from preferences
+    delete preferences.profile_picture;
+
+    // Update database
+    const updateQuery = `
+      UPDATE users 
+      SET preferences = $1, updated_at = CURRENT_TIMESTAMP 
+      WHERE user_id = $2
+    `;
+
+    await db.query(updateQuery, [JSON.stringify(preferences), req.user.userId]);
+
+    res.json({
+      success: true,
+      message: 'Profile picture deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete profile picture error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting profile picture'
     });
   }
 });

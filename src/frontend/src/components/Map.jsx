@@ -127,6 +127,134 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
+// Current Location Control Component
+function CurrentLocationControl() {
+  const map = useMap();
+  const [userMarker, setUserMarker] = useState(null);
+  const [accuracyCircle, setAccuracyCircle] = useState(null);
+
+  const handleLocate = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const latlng = [latitude, longitude];
+        
+        // Move map to user location
+        map.flyTo(latlng, 15, {
+          animate: true,
+          duration: 1.5
+        });
+
+        // Remove old markers if exist
+        if (userMarker) {
+          map.removeLayer(userMarker);
+        }
+        if (accuracyCircle) {
+          map.removeLayer(accuracyCircle);
+        }
+
+        // Add blue circle marker for user location
+        const marker = L.circleMarker(latlng, {
+          radius: 8,
+          fillColor: '#4285F4',
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8
+        }).addTo(map);
+
+        // Add accuracy circle
+        const circle = L.circle(latlng, {
+          radius: position.coords.accuracy,
+          fillColor: '#4285F4',
+          fillOpacity: 0.1,
+          color: '#4285F4',
+          weight: 1
+        }).addTo(map);
+
+        marker.bindPopup('<div style="font-size: 14px; font-weight: 500;">You are here</div>').openPopup();
+        
+        setUserMarker(marker);
+        setAccuracyCircle(circle);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        alert('Unable to retrieve your location. Please check location permissions.');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Create custom control
+    const LocationControl = L.Control.extend({
+      onAdd: function() {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
+        container.style.backgroundColor = 'white';
+        container.style.width = '40px';
+        container.style.height = '40px';
+        container.style.cursor = 'pointer';
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.justifyContent = 'center';
+        container.style.borderRadius = '4px';
+        container.style.boxShadow = '0 1px 5px rgba(0,0,0,0.2)';
+        container.title = 'Go to current location';
+        
+        container.innerHTML = '<svg style="width: 20px; height: 20px; color: #374151;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"></path></svg>';
+        
+        container.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleLocate();
+        };
+        
+        L.DomEvent.disableClickPropagation(container);
+        
+        return container;
+      }
+    });
+
+    const control = new LocationControl({ position: 'topright' });
+    control.addTo(map);
+
+    return () => {
+      try {
+        map.removeControl(control);
+      } catch (e) {
+        // Control might already be removed
+      }
+      if (userMarker) {
+        try {
+          map.removeLayer(userMarker);
+        } catch (e) {
+          // Marker might already be removed
+        }
+      }
+      if (accuracyCircle) {
+        try {
+          map.removeLayer(accuracyCircle);
+        } catch (e) {
+          // Circle might already be removed
+        }
+      }
+    };
+  }, [map]);
+
+  return null;
+}
+
 // Simple OSM preview route that owns drawing logic
 function OSMPreviewRoute({ fromCoords, toCoords, transportMode, enablePreview, onRouteFound }) {
   const map = useMap();
@@ -209,23 +337,26 @@ function useEnhancedRoute(route) {
 
   useEffect(() => {
     const enhanceRoute = async () => {
-      if (!route?.path || route.path.length < 2) {
-        setEnhancedPath(route?.path || []);
+      // Support both 'path' and 'coordinates' property names
+      const routePath = route?.path || route?.coordinates;
+      
+      if (!routePath || routePath.length < 2) {
+        setEnhancedPath(routePath || []);
         setRouteInfo({ provider: 'none', fallback: true });
         return;
       }
 
       // If route already has many points, assume it's road-following
-      if (route.path.length > 10) {
-        setEnhancedPath(route.path);
+      if (routePath.length > 10) {
+        setEnhancedPath(routePath);
         setRouteInfo({ provider: 'existing', fallback: false });
         return;
       }
 
       try {
         setIsEnhancing(true);
-        const startPoint = route.path[0];
-        const endPoint = route.path[route.path.length - 1];
+        const startPoint = routePath[0];
+        const endPoint = routePath[routePath.length - 1];
         
         console.log(`🗺️ Enhancing route ${route.name} with road-following path`);
         
@@ -245,12 +376,12 @@ function useEnhancedRoute(route) {
           });
           console.log(`✅ Enhanced route ${route.name} with ${routeResult.coordinates.length} road points via ${routeResult.provider}`);
         } else {
-          setEnhancedPath(route.path);
+          setEnhancedPath(routePath);
           setRouteInfo({ provider: 'original', fallback: true });
         }
       } catch (error) {
         console.warn(`Could not enhance route ${route.name}:`, error);
-        setEnhancedPath(route.path);
+        setEnhancedPath(routePath);
         setRouteInfo({ provider: 'error', fallback: true, error: error.message });
       } finally {
         setIsEnhancing(false);
@@ -365,7 +496,7 @@ export default function Map({
   hazard: { symbol: '⚠️', bgColor: color, size: [28, 36] },
   buddy: { symbol: '👤', bgColor: color, size: [28, 36] },
   from: { symbol: '📍', bgColor: '#10b981', size: [32, 40] }, 
-  to: { symbol: '🎯', bgColor: '#ef4444', size: [32, 40] },    
+  to: { symbol: '🎯', bgColor: '#eab308', size: [32, 40] },    
   default: { symbol: '📍', bgColor: color, size: [26, 34] }
 
     };
@@ -457,6 +588,9 @@ export default function Map({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        {/* Current Location Button */}
+        <CurrentLocationControl />
+
         {/* Preserve map view to prevent unwanted zoom changes */}
         <PreserveMapView />
 
@@ -502,7 +636,7 @@ export default function Map({
         )}
         {/* To Location Marker */}
         {toCoords && (
-          <Marker position={toCoords} icon={createCustomIcon("#ef4444", "to")}>
+          <Marker position={toCoords} icon={createCustomIcon("#eab308", "to")}>
             <Popup>
               <div className="text-sm">
                 <strong>Destination</strong>

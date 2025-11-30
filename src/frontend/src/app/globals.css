@@ -26,11 +26,21 @@
   background: #64748b;
 }
 
+/* Hide scrollbar for buddy cards horizontal scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
 /* COLORS THAT STAY THE SAME IN BOTH LIGHT AND DARK MODE */
 :root {
   /* BUTTONS, TEXT, ICONS will be same in both modes */
   --color-accent: #06d6a0;
-  --color-accent-light: #4ade80;
+  --color-accent-light: #6ff8a1;
   --color-accent-dark: #059669;
   --color-text-on-accent: #0f172a;
   --color-hazard: #f59e0b;
@@ -40,6 +50,7 @@
   --color-danger: #ef4444;
   --color-danger-light: #f87171;
   --color-success: #06d6a0;
+  --from-to-label-color: #0f172a;
 }
 
 /* DEFAULT LIGHT MODE COLORS (no class needed) */
@@ -58,6 +69,7 @@
   --color-text-primary: #f8fafc;
   --color-text-secondary: #94a3b8;
   --border-color: rgba(255, 255, 255, 0.2);
+  --from-to-label-color: #06d6a0;
 }
 
 html, body {
@@ -175,7 +187,7 @@ body {
   font-size: 3rem;
   font-weight: 700;
   color: var(--color-text-primary); 
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 @media (min-width: 768px) {
@@ -194,7 +206,7 @@ body {
   font-size: 1.25rem;
   font-weight: 500;
   color: var(--color-accent); 
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 @media (min-width: 768px) {

@@ -24,15 +24,15 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
       let result;
       try {
         result = await geocodingService.searchLocations(query, { 
-          limit: 5, 
-          countrycode: LOCATION_CONFIG.COUNTRY_CODE
+          limit: 5
+          // No country code restriction - allow global search
         });
       } catch (backendError) {
         console.log('Backend geocoding failed, using direct Nominatim:', backendError.message);
         // Fallback to direct Nominatim search
         result = await geocodingService.searchNominatim(query, { 
-          limit: 5, 
-          countrycode: LOCATION_CONFIG.COUNTRY_CODE
+          limit: 5
+          // No country code restriction - allow global search
         });
       }
 
@@ -96,13 +96,13 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
           let result;
           try {
             result = await geocodingService.searchLocations(value, { 
-              limit: 1, 
-              countrycode: LOCATION_CONFIG.COUNTRY_CODE
+              limit: 1
+              // No country code restriction - allow global search
             });
           } catch (backendError) {
             result = await geocodingService.searchNominatim(value, { 
-              limit: 1, 
-              countrycode: LOCATION_CONFIG.COUNTRY_CODE
+              limit: 1
+              // No country code restriction - allow global search
             });
           }
 
@@ -130,6 +130,13 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
     // Delay to allow clicking suggestions
     setTimeout(async () => {
       setShowSuggestions(false)
+      setSuggestions([])
+      
+      // Don't auto-geocode if the field was cleared (value is now empty)
+      // This prevents restoring the old value when user clicks Clear button
+      if (!value || value.length === 0) {
+        return
+      }
       
       // Auto-geocode if user typed but didn't select from dropdown
       if (value.length >= 3 && suggestions.length > 0) {
@@ -177,9 +184,42 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 mb-2">
-        <span className={`${icon === 'from' ? 'text-green-600' : 'text-red-600'}`}>📍</span>
-        <label className="text-sm font-medium" style={{ color: '#06d6a0' }}>
+      <div className={`mb-3 flex items-center ${icon ? 'gap-2' : ''}`}>
+        {icon === 'from' && (
+          <span
+            aria-hidden="true"
+            className="inline-flex items-center justify-center"
+            style={{
+              width: '28px',
+              height: '28px',
+              backgroundColor: '#10b981',
+              borderRadius: '50% 50% 50% 0',
+              transform: 'rotate(-45deg)',
+              border: '2px solid white',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.25)'
+            }}
+          >
+            <span style={{ transform: 'rotate(45deg)', fontSize: '16px', lineHeight: 1 }}>📍</span>
+          </span>
+        )}
+        {icon === 'to' && (
+          <span
+            aria-hidden="true"
+            className="inline-flex items-center justify-center"
+            style={{
+              width: '28px',
+              height: '28px',
+              backgroundColor: '#eab308',
+              borderRadius: '50% 50% 50% 0',
+              transform: 'rotate(-45deg)',
+              border: '2px solid white',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.25)'
+            }}
+          >
+            <span style={{ transform: 'rotate(45deg)', fontSize: '16px', lineHeight: 1 }}>🎯</span>
+          </span>
+        )}
+        <label className="text-lg font-semibold" style={{ color: 'var(--from-to-label-color)' }}>
           {icon === 'from' ? 'From' : 'To'}
         </label>
       </div>
@@ -193,7 +233,7 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full p-4 rounded-lg border-2 focus:outline-none focus:border-accent text-base dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-slate-400"
+          className="w-full p-4 rounded-lg border-2 focus:outline-none focus:border-accent text-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-slate-400"
           style={{
             backgroundColor: 'var(--bg-card)',
             borderColor: 'var(--border-color)',

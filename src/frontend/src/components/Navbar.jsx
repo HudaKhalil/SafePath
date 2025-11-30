@@ -66,14 +66,15 @@ export default function Navbar() {
     >
       <div className="container mx-auto px-8 py-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
-          <div className="w-12 h-12 flex items-center justify-center">
+          <div className="w-12 h-12 flex items-center justify-center" title="SafePath - Navigate Safely">
             <img 
               src="/logo.png" 
               alt="SafePath Logo" 
               className="w-12 h-12 object-contain"
             />
           </div>
- <div style={{ color: '#f8fafc' }} className="font-bold text-2xl">SafePath</div>        </Link>
+          <div style={{ color: '#f8fafc' }} className="font-bold text-2xl hidden min-[425px]:block">SafePath</div>
+         </Link>
 
         <nav className="hidden md:flex gap-8 items-center font-bold">
           <ThemeToggle />
@@ -132,17 +133,38 @@ export default function Navbar() {
 
           {isLoggedIn ? (
             <div className="flex items-center gap-4">
-              <span style={{ color: '#94a3b8' }}>Welcome, {user?.name || 'User'}</span>
               <Link 
                 href="/profile" 
-                className="transition-colors duration-200"
-                style={{
-                  color: pathname === '/profile' ? '#06d6a0' : '#94a3b8'
-                }}
-                onMouseEnter={(e) => e.target.style.color = '#ffffff'}
-                onMouseLeave={(e) => e.target.style.color = pathname === '/profile' ? '#06d6a0' : '#94a3b8'}
+                className="flex flex-col items-center gap-1"
               >
-                Profile
+                <div 
+                  className="w-12 h-12 rounded-full overflow-hidden border-2 flex items-center justify-center"
+                  style={{ 
+                    borderColor: pathname === '/profile' ? '#06d6a0' : '#475569',
+                    backgroundColor: '#334155'
+                  }}
+                >
+                  {user?.profile_picture ? (
+                    <img 
+                      src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="currentColor"
+                      className="w-7 h-7"
+                      style={{ color: '#94a3b8' }}
+                    >
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  )}
+                </div>
+                <span className="text-xs" style={{ color: pathname === '/profile' ? '#06d6a0' : '#94a3b8' }}>
+                  {user?.name || 'User'}
+                </span>
               </Link>
               <button 
                 onClick={handleLogout}
@@ -188,6 +210,35 @@ export default function Navbar() {
 
 
         <div className="md:hidden flex items-center gap-3">
+          {isLoggedIn && (
+            <Link href="/profile">
+              <div 
+                className="w-12 h-12 rounded-full overflow-hidden border-2 flex items-center justify-center"
+                style={{ 
+                  borderColor: pathname === '/profile' ? '#06d6a0' : '#475569',
+                  backgroundColor: '#334155'
+                }}
+              >
+                {user?.profile_picture ? (
+                  <img 
+                    src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    viewBox="0 0 24 24" 
+                    fill="currentColor"
+                    className="w-7 h-7"
+                    style={{ color: '#94a3b8' }}
+                  >
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                )}
+              </div>
+            </Link>
+          )}
           <ThemeToggle />
           <button 
             onClick={() => setOpen(!open)} 
@@ -225,8 +276,37 @@ export default function Navbar() {
                 className="pt-4 space-y-2"
                 style={{ borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}
               >
-                <div style={{ color: '#94a3b8' }}>Welcome, {user?.name || 'User'}</div>
-                <Link href="/profile" onClick={() => setOpen(false)} className="block nav-link">Profile</Link>
+                <Link href="/profile" onClick={() => setOpen(false)} className="flex items-center gap-3 p-2">
+                  <div 
+                    className="w-12 h-12 rounded-full overflow-hidden border-2 flex items-center justify-center"
+                    style={{ 
+                      borderColor: '#06d6a0',
+                      backgroundColor: '#334155'
+                    }}
+                  >
+                    {user?.profile_picture ? (
+                      <img 
+                        src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 24 24" 
+                        fill="currentColor"
+                        className="w-7 h-7"
+                        style={{ color: '#94a3b8' }}
+                      >
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <span style={{ color: '#06d6a0' }}>Profile</span>
+                    <span className="text-xs" style={{ color: '#94a3b8' }}>{user?.name || 'User'}</span>
+                  </div>
+                </Link>
                 <button 
                   onClick={() => {
                     setOpen(false);

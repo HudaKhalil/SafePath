@@ -8,7 +8,7 @@ import websocketClient from "../../lib/websocketClient";
 
 const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
-export default function NavigationPage() {
+export default function NavigationClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
@@ -426,7 +426,7 @@ export default function NavigationPage() {
   }
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-slate-900">
+    <main className="relative h-screen w-screen overflow-hidden md:overflow-y-auto md:h-auto md:min-h-screen bg-slate-900">
       {/* Hazard Alert Banners */}
       {hazardAlerts.length > 0 && (
         <div className="absolute top-0 left-0 right-0 z-50 p-4 space-y-2">
@@ -454,7 +454,7 @@ export default function NavigationPage() {
       )}
 
       {/* Map */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 md:relative md:h-96">
         <Map
           center={snappedPosition || routeCoordinates[0] || LOCATION_CONFIG.DEFAULT_CENTER}
           zoom={18}
@@ -482,7 +482,7 @@ export default function NavigationPage() {
             // Destination marker
             routeCoordinates.length > 0 && {
               position: routeCoordinates[routeCoordinates.length - 1],
-              color: "#ef4444",
+              color: "#eab308",
               type: "to",
               popup: <div className="text-sm"><strong>Destination</strong></div>
             }
@@ -490,147 +490,136 @@ export default function NavigationPage() {
         />
       </div>
 
-      {/* Top Bar - Current Instruction */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-2xl p-6">
-            {hasArrived ? (
-              <div className="text-center">
-                <div className="text-6xl mb-2">🏁</div>
-                <h2 className="text-2xl font-bold text-green-600 mb-2">
-                  You have arrived!
-                </h2>
-                <button
-                  onClick={exitNavigation}
-                  className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  Exit Navigation
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-4 mb-3">
-                  <div className="text-5xl">
-                    {getInstructionIcon(instructions[currentInstructionIndex]?.instruction)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-2xl font-bold text-slate-800">
-                      {instructions[currentInstructionIndex]?.instruction || "Follow the route"}
-                    </div>
-                    {distanceToNextTurn > 0 && (
-                      <div className="text-lg text-blue-600 font-semibold mt-1">
-                        In {formatDistance(distanceToNextTurn)}
-                      </div>
-                    )}
-                  </div>
+      {/* Top Navigation Bar */}
+      <div className="absolute md:relative top-0 left-0 right-0 z-40 bg-gradient-to-b from-slate-900/95 to-slate-900/80 md:bg-slate-900 backdrop-blur-sm pt-safe">
+        <div className="p-3">
+          {/* Current Instruction */}
+          <div className="bg-white/10 rounded-xl p-3 mb-2 backdrop-blur-md">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-2">
+                <div className="text-3xl">
+                  {instructions[currentInstructionIndex] 
+                    ? getInstructionIcon(instructions[currentInstructionIndex].instruction)
+                    : "🧭"}
                 </div>
-
-                {/* Route Info Bar */}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                  <div className="flex items-center gap-6">
-                    <div>
-                      <div className="text-sm text-gray-500">Remaining</div>
-                      <div className="text-lg font-bold text-slate-800">
-                        {formatDistance(totalDistanceRemaining)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">ETA</div>
-                      <div className="text-lg font-bold text-slate-800">
-                        {estimatedTimeRemaining} min
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Progress</div>
-                      <div className="text-lg font-bold text-blue-600">
-                        {routeProgress}%
-                      </div>
-                    </div>
+                <div>
+                  <div className="text-white text-base font-bold leading-tight">
+                    {hasArrived 
+                      ? "You have arrived!"
+                      : instructions[currentInstructionIndex]?.instruction || "Continue on route"}
                   </div>
-                  
-                  <button
-                    onClick={exitNavigation}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium"
-                  >
-                    Exit
-                  </button>
-                </div>
-                
-                {/* Progress Bar */}
-                <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${routeProgress}%` }}
-                  ></div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* GPS Status Indicator */}
-      {!isTracking && (
-        <div className="absolute top-24 left-4 bg-yellow-500 text-white px-4 py-2 rounded-lg shadow-lg z-10">
-          <div className="flex items-center gap-2">
-            <div className="animate-pulse">📡</div>
-            <span>Searching for GPS signal...</span>
-          </div>
-        </div>
-      )}
-      
-      {/* Off-Route Warning */}
-      {isOffRoute && isTracking && (
-        <div className="absolute top-24 left-4 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg z-10 animate-pulse">
-          <div className="flex items-center gap-2">
-            <div>⚠️</div>
-            <span>Off Route - Returning to path</span>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Panel - Upcoming Instructions */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4">
-        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-4 max-h-48 overflow-y-auto">
-          <h3 className="font-bold text-slate-800 mb-3 text-sm">Upcoming Directions</h3>
-          <div className="space-y-2">
-            {instructions.slice(currentInstructionIndex, currentInstructionIndex + 5).map((instruction, idx) => (
-              <div
-                key={idx}
-                className={`flex items-center gap-3 p-2 rounded-lg ${
-                  idx === 0 ? "bg-blue-50 border border-blue-200" : "bg-gray-50"
-                }`}
-              >
-                <div className="text-2xl">
-                  {getInstructionIcon(instruction.instruction)}
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-slate-700">
-                    {instruction.instruction}
-                  </div>
-                  {instruction.distance && (
-                    <div className="text-xs text-gray-500">
-                      {formatDistance(instruction.distance / 1000)}
+                  {!hasArrived && distanceToNextTurn > 0 && (
+                    <div className="text-blue-200 text-xs">
+                      in {formatDistance(distanceToNextTurn)}
                     </div>
                   )}
                 </div>
               </div>
-            ))}
+              
+              {/* GPS Status */}
+              <div className={`px-2 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${
+                isTracking ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+              }`}>
+                {isTracking ? '📍 GPS' : '❌'}
+              </div>
+            </div>
+
+            {/* Off-route warning */}
+            {isOffRoute && (
+              <div className="bg-orange-500 text-white px-2 py-1 rounded-lg text-xs font-semibold animate-pulse">
+                ⚠️ You are off the planned route
+              </div>
+            )}
+          </div>
+
+          {/* Route Progress Bar */}
+          <div className="bg-white/10 rounded-lg p-2 backdrop-blur-md">
+            <div className="flex justify-between text-white text-xs mb-1">
+              <span>{routeProgress}%</span>
+              <span>{formatDistance(totalDistanceRemaining)}</span>
+              <span>{estimatedTimeRemaining} min</span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-1.5">
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-green-500 h-1.5 rounded-full transition-all duration-500"
+                style={{ width: `${routeProgress}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Safety Badge */}
-      <div className="absolute top-24 right-4 z-10">
-        <div
-          className={`px-4 py-2 rounded-full shadow-lg font-bold text-white ${
-            routeSafety >= 7 ? "bg-green-600" : routeSafety >= 5 ? "bg-yellow-600" : "bg-red-600"
-          }`}
-        >
-          Safety: {routeSafety}/10
+      {/* Bottom Panel - Upcoming Instructions */}
+      <div className="absolute md:relative bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-slate-900/95 to-slate-900/80 md:bg-slate-900 backdrop-blur-sm pb-safe">
+        <div className="p-4 pb-6">
+          {/* Next Instructions */}
+          <div className="bg-white/10 rounded-xl p-3 backdrop-blur-md mb-3">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-white font-bold text-base">Upcoming Turns</h3>
+              
+              {/* Safety Badge */}
+              <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                routeSafety >= 7 ? 'bg-green-500 text-white' : 
+                routeSafety >= 5 ? 'bg-yellow-500 text-gray-900' : 
+                'bg-red-500 text-white'
+              }`}>
+                Safety: {parseFloat(routeSafety).toFixed(1)}/10
+              </div>
+            </div>
+            
+            <div className="space-y-1 max-h-24 overflow-y-auto">
+              {instructions.slice(currentInstructionIndex, currentInstructionIndex + 2).map((inst, idx) => (
+                <div 
+                  key={idx}
+                  className={`flex items-center space-x-2 p-2 rounded-lg ${
+                    idx === 0 ? 'bg-blue-500/30' : 'bg-white/5'
+                  }`}
+                >
+                  <div className="text-xl">
+                    {getInstructionIcon(inst.instruction)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-white text-xs">
+                      {inst.instruction || "Continue straight"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {instructions.length === 0 && (
+                <div className="text-white/60 text-xs text-center py-2">
+                  Follow the route on the map
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Exit Button */}
+          <button
+            onClick={exitNavigation}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg"
+          >
+            Exit Navigation
+          </button>
         </div>
       </div>
+
+      {/* Arrival Modal */}
+      {hasArrived && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-bounce">
+            <div className="text-6xl mb-4">🏁</div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">You've Arrived!</h2>
+            <p className="text-gray-600 mb-6">You have reached your destination</p>
+            <button
+              onClick={exitNavigation}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+            >
+              Finish Navigation
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
-
