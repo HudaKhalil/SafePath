@@ -844,6 +844,7 @@ export default function HazardReporting() {
                   <div className="text-xl font-bold text-red-600">111</div>
                   <div className="text-xs text-gray-600 mt-1">Medical advice</div>
                 </div>
+                
               </div>
             </div>
           </div>
