@@ -26,6 +26,16 @@
   background: #64748b;
 }
 
+/* Hide scrollbar for buddy cards horizontal scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
 /* COLORS THAT STAY THE SAME IN BOTH LIGHT AND DARK MODE */
 :root {
   /* BUTTONS, TEXT, ICONS will be same in both modes */
@@ -177,7 +187,7 @@ body {
   font-size: 3rem;
   font-weight: 700;
   color: var(--color-text-primary); 
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 @media (min-width: 768px) {
@@ -196,7 +206,7 @@ body {
   font-size: 1.25rem;
   font-weight: 500;
   color: var(--color-accent); 
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 @media (min-width: 768px) {

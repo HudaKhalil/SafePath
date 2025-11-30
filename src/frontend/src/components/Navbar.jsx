@@ -66,14 +66,15 @@ export default function Navbar() {
     >
       <div className="container mx-auto px-8 py-6 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
-          <div className="w-12 h-12 flex items-center justify-center">
+          <div className="w-12 h-12 flex items-center justify-center" title="SafePath - Navigate Safely">
             <img 
               src="/logo.png" 
               alt="SafePath Logo" 
               className="w-12 h-12 object-contain"
             />
           </div>
- <div style={{ color: '#f8fafc' }} className="font-bold text-2xl">SafePath</div>        </Link>
+          <div style={{ color: '#f8fafc' }} className="font-bold text-2xl hidden min-[425px]:block">SafePath</div>
+         </Link>
 
         <nav className="hidden md:flex gap-8 items-center font-bold">
           <ThemeToggle />
