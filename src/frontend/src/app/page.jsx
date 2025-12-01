@@ -167,12 +167,12 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch nearby hazards within 10km radius
+  // Fetch nearby hazards within 5km radius
   const fetchNearbyHazards = async (latitude, longitude) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
       console.log('🔍 Fetching hazards near:', latitude, longitude);
-      const response = await fetch(`${API_URL}/hazards/near/${latitude}/${longitude}?radius=10000&limit=100`, {
+      const response = await fetch(`${API_URL}/hazards/near/${latitude}/${longitude}?radius=5000&limit=100`, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -629,7 +629,7 @@ export default function Home() {
                     className="text-xs sm:text-sm"
                     style={{ color: isDark ? '#94a3b8' : '#64748b' }}
                   >
-                    Within 10km
+                    Within 5km
                   </p>
                 </div>
                 
@@ -978,7 +978,7 @@ export default function Home() {
                     className="text-xs sm:text-sm"
                     style={{ color: isDark ? '#94a3b8' : '#64748b' }}
                   >
-                    Within 10km
+                    Within 5km
                   </p>
                 </div>
                 
