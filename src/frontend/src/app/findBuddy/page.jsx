@@ -455,3 +455,524 @@ export default function FindBuddy() {
     }
     return null;
   };
+
+  const BuddyCard = ({ buddy, showActions = true }) => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow p-4 border border-gray-200 dark:border-gray-700">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+            {buddy.name ? buddy.name.substring(0, 2).toUpperCase() : buddy.buddy_name?.substring(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white">
+              {buddy.name || buddy.buddy_name || buddy.sender_name || buddy.receiver_name}
+            </h3>
+            <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+              <MapPin size={14} />
+              <span>{buddy.distance_km || '0'} km away</span>
+            </div>
+          </div>
+        </div>
+        {getStatusBadge(buddy)}
+      </div>
+
+      <div className="flex items-center gap-2 mb-3">
+        <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm capitalize">
+          {buddy.transport_mode || buddy.buddy_transport_mode || 'walking'}
+        </span>
+        {buddy.safety_priority !== undefined && (
+          <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm">
+            Safety: {(buddy.safety_priority * 100).toFixed(0)}%
+          </span>
+        )}
+      </div>
+
+      {showActions && (
+        <div className="flex gap-2 mt-4">
+          {!buddy.request_id && (
+            <button
+              onClick={() => sendBuddyRequest(buddy.id || buddy.buddy_id)}
+              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
+            >
+              Send Request
+            </button>
+          )}
+          {buddy.request_id && buddy.request_status === 'pending' && !buddy.is_sender && (
+            <>
+              <button
+                onClick={() => respondToRequest(buddy.request_id, 'accept')}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-sm"
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => respondToRequest(buddy.request_id, 'reject')}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors text-sm"
+              >
+                Reject
+              </button>
+            </>
+          )}
+          {(buddy.request_status === 'accepted' || buddy.buddy_id) && (
+            <button
+              onClick={() => {
+                setShowRoutePlanner(true);
+                setActiveTab('routes');
+              }}
+              className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
+            >
+              <Route size={16} />
+              Plan Route
+            </button>
+          )}
+          <button
+            onClick={() => setSelectedBuddy(buddy)}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors text-sm"
+          >
+            Profile
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        {/* Left Panel - Buddy List */}
+        <div className="w-full lg:w-1/3 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
+          {/* Header */}
+          <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-3 mb-4">
+              <Users className="text-blue-600" size={32} />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Find Buddies</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Connect & travel together</p>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={radius}
+                  onChange={(e) => setRadius(Number(e.target.value))}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                >
+                  <option value={1000}>1 km</option>
+                  <option value={2000}>2 km</option>
+                  <option value={5000}>5 km</option>
+                  <option value={10000}>10 km</option>
+                </select>
+
+                <select
+                  value={transportMode}
+                  onChange={(e) => setTransportMode(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                >
+                  <option value="all">All Modes</option>
+                  <option value="walking">Walking</option>
+                  <option value="cycling">Cycling</option>
+                  <option value="running">Running</option>
+                </select>
+              </div>
+
+              <button
+                onClick={() => {
+                  fetchNearbyBuddies();
+                  fetchPendingRequests();
+                  fetchAcceptedBuddies();
+                }}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Searching...' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab('nearby')}
+              className={`flex-1 px-4 py-3 text-sm font-medium ${
+                activeTab === 'nearby'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Nearby ({buddies.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`flex-1 px-4 py-3 text-sm font-medium ${
+                activeTab === 'pending'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Requests ({pendingRequests.filter(r => r.is_receiver).length})
+            </button>
+            <button
+              onClick={() => setActiveTab('accepted')}
+              className={`flex-1 px-4 py-3 text-sm font-medium ${
+                activeTab === 'accepted'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              My Buddies ({acceptedBuddies.length})
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('routes');
+                setShowRoutePlanner(true);
+              }}
+              className={`flex-1 px-4 py-3 text-sm font-medium ${
+                activeTab === 'routes'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Route size={16} className="inline mr-1" />
+              Routes
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 space-y-3">
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Nearby Tab */}
+            {activeTab === 'nearby' && (
+              <>
+                {isLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  </div>
+                ) : buddies.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="mx-auto text-gray-400 mb-2" size={48} />
+                    <p className="text-gray-600 dark:text-gray-400">No buddies found</p>
+                  </div>
+                ) : (
+                  buddies.map((buddy) => <BuddyCard key={buddy.id} buddy={buddy} />)
+                )}
+              </>
+            )}
+
+            {/* Pending Tab */}
+            {activeTab === 'pending' && (
+              <>
+                {pendingRequests.filter(r => r.is_receiver).length === 0 ? (
+                  <div className="text-center py-8">
+                    <Clock className="mx-auto text-gray-400 mb-2" size={48} />
+                    <p className="text-gray-600 dark:text-gray-400">No pending requests</p>
+                  </div>
+                ) : (
+                  pendingRequests
+                    .filter(r => r.is_receiver)
+                    .map((request) => (
+                      <BuddyCard
+                        key={request.id}
+                        buddy={{
+                          ...request,
+                          name: request.sender_name,
+                          email: request.sender_email,
+                          transport_mode: request.sender_transport_mode,
+                          request_id: request.id,
+                          request_status: 'pending',
+                          is_sender: false
+                        }}
+                      />
+                    ))
+                )}
+              </>
+            )}
+
+            {/* Accepted Tab */}
+            {activeTab === 'accepted' && (
+              <>
+                {acceptedBuddies.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircle className="mx-auto text-gray-400 mb-2" size={48} />
+                    <p className="text-gray-600 dark:text-gray-400">No connected buddies yet</p>
+                  </div>
+                ) : (
+                  acceptedBuddies.map((buddy) => <BuddyCard key={buddy.buddy_id} buddy={buddy} />)
+                )}
+              </>
+            )}
+
+            {/* Routes Tab */}
+            {activeTab === 'routes' && (
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                    <Navigation size={20} />
+                    Plan Your Route
+                  </h3>
+                  <div className="space-y-3">
+                    <AddressAutocompleteInput
+                      value={routeStart}
+                      onChange={setRouteStart}
+                      placeholder="Start location..."
+                    />
+                    <AddressAutocompleteInput
+                      value={routeEnd}
+                      onChange={setRouteEnd}
+                      placeholder="End location..."
+                    />
+                    <button
+                      onClick={searchRoute}
+                      disabled={isLoading || !routeStart || !routeEnd}
+                      className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Search size={16} />
+                      Find Route & Buddies
+                    </button>
+                  </div>
+                </div>
+
+                {/* Create Group Route Section */}
+                {showCreateGroupRoute && acceptedBuddies.length > 0 && (
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
+                      Create Group Route & Invite Buddies
+                    </h3>
+                    <input
+                      type="text"
+                      placeholder="Route name (optional)"
+                      value={routeName}
+                      onChange={(e) => setRouteName(e.target.value)}
+                      className="w-full px-3 py-2 mb-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Select buddies to invite:</p>
+                      {acceptedBuddies.map((buddy) => (
+                        <label key={buddy.buddy_id} className="flex items-center gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedBuddiesForRoute.includes(buddy.buddy_id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBuddiesForRoute([...selectedBuddiesForRoute, buddy.buddy_id]);
+                              } else {
+                                setSelectedBuddiesForRoute(selectedBuddiesForRoute.filter(id => id !== buddy.buddy_id));
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 rounded"
+                          />
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                              {buddy.buddy_name?.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span className="text-sm text-gray-900 dark:text-white">{buddy.buddy_name}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={createGroupRoute}
+                        disabled={selectedBuddiesForRoute.length === 0}
+                        className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                      >
+                        Create & Send Invites ({selectedBuddiesForRoute.length})
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCreateGroupRoute(false);
+                          setSelectedBuddiesForRoute([]);
+                        }}
+                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* My Group Routes */}
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
+                    My Group Routes ({groupRoutes.length})
+                  </h3>
+                  {groupRoutes.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <Route className="mx-auto text-gray-400 mb-2" size={48} />
+                      <p className="text-gray-600 dark:text-gray-400">No group routes yet</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Plan a route and invite buddies to get started!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {groupRoutes.map((route) => (
+                        <div key={route.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 dark:text-white">{route.route_name}</h4>
+                              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <MapPin size={14} className="text-green-600" />
+                                  <span>{route.start_address}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <MapPin size={14} className="text-red-600" />
+                                  <span>{route.end_address}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                              route.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                              route.status === 'completed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                              'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                            }`}>
+                              {route.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            <span className="flex items-center gap-1">
+                              <Users size={14} />
+                              {route.member_count} member{route.member_count !== 1 ? 's' : ''}
+                            </span>
+                            <span className="capitalize">{route.transport_mode}</span>
+                            {route.is_creator && (
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded">Creator</span>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            {!route.is_member && (
+                              <button
+                                onClick={() => joinGroupRoute(route.id)}
+                                className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                              >
+                                Join Route
+                              </button>
+                            )}
+                            {route.is_member && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(route.is_creator ? 'Cancel this route? All members will be removed.' : 'Leave this route?')) {
+                                    leaveGroupRoute(route.id);
+                                  }
+                                }}
+                                className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+                              >
+                                {route.is_creator ? 'Cancel Route' : 'Leave Route'}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                // View route details on map
+                                setRouteCoordinates({
+                                  start: { lat: route.start_lat, lon: route.start_lon },
+                                  end: { lat: route.end_lat, lon: route.end_lon }
+                                });
+                              }}
+                              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-sm font-medium transition-colors"
+                            >
+                              View on Map
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {routeBuddies.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
+                      Buddies on Your Route ({routeBuddies.length})
+                    </h3>
+                    {routeBuddies.map((buddy) => <BuddyCard key={buddy.id} buddy={buddy} />)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel - Map */}
+        <div className="hidden lg:block lg:w-2/3 relative">
+          {userLocation && (
+            <MapComponent
+              userLocation={userLocation}
+              buddies={activeTab === 'routes' ? routeBuddies : buddies}
+              route={selectedRoute}
+              routeCoordinates={routeCoordinates}
+            />
+          )}
+        </div>
+
+        {/* Profile Modal */}
+        {selectedBuddy && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedBuddy(null)}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-xl">
+                    {selectedBuddy.name?.substring(0, 2).toUpperCase() || 'UN'}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {selectedBuddy.name || selectedBuddy.buddy_name}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{selectedBuddy.email || selectedBuddy.buddy_email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedBuddy(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                  <MapPin size={18} />
+                  <span>{selectedBuddy.distance_km} km away</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm capitalize">
+                    {selectedBuddy.transport_mode || selectedBuddy.buddy_transport_mode || 'walking'}
+                  </span>
+                  {selectedBuddy.safety_priority !== undefined && (
+                    <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm">
+                      Safety Priority: {(selectedBuddy.safety_priority * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-2">
+                {!selectedBuddy.request_id && !selectedBuddy.buddy_id && (
+                  <button
+                    onClick={() => {
+                      sendBuddyRequest(selectedBuddy.id);
+                      setSelectedBuddy(null);
+                    }}
+                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Send Request
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedBuddy(null)}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </ProtectedRoute>
+  );
+}
