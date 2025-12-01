@@ -14,10 +14,25 @@ export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState(null)
+  const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {
     checkAuthStatus()
+    
+    // Track dark mode
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'))
+    }
+    checkDarkMode()
+    const observer = new MutationObserver(checkDarkMode)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
   }, [])
+
+  // Close hamburger menu when pathname changes (user navigates via bottom nav or any other means)
+  useEffect(() => {
+    setOpen(false)
+  }, [pathname])
 
   const checkAuthStatus = async () => {
     try {
@@ -73,8 +88,7 @@ export default function Navbar() {
               className="w-12 h-12 object-contain"
             />
           </div>
-          <div style={{ color: '#f8fafc' }} className="font-bold text-2xl hidden min-[425px]:block">SafePath</div>
-         </Link>
+ <div style={{ color: '#f8fafc' }} className="font-bold text-2xl hidden sm:block">SafePath</div>        </Link>
 
         <nav className="hidden md:flex gap-8 items-center font-bold">
           <ThemeToggle />
@@ -266,10 +280,56 @@ export default function Navbar() {
           }}
         >
           <nav className="flex flex-col gap-4 p-4">
-            <Link href="/" onClick={() => setOpen(false)} className="nav-link">Home</Link>
-            <Link href="/suggested-routes" onClick={() => setOpen(false)} className="nav-link">Suggested Routes</Link>
-            <Link href="/report-hazards" onClick={() => setOpen(false)} className="nav-link">Report Hazards</Link>
-            <Link href="/findBuddy" onClick={() => setOpen(false)} className="nav-link">Find Buddy</Link>
+            <Link 
+              href="/" 
+              onClick={() => setOpen(false)} 
+              className="transition-colors duration-200 text-base font-medium"
+              style={{ color: isDark ? '#06d6a0' : '#f8fafc' }}
+              onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
+            >
+              Home
+            </Link>
+            <Link 
+              href="/suggested-routes" 
+              onClick={() => setOpen(false)} 
+              className="transition-colors duration-200 text-base font-medium"
+              style={{ color: isDark ? '#06d6a0' : '#f8fafc' }}
+              onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
+            >
+              Suggested Routes
+            </Link>
+            <Link 
+              href="/report-hazards" 
+              onClick={() => setOpen(false)} 
+              className="transition-colors duration-200 text-base font-medium"
+              style={{ color: isDark ? '#06d6a0' : '#f8fafc' }}
+              onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
+            >
+              Report Hazards
+            </Link>
+            <Link 
+              href="/findBuddy" 
+              onClick={() => setOpen(false)} 
+              className="transition-colors duration-200 text-base font-medium"
+              style={{ color: isDark ? '#06d6a0' : '#f8fafc' }}
+              onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
+            >
+              Find Buddy
+            </Link>
+            <Link 
+              href="/privacy" 
+              onClick={() => setOpen(false)} 
+              className="transition-colors duration-200 text-base font-medium"
+              style={{ color: isDark ? '#06d6a0' : '#f8fafc' }}
+              onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
+            >
+              Privacy Policy
+            </Link>
 
             {isLoggedIn ? (
               <div 
@@ -328,7 +388,16 @@ export default function Navbar() {
                 className="pt-4 space-y-2"
                 style={{ borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}
               >
-                <Link href="/auth/login" onClick={() => setOpen(false)} className="block nav-link">Login</Link>
+                <Link 
+                  href="/auth/login" 
+                  onClick={() => setOpen(false)} 
+                  className="block transition-colors duration-200 text-base font-medium"
+                  style={{ color: isDark ? '#06d6a0' : '#f8fafc' }}
+                  onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+                  onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
+                >
+                  Login
+                </Link>
                 <Link 
                   href="/auth/signup" 
                   onClick={() => setOpen(false)}
