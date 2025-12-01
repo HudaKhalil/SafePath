@@ -5,6 +5,26 @@ import { usePathname } from "next/navigation";
 import { Home, Map, AlertTriangle, ParkingCircle, Users2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
+// Add style for fixed positioning with media queries
+if (typeof document !== 'undefined' && !document.getElementById('bottom-nav-styles')) {
+  const style = document.createElement('style');
+  style.id = 'bottom-nav-styles';
+  style.textContent = `
+    .bottom-nav-fixed {
+      position: fixed !important;
+      bottom: 0 !important;
+      top: auto !important;
+    }
+    @media (min-width: 768px) {
+      .bottom-nav-fixed {
+        top: 0 !important;
+        bottom: auto !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function Item({ icon: Icon, label, href, active, isDark }) {
   const activeColor = isDark ? '#06d6a0' : '#ffffff';
   const inactiveColor = isDark ? '#94a3b8' : '#64748b';
@@ -52,10 +72,11 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-1001 backdrop-blur border-t"
+      className="bottom-nav-fixed lg:hidden left-0 right-0 backdrop-blur md:border-b border-t md:border-t-0"
       role="navigation"
       aria-label="Primary"
       style={{
+        zIndex: 1001,
         backgroundColor: 'rgba(15, 23, 42, 0.95)',
         borderColor: isDark ? '#334155' : 'rgba(255, 255, 255, 0.1)'
       }}
