@@ -50,6 +50,24 @@ class WebSocketClient {
       console.log('✅ WebSocket connected:', this.socket.id);
       this.isConnected = true;
       this.reconnectAttempts = 0;
+
+      // Authenticate after connection
+      const token = Cookies.get('auth_token');
+      if (token) {
+        console.log('🔐 Authenticating WebSocket connection...');
+        this.socket.emit('authenticate', { token });
+      }
+    });
+
+    // Handle authentication response
+    this.socket.on('authenticated', (data) => {
+      console.log('✅ WebSocket authenticated:', data);
+      this.emit('authenticated', data);
+    });
+
+    this.socket.on('auth_error', (error) => {
+      console.error('❌ WebSocket authentication failed:', error);
+      this.emit('auth_error', error);
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -71,6 +89,17 @@ class WebSocketClient {
       console.warn('WebSocket error:', error?.message || error);
     });
 
+    // Subscription confirmation events
+    this.socket.on('subscribed', (data) => {
+      console.log('✅ Subscribed to hazard updates:', data);
+      this.emit('subscribed', data);
+    });
+
+    this.socket.on('unsubscribed', (data) => {
+      console.log('✅ Unsubscribed from hazard updates:', data);
+      this.emit('unsubscribed', data);
+    });
+
     // Hazard-specific events
     this.socket.on('nearby_hazards', (data) => {
       console.log('📍 Received nearby hazards:', data);
@@ -85,6 +114,11 @@ class WebSocketClient {
     this.socket.on('hazard_updated', (data) => {
       console.log('🔄 Hazard updated:', data);
       this.emit('hazard_updated', data);
+    });
+
+    this.socket.on('hazard_resolved', (data) => {
+      console.log('✅ Hazard resolved:', data);
+      this.emit('hazard_resolved', data);
     });
   }
 
@@ -135,6 +169,42 @@ class WebSocketClient {
   }
 
   /**
+   * Subscribe to hazard updates for a location
+   * @param {number} latitude - Location latitude
+   * @param {number} longitude - Location longitude
+   * @param {number} radius - Search radius in meters (default: 5000)
+   */
+  subscribeToHazards(latitude, longitude, radius = 5000) {
+    if (!this.socket?.connected) {
+      console.warn('Cannot subscribe: WebSocket not connected');
+      return false;
+    }
+
+    console.log(`📍 Subscribing to hazards at [${latitude}, ${longitude}] with radius ${radius}m`);
+
+    this.socket.emit('subscribe_hazard_updates', {
+      latitude,
+      longitude,
+      radius
+    });
+
+    return true;
+  }
+
+  /**
+   * Unsubscribe from hazard updates
+   */
+  unsubscribeFromHazards() {
+    if (!this.socket?.connected) {
+      return false;
+    }
+
+    this.socket.emit('unsubscribe_hazard_updates');
+    console.log('📍 Unsubscribed from hazard updates');
+    return true;
+  }
+
+  /**
    * Send user position to get nearby hazards
    * @param {number} latitude - User latitude
    * @param {number} longitude - User longitude
@@ -147,7 +217,7 @@ class WebSocketClient {
     }
 
     console.log(`📍 Sending position: ${latitude}, ${longitude} (radius: ${radius}m)`);
-    
+
     this.socket.emit('user_position', {
       latitude,
       longitude,

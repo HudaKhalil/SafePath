@@ -1,6 +1,5 @@
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -10,6 +9,7 @@ require('dotenv').config();
 // Import database connection
 const db = require('./config/database');
 const csvDataLoader = require('./lib/csvDataLoader');
+const websocketService = require('./lib/websocketService');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -126,49 +126,14 @@ const startServer = async () => {
     
     // Create HTTP server
     const server = http.createServer(app);
-    
-    // Setup Socket.IO for real-time features
-    const io = new Server(server, {
-      cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-        methods: ['GET', 'POST'],
-        credentials: true
-      }
-    });
-    
-    // WebSocket connection handling
-    io.on('connection', (socket) => {
-      console.log('🔌 Client connected:', socket.id);
-      
-      // Handle hazard subscriptions
-      socket.on('subscribe_hazards', (data) => {
-        const { latitude, longitude, radius } = data;
-        socket.join(`hazards_${latitude}_${longitude}`);
-        console.log(`📍 Client ${socket.id} subscribed to hazards at [${latitude}, ${longitude}]`);
-      });
-      
-      socket.on('unsubscribe_hazards', () => {
-        socket.rooms.forEach(room => {
-          if (room.startsWith('hazards_')) {
-            socket.leave(room);
-          }
-        });
-        console.log(`📍 Client ${socket.id} unsubscribed from hazards`);
-      });
-      
-      socket.on('user_position', (data) => {
-        const { latitude, longitude, radius } = data;
-        // Broadcast nearby hazards (this would query database in production)
-        socket.emit('nearby_hazards', { hazards: [] });
-      });
-      
-      socket.on('disconnect', () => {
-        console.log('🔌 Client disconnected:', socket.id);
-      });
-    });
-    
-    // Make io available to routes
-    app.set('io', io);
+
+    // Initialize WebSocket service for real-time hazard alerts
+    console.log('🔌 Initializing WebSocket service...');
+    websocketService.initialize(server);
+    console.log('✅ WebSocket service initialized with authentication');
+
+    // Make websocket service available to routes (optional, already imported where needed)
+    app.set('websocketService', websocketService);
     
     server.listen(PORT, () => {
       console.log(`🚀 London Safety Routing API server running on port ${PORT}`);
