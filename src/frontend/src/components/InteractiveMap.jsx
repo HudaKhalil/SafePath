@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { LOCATION_CONFIG } from "../lib/locationConfig";
 
 // ---- default markers fix (production) ----
 delete L.Icon.Default.prototype._getIconUrl;
@@ -52,7 +53,7 @@ const createCustomIcon = (color, size = [25, 41]) =>
   });
 
 const originIcon = createCustomIcon("#10B981"); // green
-const destinationIcon = createCustomIcon("#EF4444"); // red
+const destinationIcon = createCustomIcon("#eab308"); // yellow
 const riskAreaIcon = createCustomIcon("#F59E0B", [20, 32]); // orange small
 
 // ---- map click handler ----
@@ -71,6 +72,126 @@ function MapEventHandler({ onLocationSelect }) {
   return null;
 }
 
+// ---- current location control ----
+function CurrentLocationControl() {
+  const map = useMap();
+  const [locating, setLocating] = useState(false);
+  const [userMarker, setUserMarker] = useState(null);
+
+  const handleLocate = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const latlng = [latitude, longitude];
+        
+        // Move map to user location
+        map.flyTo(latlng, 15, {
+          animate: true,
+          duration: 1.5
+        });
+
+        // Remove old marker if exists
+        if (userMarker) {
+          map.removeLayer(userMarker);
+        }
+
+        // Add blue circle marker for user location
+        const marker = L.circleMarker(latlng, {
+          radius: 8,
+          fillColor: '#4285F4',
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8
+        }).addTo(map);
+
+        // Add accuracy circle
+        const accuracyCircle = L.circle(latlng, {
+          radius: position.coords.accuracy,
+          fillColor: '#4285F4',
+          fillOpacity: 0.1,
+          color: '#4285F4',
+          weight: 1
+        }).addTo(map);
+
+        marker.bindPopup('<div class="text-sm font-medium">You are here</div>').openPopup();
+        
+        setUserMarker(marker);
+        setLocating(false);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        alert('Unable to retrieve your location. Please check location permissions.');
+        setLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Create custom control
+    const LocationControl = L.Control.extend({
+      onAdd: function() {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
+        container.style.backgroundColor = 'white';
+        container.style.width = '40px';
+        container.style.height = '40px';
+        container.style.cursor = 'pointer';
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.justifyContent = 'center';
+        container.style.borderRadius = '4px';
+        container.style.boxShadow = '0 1px 5px rgba(0,0,0,0.2)';
+        container.title = 'Go to current location';
+        
+        container.innerHTML = '<svg style="width: 20px; height: 20px; color: #374151;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"></path></svg>';
+        
+        container.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleLocate();
+        };
+        
+        L.DomEvent.disableClickPropagation(container);
+        
+        return container;
+      }
+    });
+
+    const control = new LocationControl({ position: 'topright' });
+    control.addTo(map);
+
+    return () => {
+      try {
+        map.removeControl(control);
+      } catch (e) {
+        // Control might already be removed
+      }
+      if (userMarker) {
+        try {
+          map.removeLayer(userMarker);
+        } catch (e) {
+          // Marker might already be removed
+        }
+      }
+    };
+  }, [map]);
+
+  return null;
+}
+
 // ---- color by safety score ----
 const getRouteColor = (s) => {
   if ((s ?? 0) >= 80) return "#10B981"; // safe
@@ -79,7 +200,7 @@ const getRouteColor = (s) => {
 };
 
 export default function InteractiveMap({
-  center = [53.3498, -6.2603], // Dublin default
+  center = LOCATION_CONFIG.DEFAULT_CENTER, // London default
   routes = [],
   selectedRoute = null,
   onLocationSelect,
@@ -121,7 +242,7 @@ export default function InteractiveMap({
   }, [selectedRoute, center]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative z-10">
       <MapContainer
         center={center}
         zoom={13}
@@ -137,6 +258,7 @@ export default function InteractiveMap({
         />
 
         <MapEventHandler onLocationSelect={onLocationSelect} />
+        <CurrentLocationControl />
 
         {routes.map((route, idx) => {
           if (!route.coordinates?.length) return null;
@@ -231,8 +353,8 @@ export default function InteractiveMap({
         ))}
       </MapContainer>
 
-      {/* legend */}
-      <div className="absolute top-4 right-4 z-[1000]">
+      {/* legend - moved down to avoid overlap with location button */}
+      <div className="absolute top-20 right-4 z-[1000]">
         <div className="bg-white rounded-lg shadow-md p-2">
           <div className="text-xs text-gray-600 mb-2">Legend</div>
           <div className="space-y-1 text-xs">
