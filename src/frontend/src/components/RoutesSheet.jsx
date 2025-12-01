@@ -306,9 +306,17 @@ export default function RoutesSheet({
               </button>
               <h2 
                 className="text-2xl md:text-3xl font-bold transition-colors cursor-pointer" 
-                style={{ color: isDark ? '#06d6a0' : '#1e293b' }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
-                onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#06d6a0' : '#1e293b'}
+                style={typeof title === 'string' ? { color: isDark ? '#06d6a0' : '#1e293b' } : {}}
+                onMouseEnter={(e) => {
+                  if (typeof title === 'string') {
+                    e.currentTarget.style.color = '#06d6a0';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (typeof title === 'string') {
+                    e.currentTarget.style.color = isDark ? '#06d6a0' : '#1e293b';
+                  }
+                }}
               >
                 {title}
               </h2>

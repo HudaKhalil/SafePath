@@ -49,6 +49,7 @@ export default function HazardReporting() {
     longitude: '',
     affectsTraffic: false,
     weatherRelated: false
+    
   })
 
   // Define all callbacks first before useEffect
