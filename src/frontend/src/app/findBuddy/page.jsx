@@ -1,336 +1,457 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import ProtectedRoute from '../../components/auth/ProtectedRoute';
+import AddressAutocompleteInput from '../../components/AddressAutocompleteInput';
+import { Users, MapPin, MessageCircle, CheckCircle, Clock, X, Route, Search, Filter, Navigation } from 'lucide-react';
+
+// Dynamic import for map to avoid SSR issues
+const MapComponent = dynamic(() => import('../../components/BuddyMap'), { ssr: false });
+
+const API_URL = 'http://localhost:5001';
+
 export default function FindBuddy() {
-  const buddies = [
-    { 
-      initials: 'AM', 
-      name: 'Alex M.', 
-      type: 'Cyclist', 
-      rating: '4.5', 
-      location: 'Central London • Regular Commuter',
-      routes: ['Kings Cross → London Bridge', 'Camden → City of London'],
-      available: ['Mon-Fri', 'Morning', 'Evening'],
-      lastActive: '2 hours ago'
-    },
-    { 
-      initials: 'SJ', 
-      name: 'Sarah J.', 
-      type: 'Pedestrian', 
-      rating: '4.7', 
-      location: 'East London • Student',
-      routes: ['Victoria Park → Mile End', 'Canary Wharf → Greenwich'],
-      available: ['Tue-Thu', 'Afternoon', 'Weekend'],
-      lastActive: '1 hour ago'
-    },
-    { 
-      initials: 'MR', 
-      name: 'Mike R.', 
-      type: 'Cyclist', 
-      rating: '4.5', 
-      location: 'West London • Professional',
-      routes: ['Hammersmith → Westminster', 'Kensington → Paddington'],
-      available: ['Daily', 'Morning'],
-      lastActive: '30 minutes ago'
-    },
-    { 
-      initials: 'LT', 
-      name: 'Lisa T.', 
-      type: 'Pedestrian', 
-      rating: '5.0', 
-      location: 'South London • Fitness Enthusiast',
-      routes: ['Clapham → Waterloo', 'Brixton → London Bridge'],
-      available: ['Mon-Fri', 'Evening'],
-      lastActive: '45 minutes ago'
-    },
-    { 
-      initials: 'JK', 
-      name: 'James K.', 
-      type: 'Cyclist', 
-      rating: '4.6', 
-      location: 'North London • Night Shift Worker',
-      routes: ['Islington → King\'s Cross', 'Highbury → Arsenal'],
-      available: ['Mon-Fri', 'Night'],
-      lastActive: '3 hours ago'
-    },
-    { 
-      initials: 'EM', 
-      name: 'Emma M.', 
-      type: 'Pedestrian', 
-      rating: '4.9', 
-      location: 'Central London • Tourist Guide',
-      routes: ['Covent Garden → Tower Bridge', 'Westminster → St. Paul\'s'],
-      available: ['Weekend', 'Afternoon'],
-      lastActive: '1 hour ago'
+  // State management
+  const [activeTab, setActiveTab] = useState('nearby'); // nearby, pending, accepted, routes
+  const [buddies, setBuddies] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [acceptedBuddies, setAcceptedBuddies] = useState([]);
+  const [radius, setRadius] = useState(5000);
+  const [transportMode, setTransportMode] = useState('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedBuddy, setSelectedBuddy] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  
+  // Route planning state
+  const [showRoutePlanner, setShowRoutePlanner] = useState(false);
+  const [routeStart, setRouteStart] = useState('');
+  const [routeEnd, setRouteEnd] = useState('');
+  const [routeBuddies, setRouteBuddies] = useState([]);
+  const [selectedRoute, setSelectedRoute] = useState(null);
+  const [routeCoordinates, setRouteCoordinates] = useState(null);
+  const [selectedBuddiesForRoute, setSelectedBuddiesForRoute] = useState([]);
+  const [groupRoutes, setGroupRoutes] = useState([]);
+  const [routeName, setRouteName] = useState('');
+  const [showCreateGroupRoute, setShowCreateGroupRoute] = useState(false);
+
+  const getToken = () => {
+    if (typeof window !== 'undefined') {
+      return document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
     }
-  ]
+    return null;
+  };
 
-  return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-dark via-primary to-slate-700 py-24">
-        {/* Decorative Circles */}
-        <div className="absolute top-20 left-10 w-20 h-20 bg-accent/20 rounded-full"></div>
-        <div className="absolute top-40 right-20 w-32 h-32 bg-accent/10 rounded-full"></div>
-        <div className="absolute bottom-20 left-1/4 w-16 h-16 bg-accent/15 rounded-full"></div>
-        <div className="absolute bottom-40 right-1/3 w-24 h-24 bg-accent/20 rounded-full"></div>
-        
-        <div className="relative container mx-auto px-6 text-center">
-          <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-8">
-            <span className="text-2xl text-primary-dark">👥</span>
-          </div>
-          
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">
-            Find Your Perfect
-          </h1>
-          <h2 className="text-5xl md:text-6xl font-bold text-accent mb-8">
-            Travel Buddy
-          </h2>
-          <p className="text-xl text-text-secondary max-w-2xl mx-auto mb-12">
-            Connect with people and make your journeys safer, more fun, and meaningful
-          </p>
+  // Get user location
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lon: longitude });
+        updateUserLocation(latitude, longitude);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        setUserLocation({ lat: 51.5074, lon: -0.1276 });
+      }
+    );
+  }, []);
 
-          {/* Feature Cards */}
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <div className="bg-primary/60 backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center">
-              <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-accent">🛡️</span>
-              </div>
-              <h3 className="font-bold text-white mb-2">Enhanced Safety</h3>
-              <p className="text-sm text-text-secondary">Travel with verified companions for peace of mind on every journey</p>
-            </div>
+  const updateUserLocation = async (lat, lon) => {
+    try {
+      const token = getToken();
+      await fetch(`${API_URL}/api/buddies/my-profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({ lat, lon, transport_mode: transportMode !== 'all' ? transportMode : 'walking' })
+      });
+    } catch (error) {
+      console.error('Error updating location:', error);
+    }
+  };
 
-            <div className="bg-primary/60 backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center">
-              <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-accent">💚</span>
-              </div>
-              <h3 className="font-bold text-white mb-2">Build Connections</h3>
-              <p className="text-sm text-text-secondary">Meet like-minded people and create lasting friendships through shared journeys</p>
-            </div>
+  const fetchNearbyBuddies = async () => {
+    if (!userLocation) return;
+    
+    setIsLoading(true);
+    setError(null);
 
-            <div className="bg-primary/60 backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center">
-              <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-accent">👥</span>
-              </div>
-              <h3 className="font-bold text-white mb-2">Explore Together</h3>
-              <p className="text-sm text-text-secondary">Discover new routes and hidden gems with local companions</p>
-            </div>
-          </div>
-        </div>
-      </section>
+    try {
+      const token = getToken();
+      const params = new URLSearchParams({
+        radius: radius.toString(),
+        limit: '50'
+      });
 
-      {/* Search Filters */}
-      <section className="bg-white py-8">
-        <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto bg-white border-2 border-gray-200 rounded-2xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-blue-600">🔍</span>
-              <h3 className="text-xl font-bold text-primary-dark">Find Your Perfect Travel Buddy</h3>
-            </div>
-            
-            <div className="grid md:grid-cols-4 gap-4 items-end">
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  <span className="text-gray-500">🚶</span>
-                  Transport Mode
-                </label>
-                <select className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900">
-                  <option>All Modes</option>
-                  <option>Pedestrian</option>
-                  <option>Cyclist</option>
-                </select>
-              </div>
+      if (transportMode !== 'all') {
+        params.append('transport_mode', transportMode);
+      }
 
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  <span className="text-gray-500">🏢</span>
-                  Area/Borough
-                </label>
-                <select className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900">
-                  <option>All Areas</option>
-                  <option>Central London</option>
-                  <option>East London</option>
-                  <option>West London</option>
-                  <option>North London</option>
-                  <option>South London</option>
-                </select>
-              </div>
+      const response = await fetch(`${API_URL}/api/buddies/nearby?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
 
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  <span className="text-gray-500">⏰</span>
-                  Time Preference
-                </label>
-                <select className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent text-gray-900">
-                  <option>Any Time</option>
-                  <option>Morning</option>
-                  <option>Afternoon</option>
-                  <option>Evening</option>
-                  <option>Night</option>
-                </select>
-              </div>
+      const data = await response.json();
+      if (data.success) {
+        setBuddies(data.data.buddies);
+      } else {
+        setError(data.message || 'Failed to fetch buddies');
+      }
+    } catch (error) {
+      console.error('Error fetching buddies:', error);
+      setError('Failed to connect to server');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-              <div>
-                <button className="w-full bg-accent hover:bg-accent/90 text-primary-dark font-bold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2">
-                  🔍 Find Buddies
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+  const fetchPendingRequests = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/requests?status=pending`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
 
-      {/* Available Travel Buddies */}
-      <section className="bg-white py-12">
-        <div className="container mx-auto px-6">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold text-primary-dark">Available Travel Buddies</h2>
-            <div className="text-sm text-gray-600">12 buddies found in your area</div>
-          </div>
+      const data = await response.json();
+      if (data.success) {
+        setPendingRequests(data.data.requests);
+      }
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+    }
+  };
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {buddies.map((buddy) => (
-              <div key={buddy.initials} className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-primary-dark font-bold">
-                      {buddy.initials}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-primary-dark">{buddy.name}</h4>
-                      <div className="text-sm text-gray-600">{buddy.type} • ⭐ {buddy.rating}</div>
-                    </div>
-                  </div>
-                </div>
+  const fetchAcceptedBuddies = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/accepted`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
 
-                <div className="text-sm text-gray-600 mb-4">{buddy.location}</div>
+      const data = await response.json();
+      if (data.success) {
+        setAcceptedBuddies(data.data.buddies);
+      }
+    } catch (error) {
+      console.error('Error fetching accepted buddies:', error);
+    }
+  };
 
-                <div className="mb-4">
-                  <div className="text-sm font-medium text-gray-700 mb-2">Preferred Routes:</div>
-                  <ul className="text-xs text-gray-600 space-y-1">
-                    {buddy.routes.map((route, index) => (
-                      <li key={index} className="flex items-center gap-1">
-                        <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                        {route}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+  const sendBuddyRequest = async (receiverId) => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          receiver_id: receiverId,
+          message: 'Hey! Would you like to be travel buddies?'
+        })
+      });
 
-                <div className="mb-4">
-                  <div className="text-sm font-medium text-gray-700 mb-2">Available:</div>
-                  <div className="flex gap-1 flex-wrap">
-                    {buddy.available.map((time, index) => (
-                      <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                        {time}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+      const data = await response.json();
+      if (data.success) {
+        alert('Buddy request sent!');
+        fetchNearbyBuddies();
+        fetchPendingRequests();
+      } else {
+        alert(data.message || 'Failed to send request');
+      }
+    } catch (error) {
+      console.error('Error sending request:', error);
+      alert('Failed to send request');
+    }
+  };
 
-                <div className="flex items-center gap-1 text-xs text-gray-500 mb-4">
-                  <span>⏰</span>
-                  <span>Last active: {buddy.lastActive}</span>
-                </div>
+  const respondToRequest = async (requestId, action) => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/requests/${requestId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({ action })
+      });
 
-                <button className="w-full bg-primary-dark hover:bg-primary text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2">
-                  � Connect
-                </button>
-              </div>
-            ))}
-          </div>
+      const data = await response.json();
+      if (data.success) {
+        fetchPendingRequests();
+        fetchAcceptedBuddies();
+        fetchNearbyBuddies();
+        if (action === 'accept') {
+          alert('Buddy request accepted! You can now plan routes together.');
+        }
+      } else {
+        alert(data.message || `Failed to ${action} request`);
+      }
+    } catch (error) {
+      console.error('Error responding to request:', error);
+      alert(`Failed to ${action} request`);
+    }
+  };
 
-          <div className="text-center">
-            <button className="bg-accent hover:bg-accent/90 text-primary-dark font-bold py-3 px-8 rounded-lg transition-all duration-200">
-              Load More Buddies
-            </button>
-          </div>
-        </div>
-      </section>
+  // Route planning functions
+  const searchRoute = async () => {
+    if (!routeStart || !routeEnd) {
+      alert('Please enter both start and end locations');
+      return;
+    }
 
-      {/* Safety Tips Section */}
-      <section className="py-16">
-        <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto bg-gradient-to-r from-accent to-blue-500 rounded-3xl p-12 text-center">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-2xl text-white">🛡️</span>
-            </div>
-            
-            <h2 className="text-3xl font-bold text-white mb-4">Travel Buddy Safety Tips</h2>
-            <p className="text-xl text-white/90 mb-8">Stay safe while exploring together</p>
+    setIsLoading(true);
+    try {
+      // Geocode addresses
+      const startGeo = await geocodeAddress(routeStart);
+      const endGeo = await geocodeAddress(routeEnd);
 
-            <div className="grid md:grid-cols-2 gap-8 text-left">
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl">📱</span>
-                  <h3 className="text-xl font-bold text-white">Before Meeting</h3>
-                </div>
-                <ul className="space-y-2 text-white/90 text-sm">
-                  <li className="flex items-center gap-2">
-                    <span className="w-1 h-1 bg-white rounded-full"></span>
-                    Always share route details with your buddy beforehand
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1 h-1 bg-white rounded-full"></span>
-                    Meet in a public, well-lit location first
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1 h-1 bg-white rounded-full"></span>
-                    Check their profile and reviews from other users
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1 h-1 bg-white rounded-full"></span>
-                    Trust your instincts - if something feels off, don't go
-                  </li>
-                </ul>
-              </div>
+      if (!startGeo || !endGeo) {
+        alert('Could not find one or more locations');
+        return;
+      }
 
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl">🚶</span>
-                  <h3 className="text-xl font-bold text-white">During Travel</h3>
-                </div>
-                <ul className="space-y-2 text-white/90 text-sm">
-                  <li className="flex items-center gap-2">
-                    <span className="w-1 h-1 bg-white rounded-full"></span>
-                    Use reflective gear and lights during night travel
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1 h-1 bg-white rounded-full"></span>
-                    Stay together and maintain communication
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1 h-1 bg-white rounded-full"></span>
-                    Stick to well-known and safe routes
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1 h-1 bg-white rounded-full"></span>
-                    Keep emergency contacts handy on your phone
-                  </li>
-                </ul>
-              </div>
-            </div>
+      // Get route
+      const route = await getRoute(startGeo, endGeo, transportMode !== 'all' ? transportMode : 'walking');
+      setSelectedRoute(route);
+      setRouteCoordinates({ start: startGeo, end: endGeo });
 
-            <button className="mt-8 bg-white/20 hover:bg-white/30 text-white border-2 border-white/30 font-bold py-3 px-8 rounded-lg transition-all duration-200">
-              ⚠️ Report Any Safety Issues
-            </button>
-          </div>
-        </div>
-      </section>
+      // Find buddies on similar routes
+      await findRouteBuddies(startGeo, endGeo);
+      
+      // Show option to create group route
+      setShowCreateGroupRoute(true);
+    } catch (error) {
+      console.error('Error planning route:', error);
+      alert('Failed to plan route');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      {/* Bottom CTA */}
-      <section className="bg-white py-16">
-        <div className="container mx-auto px-6 text-center">
-          <h2 className="text-4xl font-bold text-primary-dark mb-4">Ready to Find Your Travel Buddy?</h2>
-          <p className="text-xl text-gray-600 mb-8">Join our growing community of safety-conscious travelers</p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="bg-accent hover:bg-accent/90 text-primary-dark font-bold py-4 px-8 rounded-lg transition-all duration-200 flex items-center justify-center gap-2">
-              👤 Create Your Profile
-            </button>
-            <button className="bg-primary-dark hover:bg-primary text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 flex items-center justify-center gap-2">
-              🗺️ Plan a Route First
-            </button>
-          </div>
-        </div>
-      </section>
-    </div>
-  )
-}
+  const geocodeAddress = async (address) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`
+      );
+      const data = await response.json();
+      if (data && data.length > 0) {
+        return { 
+          lat: parseFloat(data[0].lat), 
+          lon: parseFloat(data[0].lon),
+          display_name: data[0].display_name 
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      return null;
+    }
+  };
+
+  const getRoute = async (start, end, mode) => {
+    try {
+      const response = await fetch(`${API_URL}/api/routes/find`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          fromLat: start.lat,
+          fromLon: start.lon,
+          toLat: end.lat,
+          toLon: end.lon,
+          mode: mode
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Return the safest route for display
+        return data.data.safest || data.data.fastest;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting route:', error);
+      return null;
+    }
+  };
+
+  const findRouteBuddies = async (start, end) => {
+    try {
+      const token = getToken();
+      const params = new URLSearchParams({
+        start_lat: start.lat.toString(),
+        start_lon: start.lon.toString(),
+        end_lat: end.lat.toString(),
+        end_lon: end.lon.toString(),
+        radius: '2000' // 2km radius around start/end points
+      });
+
+      const response = await fetch(`${API_URL}/api/buddies/route-buddies?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setRouteBuddies(data.data.buddies);
+      }
+    } catch (error) {
+      console.error('Error finding route buddies:', error);
+    }
+  };
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  useEffect(() => {
+    if (userLocation) {
+      fetchNearbyBuddies();
+      fetchPendingRequests();
+      fetchAcceptedBuddies();
+      fetchGroupRoutes();
+    }
+  }, [userLocation, radius, transportMode]);
+
+  const fetchGroupRoutes = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/group-routes`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (data.success) {
+        setGroupRoutes(data.data.routes);
+      }
+    } catch (error) {
+      console.error('Error fetching group routes:', error);
+    }
+  };
+
+  const createGroupRoute = async () => {
+    if (!routeCoordinates || selectedBuddiesForRoute.length === 0) {
+      setError('Please select at least one buddy to invite');
+      return;
+    }
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/group-routes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          route_name: routeName || `Route to ${routeEnd}`,
+          start_lat: routeCoordinates.start.lat,
+          start_lon: routeCoordinates.start.lon,
+          end_lat: routeCoordinates.end.lat,
+          end_lon: routeCoordinates.end.lon,
+          start_address: routeStart,
+          end_address: routeEnd,
+          transport_mode: transportMode !== 'all' ? transportMode : 'walking',
+          buddy_ids: selectedBuddiesForRoute
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setError(null);
+        setShowCreateGroupRoute(false);
+        setSelectedBuddiesForRoute([]);
+        setRouteName('');
+        await fetchGroupRoutes();
+        alert('Group route created and invitations sent!');
+      } else {
+        setError(data.message || 'Failed to create group route');
+      }
+    } catch (error) {
+      console.error('Error creating group route:', error);
+      setError('Failed to create group route');
+    }
+  };
+
+  const joinGroupRoute = async (routeId) => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/group-routes/${routeId}/join`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchGroupRoutes();
+        alert('Successfully joined the route!');
+      } else {
+        setError(data.message || 'Failed to join route');
+      }
+    } catch (error) {
+      console.error('Error joining route:', error);
+      setError('Failed to join route');
+    }
+  };
+
+  const leaveGroupRoute = async (routeId) => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/group-routes/${routeId}/leave`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchGroupRoutes();
+        alert(data.message || 'Left the route successfully');
+      } else {
+        setError(data.message || 'Failed to leave route');
+      }
+    } catch (error) {
+      console.error('Error leaving route:', error);
+      setError('Failed to leave route');
+    }
+  };
+
+  const getStatusBadge = (buddy) => {
+    if (buddy.request_id) {
+      if (buddy.request_status === 'pending') {
+        return buddy.is_sender ? (
+          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">Pending</span>
+        ) : (
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Respond</span>
+        );
+      } else if (buddy.request_status === 'accepted') {
+        return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full flex items-center gap-1"><CheckCircle size={12} /> Connected</span>;
+      }
+    }
+    return null;
+  };
