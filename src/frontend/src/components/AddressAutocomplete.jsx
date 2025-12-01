@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { debounce } from 'lodash'
 import { geocodingService } from '../lib/services'
 import { LOCATION_CONFIG } from '../lib/locationConfig'
@@ -9,7 +9,26 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
   const [suggestions, setSuggestions] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isDark, setIsDark] = useState(false)
   const debounceRef = useRef(null)
+
+  // Dark mode detection
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const isDarkMode = document.documentElement.classList.contains('dark')
+      setIsDark(isDarkMode)
+    }
+
+    checkDarkMode()
+
+    const observer = new MutationObserver(checkDarkMode)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   // Enhanced search function that tries backend first, then fallback to direct Nominatim
   const searchAddress = async (query) => {
@@ -233,11 +252,18 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full p-4 rounded-lg border-2 focus:outline-none focus:border-accent text-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-slate-400"
+          className="w-full p-4 rounded-lg border-2 focus:outline-none text-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-slate-400"
           style={{
             backgroundColor: 'var(--bg-card)',
             borderColor: 'var(--border-color)',
-            color: 'var(--color-text-primary)'
+            color: 'var(--color-text-primary)',
+            '--tw-ring-color': isDark ? '#06d6a0' : '#1e293b'
+          }}
+          onFocusCapture={(e) => {
+            e.target.style.borderColor = isDark ? '#06d6a0' : '#1e293b'
+          }}
+          onBlurCapture={(e) => {
+            e.target.style.borderColor = 'var(--border-color)'
           }}
           autoComplete="off"
         />

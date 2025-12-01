@@ -411,6 +411,15 @@ export default function NavigationClient() {
     if (synthesisRef.current) {
       synthesisRef.current.cancel();
     }
+    
+    // Save navigation state to preserve route when returning
+    try {
+      sessionStorage.setItem('returning_from_navigation', 'true');
+      sessionStorage.setItem('last_navigation_route_id', routeId);
+    } catch (error) {
+      console.error("Error saving navigation state:", error);
+    }
+    
     router.push("/suggested-routes");
   };
 
