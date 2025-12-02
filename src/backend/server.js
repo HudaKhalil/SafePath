@@ -126,14 +126,12 @@ const startServer = async () => {
     
     // Create HTTP server
     const server = http.createServer(app);
-
-    // Initialize WebSocket service for real-time hazard alerts
-    console.log('🔌 Initializing WebSocket service...');
-    websocketService.initialize(server);
-    console.log('✅ WebSocket service initialized with authentication');
-
-    // Make websocket service available to routes (optional, already imported where needed)
-    app.set('websocketService', websocketService);
+    
+    // Initialize WebSocket service with authentication and all event handlers
+    const io = websocketService.initialize(server);
+    
+    // Make io available to routes
+    app.set('io', io);
     
     server.listen(PORT, () => {
       console.log(`🚀 London Safety Routing API server running on port ${PORT}`);

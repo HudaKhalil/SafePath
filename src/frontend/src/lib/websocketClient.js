@@ -120,6 +120,17 @@ class WebSocketClient {
       console.log('✅ Hazard resolved:', data);
       this.emit('hazard_resolved', data);
     });
+
+    // Navigation events
+    this.socket.on('navigation_started', (data) => {
+      console.log('🧭 Navigation started:', data);
+      this.emit('navigation_started', data);
+    });
+
+    this.socket.on('navigation_ended', (data) => {
+      console.log('🏁 Navigation ended:', data);
+      this.emit('navigation_ended', data);
+    });
   }
 
   /**
@@ -223,6 +234,73 @@ class WebSocketClient {
       longitude,
       radius
     });
+  }
+
+  /**
+   * Start navigation session
+   * @param {string} routeId - Route identifier
+   * @param {string} routeName - Route name
+   * @param {object} startLocation - Start location coordinates {latitude, longitude}
+   * @param {object} endLocation - End location coordinates {latitude, longitude}
+   */
+  startNavigation(routeId, routeName, startLocation, endLocation) {
+    if (!this.socket?.connected) {
+      console.warn('Cannot start navigation: WebSocket not connected');
+      return false;
+    }
+
+    console.log(`🧭 Starting navigation for route ${routeId}`);
+
+    this.socket.emit('start_navigation', {
+      routeId,
+      routeName,
+      startLocation,
+      endLocation
+    });
+
+    return true;
+  }
+
+  /**
+   * Send navigation progress update
+   * @param {object} currentPosition - Current position {latitude, longitude}
+   * @param {number} remainingDistance - Remaining distance in meters
+   * @param {number} estimatedTimeRemaining - Estimated time remaining in seconds
+   */
+  updateNavigationProgress(currentPosition, remainingDistance, estimatedTimeRemaining) {
+    if (!this.socket?.connected) {
+      console.warn('Cannot update navigation: WebSocket not connected');
+      return false;
+    }
+
+    this.socket.emit('navigation_progress', {
+      currentPosition,
+      remainingDistance,
+      estimatedTimeRemaining
+    });
+
+    return true;
+  }
+
+  /**
+   * End navigation session
+   * @param {string} reason - Reason for ending ('completed', 'cancelled', 'interrupted')
+   * @param {object} finalPosition - Final position {latitude, longitude}
+   */
+  endNavigation(reason = 'completed', finalPosition = null) {
+    if (!this.socket?.connected) {
+      console.warn('Cannot end navigation: WebSocket not connected');
+      return false;
+    }
+
+    console.log(`🏁 Ending navigation: ${reason}`);
+
+    this.socket.emit('end_navigation', {
+      reason,
+      finalPosition
+    });
+
+    return true;
   }
 
   /**

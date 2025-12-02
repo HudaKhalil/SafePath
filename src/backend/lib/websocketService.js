@@ -77,6 +77,19 @@ class WebSocketService {
         this.unsubscribeFromHazards(socket);
       });
 
+      // Navigation events with authentication
+      socket.on('start_navigation', (data) => {
+        this.handleStartNavigation(socket, data);
+      });
+
+      socket.on('navigation_progress', (data) => {
+        this.handleNavigationProgress(socket, data);
+      });
+
+      socket.on('end_navigation', (data) => {
+        this.handleEndNavigation(socket, data);
+      });
+
       // Handle disconnect
       socket.on('disconnect', (reason) => {
         this.handleDisconnect(socket, reason);
@@ -175,6 +188,31 @@ class WebSocketService {
       // Import database connection dynamically to avoid circular dependency
       const db = require('../config/database');
       
+      // Check if hazards table exists first
+      const tableCheckQuery = `
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'hazards'
+        );
+      `;
+      
+      const tableExists = await db.query(tableCheckQuery);
+      
+      if (!tableExists.rows[0].exists) {
+        // Table doesn't exist yet, return empty hazards
+        socket.emit('nearby_hazards', {
+          hazards: [],
+          userLocation: { latitude, longitude },
+          radius: radius,
+          count: 0,
+          timestamp: new Date().toISOString(),
+          note: 'Hazards table not initialized'
+        });
+        console.log(`[WebSocket] Hazards table not found, returning empty result for socket ${socket.id}`);
+        return;
+      }
+      
       // Query nearby hazards using PostGIS
       const query = `
         SELECT 
@@ -182,8 +220,8 @@ class WebSocketService {
           hazard_type,
           severity,
           description,
-          ST_Y(location::geometry) as latitude,
-          ST_X(location::geometry) as longitude,
+          latitude,
+          longitude,
           priority_level,
           affects_traffic,
           weather_related,
@@ -221,10 +259,16 @@ class WebSocketService {
       
     } catch (error) {
       console.error('[WebSocket] Error handling user position:', error);
-      socket.emit('error', { 
-        message: 'Failed to fetch nearby hazards',
-        details: error.message 
+      // Send empty result instead of error to prevent frontend issues
+      socket.emit('nearby_hazards', {
+        hazards: [],
+        userLocation: { latitude: coords.latitude, longitude: coords.longitude },
+        radius: coords.radius || 1500,
+        count: 0,
+        timestamp: new Date().toISOString(),
+        error: 'Database query failed'
       });
+      console.log(`[WebSocket] Sent empty hazards due to error for socket ${socket.id}`);
     }
   }
 
@@ -259,6 +303,129 @@ class WebSocketService {
     this.connections.delete(socket.id);
     socket.emit('unsubscribed', { message: 'Unsubscribed from hazard updates' });
     console.log(`Socket ${socket.id} unsubscribed from hazards`);
+  }
+
+  /**
+   * Handle navigation start with authentication
+   */
+  handleStartNavigation(socket, data) {
+    if (!socket.authenticated) {
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    const { routeId, routeName, startLocation, endLocation } = data;
+
+    if (!routeId || !startLocation || !endLocation) {
+      socket.emit('error', { message: 'Invalid navigation data' });
+      return;
+    }
+
+    // Store navigation session
+    const navigationData = {
+      socketId: socket.id,
+      userId: socket.userId,
+      routeId,
+      routeName: routeName || 'Route',
+      startLocation,
+      endLocation,
+      startTime: new Date(),
+      isNavigating: true
+    };
+
+    // Update connection with navigation data
+    const connection = this.connections.get(socket.id);
+    if (connection) {
+      connection.navigation = navigationData;
+      this.connections.set(socket.id, connection);
+    }
+
+    socket.emit('navigation_started', {
+      message: 'Navigation started',
+      routeId,
+      routeName: navigationData.routeName,
+      timestamp: navigationData.startTime.toISOString()
+    });
+
+    console.log(`User ${socket.userId} started navigation for route ${routeId}`);
+  }
+
+  /**
+   * Handle navigation progress updates with authentication
+   */
+  handleNavigationProgress(socket, data) {
+    if (!socket.authenticated) {
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    const connection = this.connections.get(socket.id);
+    
+    if (!connection || !connection.navigation) {
+      socket.emit('error', { message: 'No active navigation session' });
+      return;
+    }
+
+    const { currentPosition, remainingDistance, estimatedTimeRemaining } = data;
+
+    if (!currentPosition) {
+      socket.emit('error', { message: 'Current position required' });
+      return;
+    }
+
+    // Update navigation progress
+    connection.navigation.lastUpdate = new Date();
+    connection.navigation.currentPosition = currentPosition;
+    connection.navigation.remainingDistance = remainingDistance;
+    connection.navigation.estimatedTimeRemaining = estimatedTimeRemaining;
+    this.connections.set(socket.id, connection);
+
+    // Check for nearby hazards at current position
+    this.handleUserPosition(socket, {
+      latitude: currentPosition.latitude,
+      longitude: currentPosition.longitude,
+      radius: 1500 // 1.5km radius during navigation
+    });
+
+    console.log(`Navigation progress updated for user ${socket.userId}`);
+  }
+
+  /**
+   * Handle navigation end with authentication
+   */
+  handleEndNavigation(socket, data) {
+    if (!socket.authenticated) {
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    const connection = this.connections.get(socket.id);
+    
+    if (!connection || !connection.navigation) {
+      socket.emit('error', { message: 'No active navigation session' });
+      return;
+    }
+
+    const { reason = 'completed', finalPosition } = data;
+
+    // Calculate navigation duration
+    const duration = new Date() - connection.navigation.startTime;
+    const durationMinutes = Math.round(duration / 60000);
+
+    // Clear navigation data
+    const navigationData = connection.navigation;
+    delete connection.navigation;
+    this.connections.set(socket.id, connection);
+
+    socket.emit('navigation_ended', {
+      message: 'Navigation ended',
+      routeId: navigationData.routeId,
+      reason,
+      duration: durationMinutes,
+      timestamp: new Date().toISOString()
+    });
+
+    console.log(`User ${socket.userId} ended navigation (${reason}) after ${durationMinutes} minutes`);
   }
 
   /**
