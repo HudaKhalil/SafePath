@@ -3,110 +3,153 @@ const { body, validationResult } = require('express-validator');
 const { query, pool: getPool } = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const websocketService = require('../lib/websocketService');
+const { uploadHazard } = require('../middleware/upload');
 
 const router = express.Router();
 
 console.log('🎯 Hazard routes initialized with WebSocket service');
 
-router.post('/', authenticateToken, [
-  body('description').trim().isLength({ min: 10 }).withMessage('Description must be at least 10 characters'),
-  body('latitude').isFloat({ min: -90, max: 90 }).withMessage('Valid latitude required'),
-  body('longitude').isFloat({ min: -180, max: 180 }).withMessage('Valid longitude required'),
-  body('type').isIn([
-    'construction', 'accident', 'crime', 'flooding', 'poor_lighting', 
-    'road_damage', 'pothole', 'unsafe_crossing', 'broken_glass', 
-    'suspicious_activity', 'vandalism', 'other', 'Road Damage', 'Pothole'
-  ]).withMessage('Invalid hazard type'),
-  body('severity').optional().isIn(['low', 'medium', 'high', 'critical']).withMessage('Invalid severity level'),
-  body('affectsTraffic').optional().isBoolean().withMessage('affectsTraffic must be boolean'),
-  body('weatherRelated').optional().isBoolean().withMessage('weatherRelated must be boolean')
-], async (req, res) => {
-  try {
-    console.log('📝 Received hazard report:', JSON.stringify(req.body, null, 2));
-    
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      console.log('❌ Validation errors:', JSON.stringify(errors.array(), null, 2));
+router.post('/', authenticateToken, (req, res) => {
+  // Handle file upload first
+  uploadHazard(req, res, async (err) => {
+    if (err) {
+      console.error('❌ File upload error:', err);
       return res.status(400).json({
         success: false,
-        message: 'Validation failed',
-        errors: errors.array()
+        message: err.message || 'File upload failed'
       });
     }
 
-    const { 
-      description, 
-      latitude, 
-      longitude, 
-      type: hazardType, 
-      severity = 'medium',
-      affectsTraffic = false,
-      weatherRelated = false
-    } = req.body;
+    // Manual validation since express-validator doesn't work well with multer
+    const { description, latitude, longitude, type: hazardType, severity = 'medium', affectsTraffic = 'false', weatherRelated = 'false' } = req.body;
 
-    // Use optimized prepared statement for performance
-    const result = await query(`
-      INSERT INTO hazards (
-        user_id, description, location, latitude, longitude, hazard_type, severity, 
-        metadata, reported_at
-      )
-      VALUES ($1, $2, ST_SetSRID(ST_Point($4, $3), 4326)::geography, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
-      RETURNING 
-        id, description, hazard_type, severity,
-        latitude, longitude, reported_at, status
-    `, [
-      req.user.userId, 
-      description, 
-      latitude, 
-      longitude, 
-      hazardType.toLowerCase().replace(' ', '_'), 
-      severity, 
-      JSON.stringify({ affectsTraffic, weatherRelated })
-    ]);
+    // Validate required fields
+    if (!description || description.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Description must be at least 10 characters'
+      });
+    }
 
-    const hazard = result.rows[0];
-    
-    console.log(`✅ New hazard reported: ID ${hazard.id}, Type: ${hazard.hazard_type}, Severity: ${hazard.severity}`);
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
 
-    // Broadcast to WebSocket clients in real-time 
-    websocketService.broadcastNewHazard({
-      id: hazard.id,
-      hazard_type: hazard.hazard_type,
-      severity: hazard.severity,
-      description: hazard.description,
-      latitude: hazard.latitude,
-      longitude: hazard.longitude,
-      status: hazard.status,
-      reported_at: hazard.reported_at
-    });
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid latitude required'
+      });
+    }
 
-    res.status(201).json({
-      success: true,
-      message: 'Hazard reported successfully! Nearby users will be notified in real-time.',
-      data: {
-        hazard: {
-          id: hazard.id,
-          description: hazard.description,
-          location: {
-            latitude: hazard.latitude,
-            longitude: hazard.longitude
-          },
-          hazardType: hazard.hazard_type,
-          severity: hazard.severity,
-          reportedAt: hazard.reported_at,
-          status: hazard.status
-        }
+    if (isNaN(lng) || lng < -180 || lng > 180) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid longitude required'
+      });
+    }
+
+    const validTypes = [
+      'construction', 'accident', 'crime', 'flooding', 'poor_lighting', 
+      'road_damage', 'pothole', 'unsafe_crossing', 'broken_glass', 
+      'suspicious_activity', 'vandalism', 'other', 'Road Damage', 'Pothole'
+    ];
+
+    if (!validTypes.includes(hazardType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid hazard type'
+      });
+    }
+
+    const validSeverities = ['low', 'medium', 'high', 'critical'];
+    if (!validSeverities.includes(severity)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid severity level'
+      });
+    }
+
+    try {
+      console.log('📝 Received hazard report:', JSON.stringify(req.body, null, 2));
+      
+      // Get image URL if file was uploaded
+      const imageUrl = req.file ? `/uploads/hazards/${req.file.filename}` : null;
+      
+      if (req.file) {
+        console.log('📷 Image uploaded:', req.file.filename);
       }
-    });
 
-  } catch (error) {
-    console.error('❌ Report hazard error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
+      // Convert affectsTraffic and weatherRelated from strings to booleans
+      const affectsTrafficBool = affectsTraffic === 'true' || affectsTraffic === true;
+      const weatherRelatedBool = weatherRelated === 'true' || weatherRelated === true;
+
+      // Use optimized prepared statement for performance
+      const result = await query(`
+        INSERT INTO hazards (
+          user_id, description, location, latitude, longitude, hazard_type, severity, 
+          metadata, image_url, reported_at
+        )
+        VALUES ($1, $2, ST_SetSRID(ST_Point($4, $3), 4326)::geography, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+        RETURNING 
+          id, description, hazard_type, severity,
+          latitude, longitude, image_url, reported_at, status
+      `, [
+        req.user.userId, 
+        description.trim(), 
+        lat, 
+        lng, 
+        hazardType.toLowerCase().replace(' ', '_'), 
+        severity, 
+        JSON.stringify({ affectsTraffic: affectsTrafficBool, weatherRelated: weatherRelatedBool }),
+        imageUrl
+      ]);
+
+      const hazard = result.rows[0];
+      
+      console.log(`✅ New hazard reported: ID ${hazard.id}, Type: ${hazard.hazard_type}, Severity: ${hazard.severity}${hazard.image_url ? ' with image' : ''}`);
+
+      // Broadcast to WebSocket clients in real-time 
+      websocketService.broadcastNewHazard({
+        id: hazard.id,
+        hazard_type: hazard.hazard_type,
+        severity: hazard.severity,
+        description: hazard.description,
+        latitude: hazard.latitude,
+        longitude: hazard.longitude,
+        image_url: hazard.image_url,
+        status: hazard.status,
+        reported_at: hazard.reported_at
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Hazard reported successfully! Nearby users will be notified in real-time.',
+        data: {
+          hazard: {
+            id: hazard.id,
+            description: hazard.description,
+            location: {
+              latitude: hazard.latitude,
+              longitude: hazard.longitude
+            },
+            hazardType: hazard.hazard_type,
+            severity: hazard.severity,
+            imageUrl: hazard.image_url,
+            reportedAt: hazard.reported_at,
+            status: hazard.status
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Report hazard error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
 });
 
 // Get all hazards with optional filtering
@@ -128,6 +171,7 @@ router.get('/', async (req, res) => {
         h.severity,
         h.latitude,
         h.longitude,
+        h.image_url,
         h.reported_at,
         h.status
       FROM hazards h
@@ -171,6 +215,8 @@ router.get('/', async (req, res) => {
       hazardType: hazard.hazard_type,
       severity: hazard.severity,
       status: hazard.status,
+      image_url: hazard.image_url,
+      imageUrl: hazard.image_url,
       reportedAt: hazard.reported_at
     }));
 
@@ -211,6 +257,7 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
         h.severity,
         h.latitude,
         h.longitude,
+        h.image_url,
         h.reported_at,
         h.status,
         ST_Distance(
@@ -243,6 +290,8 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
       type: hazard.hazard_type,
       severity: hazard.severity,
       status: hazard.status,
+      image_url: hazard.image_url,
+      imageUrl: hazard.image_url,
       reportedAt: hazard.reported_at,
       created_at: hazard.reported_at,
       distanceMeters: Math.round(hazard.distance_meters)
