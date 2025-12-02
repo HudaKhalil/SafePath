@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { LOCATION_CONFIG } from "../../lib/locationConfig";
 import websocketClient from "../../lib/websocketClient";
+import RoutesSheet from "../../components/RoutesSheet";
 
 const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
@@ -143,64 +144,107 @@ export default function NavigationClient() {
     }
   }, []);
 
+  // Track WebSocket authentication state
+  const [isWebSocketReady, setIsWebSocketReady] = useState(false);
+
   // Connect to WebSocket for hazard detection
   useEffect(() => {
     websocketClient.connect();
     
+    // Listen for authentication success
+    websocketClient.on('authenticated', (data) => {
+      console.log('✅ WebSocket ready for hazard detection');
+      setIsWebSocketReady(true);
+    });
+    
     websocketClient.on('nearby_hazards', (data) => {
+      console.log('📍 Received hazards data:', data);
       if (data.hazards && Array.isArray(data.hazards)) {
-        setNearbyHazards(data.hazards);
+        console.log('All hazards:', data.hazards.map(h => ({
+          id: h.id,
+          type: h.hazard_type,
+          distance: h.distance_meters,
+          severity: h.severity
+        })));
         
-        // Alert on high-risk hazards within 300m
-        const criticalHazards = data.hazards.filter(
-          h => (h.severity === 'high' || h.severity === 'critical') && 
-               h.distance_meters < 300
+        // Filter hazards that are within 100m and on the route
+        const within100m = data.hazards.filter(h => h.distance_meters <= 100);
+        console.log(`Hazards within 100m: ${within100m.length}`, within100m.map(h => h.distance_meters));
+        
+        const hazardsOnRoute = within100m.filter(h => 
+          isHazardOnRoute(h.latitude, h.longitude)
         );
         
-        criticalHazards.forEach(hazard => {
-          const alertMessage = `Warning: ${hazard.hazard_type.replace('_', ' ')} ahead, ${Math.round(hazard.distance_meters)} meters away`;
-          addHazardAlert(alertMessage, hazard.severity);
-          speak(alertMessage);
+        console.log(`✅ Found ${hazardsOnRoute.length} hazards within 100m on route (out of ${data.hazards.length} total)`);
+        setNearbyHazards(hazardsOnRoute);
+        
+        // Remove alerts for hazards that are no longer nearby or on route
+        setHazardAlerts(prev => {
+          const currentHazardIds = hazardsOnRoute.map(h => h.id);
+          return prev.filter(alert => 
+            !alert.hazardId || currentHazardIds.includes(alert.hazardId)
+          );
         });
+        
+        // Show alerts for ALL hazards within 100m on route
+        hazardsOnRoute.forEach(hazard => {
+          const alertMessage = `${hazard.severity === 'critical' || hazard.severity === 'high' ? 'Warning' : 'Notice'}: ${hazard.hazard_type.replace(/_/g, ' ')} ahead, ${Math.round(hazard.distance_meters)} meters away`;
+          addHazardAlert(alertMessage, hazard.severity, hazard.id);
+          
+          // Voice alerts only for high and critical severity
+          if (hazard.severity === 'high' || hazard.severity === 'critical') {
+            speak(alertMessage);
+          }
+        });
+        
+        console.log(`🚨 Showing alerts for ${hazardsOnRoute.length} hazards:`, hazardsOnRoute.map(h => ({
+          type: h.hazard_type,
+          distance: h.distance_meters,
+          severity: h.severity
+        })));
       }
     });
 
     return () => {
       websocketClient.disconnect();
+      setIsWebSocketReady(false);
     };
   }, []);
 
   // Check for hazards along route periodically
   useEffect(() => {
-    if (currentPosition && isTracking) {
+    if (currentPosition && isTracking && isWebSocketReady) {
       const now = Date.now();
       
-      // Check for hazards every 15 seconds
-      if (now - hazardCheckRef.current > 15000) {
+      // Check for hazards immediately on first position, then every 15 seconds
+      if (hazardCheckRef.current === 0 || now - hazardCheckRef.current > 15000) {
+        console.log('🔍 Checking for hazards at position:', currentPosition);
         websocketClient.sendUserPosition(
           currentPosition[0],
           currentPosition[1],
-          500 // 500m radius for navigation
+          1500 // 1.5km radius for navigation
         );
         hazardCheckRef.current = now;
       }
     }
-  }, [currentPosition, isTracking]);
+  }, [currentPosition, isTracking, isWebSocketReady]);
 
-  const addHazardAlert = (message, severity) => {
+  const addHazardAlert = (message, severity, hazardId) => {
     const alert = {
-      id: Date.now(),
+      id: hazardId || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       message,
       severity,
-      timestamp: new Date()
+      timestamp: new Date(),
+      hazardId
     };
 
-    setHazardAlerts(prev => [alert, ...prev.slice(0, 2)]); // Keep last 3 alerts
-
-    // Auto-dismiss after 15 seconds
-    setTimeout(() => {
-      setHazardAlerts(prev => prev.filter(a => a.id !== alert.id));
-    }, 15000);
+    setHazardAlerts(prev => {
+      // Check if alert for this hazard already exists
+      if (hazardId && prev.some(a => a.hazardId === hazardId)) {
+        return prev;
+      }
+      return [alert, ...prev.slice(0, 4)]; // Keep last 5 alerts
+    });
   };
 
   // Calculate distance between two coordinates (Haversine formula)
@@ -229,6 +273,40 @@ export default function NavigationClient() {
         Math.cos(dLon);
     const bearing = Math.atan2(y, x);
     return ((bearing * 180) / Math.PI + 360) % 360; // Convert to degrees
+  };
+
+  // Check if hazard is along the route path (within 150m of any route segment)
+  const isHazardOnRoute = (hazardLat, hazardLon) => {
+    if (routeCoordinates.length === 0) {
+      console.log('⚠️ No route coordinates available');
+      return true; // Show all hazards if no route loaded yet
+    }
+
+    for (let i = 0; i < routeCoordinates.length - 1; i++) {
+      const segmentStart = routeCoordinates[i];
+      const segmentEnd = routeCoordinates[i + 1];
+
+      // Find closest point on this segment to the hazard
+      const closestPoint = closestPointOnSegment(
+        hazardLat,
+        hazardLon,
+        segmentStart[0],
+        segmentStart[1],
+        segmentEnd[0],
+        segmentEnd[1]
+      );
+
+      const distance = calculateDistance(hazardLat, hazardLon, closestPoint[0], closestPoint[1]);
+
+      // If hazard is within 150m of the route segment, it's on the route
+      if (distance < 0.15) { // 0.15 km = 150 meters
+        console.log(`✅ Hazard at [${hazardLat}, ${hazardLon}] is ${Math.round(distance * 1000)}m from route`);
+        return true;
+      }
+    }
+
+    console.log(`❌ Hazard at [${hazardLat}, ${hazardLon}] is not on route`);
+    return false;
   };
 
   // Find closest point on route and snap to it
@@ -425,9 +503,9 @@ export default function NavigationClient() {
 
   if (!routeCoordinates.length) {
     return (
-      <main className="flex items-center justify-center min-h-screen bg-slate-900 text-white">
+      <main className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-slate-900 dark:border-white mx-auto mb-4"></div>
           <p>Loading navigation...</p>
         </div>
       </main>
@@ -435,35 +513,10 @@ export default function NavigationClient() {
   }
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden md:overflow-y-auto md:h-auto md:min-h-screen bg-slate-900">
-      {/* Hazard Alert Banners */}
-      {hazardAlerts.length > 0 && (
-        <div className="absolute top-0 left-0 right-0 z-50 p-4 space-y-2">
-          {hazardAlerts.map(alert => (
-            <div
-              key={alert.id}
-              className={`p-4 rounded-lg shadow-lg animate-pulse ${
-                alert.severity === 'critical' || alert.severity === 'high'
-                  ? 'bg-red-500 text-white'
-                  : 'bg-yellow-500 text-gray-900'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-lg">{alert.message}</span>
-                <button
-                  onClick={() => setHazardAlerts(prev => prev.filter(a => a.id !== alert.id))}
-                  className="ml-4 text-2xl hover:opacity-70"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Map */}
-      <div className="absolute inset-0 md:relative md:h-96">
+    <main className="relative h-screen w-screen overflow-hidden bg-white dark:bg-slate-900">
+      {/* Map Layer - Full screen */}
+      <div className="absolute inset-0" style={{ paddingLeft: '16px', paddingRight: '16px', paddingTop: '120px' }}>
+        {nearbyHazards.length > 0 && console.log('🗺️ Passing hazards to Map:', nearbyHazards)}
         <Map
           center={snappedPosition || routeCoordinates[0] || LOCATION_CONFIG.DEFAULT_CENTER}
           zoom={18}
@@ -499,26 +552,26 @@ export default function NavigationClient() {
         />
       </div>
 
-      {/* Top Navigation Bar */}
-      <div className="absolute md:relative top-0 left-0 right-0 z-40 bg-gradient-to-b from-slate-900/95 to-slate-900/80 md:bg-slate-900 backdrop-blur-sm pt-safe">
-        <div className="p-3">
+      {/* Top Navigation Bar - Fixed Above Map */}
+      <div className="fixed top-[104px] left-0 right-0 z-[1000] bg-slate-900 shadow-xl">
+        <div className="px-2 py-2">
           {/* Current Instruction */}
-          <div className="bg-white/10 rounded-xl p-3 mb-2 backdrop-blur-md">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <div className="text-3xl">
+          <div className="bg-slate-800/95 rounded-lg p-2 mb-1.5 border border-slate-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                <div className="text-2xl flex-shrink-0 !text-[#06d6a0]">
                   {instructions[currentInstructionIndex] 
                     ? getInstructionIcon(instructions[currentInstructionIndex].instruction)
                     : "🧭"}
                 </div>
-                <div>
-                  <div className="text-white text-base font-bold leading-tight">
+                <div className="flex-1 min-w-0">
+                  <div className="!text-[#06d6a0] text-sm font-bold leading-tight truncate">
                     {hasArrived 
                       ? "You have arrived!"
                       : instructions[currentInstructionIndex]?.instruction || "Continue on route"}
                   </div>
                   {!hasArrived && distanceToNextTurn > 0 && (
-                    <div className="text-blue-200 text-xs">
+                    <div className="text-blue-300 text-xs">
                       in {formatDistance(distanceToNextTurn)}
                     </div>
                   )}
@@ -526,31 +579,31 @@ export default function NavigationClient() {
               </div>
               
               {/* GPS Status */}
-              <div className={`px-2 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${
+              <div className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ml-2 ${
                 isTracking ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
               }`}>
-                {isTracking ? '📍 GPS' : '❌'}
+                {isTracking ? '📍' : '❌'}
               </div>
             </div>
 
             {/* Off-route warning */}
             {isOffRoute && (
-              <div className="bg-orange-500 text-white px-2 py-1 rounded-lg text-xs font-semibold animate-pulse">
+              <div className="bg-orange-500 text-white px-2 py-1 rounded-md text-xs font-semibold animate-pulse mt-1.5">
                 ⚠️ You are off the planned route
               </div>
             )}
           </div>
 
           {/* Route Progress Bar */}
-          <div className="bg-white/10 rounded-lg p-2 backdrop-blur-md">
-            <div className="flex justify-between text-white text-xs mb-1">
-              <span>{routeProgress}%</span>
-              <span>{formatDistance(totalDistanceRemaining)}</span>
-              <span>{estimatedTimeRemaining} min</span>
+          <div className="bg-slate-800/95 rounded-lg p-2 border border-slate-700">
+            <div className="flex justify-between text-white text-base mb-1.5">
+              <span className="font-bold text-lg">{routeProgress}%</span>
+              <span className="font-bold text-lg">{formatDistance(totalDistanceRemaining)}</span>
+              <span className="font-bold text-lg">{estimatedTimeRemaining} min</span>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-1.5">
+            <div className="w-full bg-slate-700 rounded-full h-2">
               <div 
-                className="bg-gradient-to-r from-blue-500 to-green-500 h-1.5 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${routeProgress}%` }}
               />
             </div>
@@ -558,16 +611,62 @@ export default function NavigationClient() {
         </div>
       </div>
 
-      {/* Bottom Panel - Upcoming Instructions */}
-      <div className="absolute md:relative bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-slate-900/95 to-slate-900/80 md:bg-slate-900 backdrop-blur-sm pb-safe">
-        <div className="p-4 pb-6">
+      {/* Bottom Panel - Popup Sheet */}
+      <RoutesSheet
+        title="Navigation"
+        subtitle=""
+        initialExpanded={false}
+        minHeight={100}
+        collapsedHeight={100}
+        maxHeight={400}
+        enableFullHeight={true}
+      >
+        <div className="p-4 pt-2 md:pt-4 space-y-3">
+          {/* Hazard Alerts Section */}
+          {hazardAlerts.length > 0 && (
+            <div className="space-y-2">
+              {hazardAlerts.map(alert => (
+                <div
+                  key={alert.id}
+                  className={`p-3 rounded-lg shadow-lg border-2 animate-pulse ${
+                    alert.severity === 'critical'
+                      ? 'bg-red-100 text-red-900 border-red-300 dark:bg-red-900/30 dark:text-red-100 dark:border-red-600'
+                      : alert.severity === 'high'
+                      ? 'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-900/30 dark:text-orange-100 dark:border-orange-600'
+                      : alert.severity === 'medium'
+                      ? 'bg-yellow-100 text-yellow-900 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-100 dark:border-yellow-600'
+                      : 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-900/30 dark:text-blue-100 dark:border-blue-600'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      <span className="text-2xl flex-shrink-0">⚠️</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm leading-tight">{alert.message}</p>
+                        <p className="text-xs opacity-75 mt-1">
+                          {alert.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setHazardAlerts(prev => prev.filter(a => a.id !== alert.id))}
+                      className="text-2xl hover:opacity-70 flex-shrink-0 w-6 h-6 flex items-center justify-center leading-none"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Next Instructions */}
-          <div className="bg-white/10 rounded-xl p-3 backdrop-blur-md mb-3">
+          <div className="bg-slate-200 dark:bg-[#334155] rounded-lg p-3 border border-slate-400 dark:border-slate-600">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-white font-bold text-base">Upcoming Turns</h3>
+              <h3 className="text-slate-900 dark:text-white font-bold text-base">Upcoming Turns</h3>
               
               {/* Safety Badge */}
-              <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
+              <div className={`px-2.5 py-1 rounded-full text-sm font-semibold ${
                 routeSafety >= 7 ? 'bg-green-500 text-white' : 
                 routeSafety >= 5 ? 'bg-yellow-500 text-gray-900' : 
                 'bg-red-500 text-white'
@@ -576,19 +675,19 @@ export default function NavigationClient() {
               </div>
             </div>
             
-            <div className="space-y-1 max-h-24 overflow-y-auto">
-              {instructions.slice(currentInstructionIndex, currentInstructionIndex + 2).map((inst, idx) => (
+            <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-400 dark:scrollbar-thumb-slate-600">
+              {instructions.slice(currentInstructionIndex, currentInstructionIndex + 4).map((inst, idx) => (
                 <div 
                   key={idx}
-                  className={`flex items-center space-x-2 p-2 rounded-lg ${
-                    idx === 0 ? 'bg-blue-500/30' : 'bg-white/5'
+                  className={`flex items-center gap-3 p-4 rounded-2xl border hover:shadow-md transition-all ${
+                    idx === 0 ? 'bg-[#6ff8a1]/20 dark:!bg-slate-800 border-gray-200 dark:border-slate-700' : 'bg-white dark:!bg-slate-800 border-gray-200 dark:border-slate-700'
                   }`}
                 >
-                  <div className="text-xl">
+                  <div className="text-2xl shrink-0" style={{ color: 'var(--from-to-label-color)' }}>
                     {getInstructionIcon(inst.instruction)}
                   </div>
-                  <div className="flex-1">
-                    <div className="text-white text-xs">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-gray-900 dark:text-white text-base font-bold">
                       {inst.instruction || "Continue straight"}
                     </div>
                   </div>
@@ -596,7 +695,7 @@ export default function NavigationClient() {
               ))}
               
               {instructions.length === 0 && (
-                <div className="text-white/60 text-xs text-center py-2">
+                <div className="text-slate-600 dark:text-slate-400 text-sm text-center py-3">
                   Follow the route on the map
                 </div>
               )}
@@ -606,16 +705,19 @@ export default function NavigationClient() {
           {/* Exit Button */}
           <button
             onClick={exitNavigation}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg"
+            className="w-full font-bold py-3 px-4 rounded-lg transition-colors shadow-lg"
+            style={{ backgroundColor: '#06d6a0', color: '#1e293b' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#05c090'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#06d6a0'}
           >
             Exit Navigation
           </button>
         </div>
-      </div>
+      </RoutesSheet>
 
       {/* Arrival Modal */}
       {hasArrived && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-bounce">
             <div className="text-6xl mb-4">🏁</div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">You've Arrived!</h2>
