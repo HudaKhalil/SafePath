@@ -228,7 +228,7 @@ export default function AddressAutocomplete({ value, onChange, placeholder, icon
             style={{
               width: '28px',
               height: '28px',
-              backgroundColor: '#eab308',
+              backgroundColor: '#d946ef',
               borderRadius: '50% 50% 50% 0',
               transform: 'rotate(-45deg)',
               border: '2px solid white',
