@@ -568,43 +568,21 @@ export default function Home() {
                 zoom={mapZoom}
                 height="100%"
                 onMapClick={handleMapClick}
-                markers={(() => {
-                  const hazardMarkers = nearbyHazards.map(hazard => ({
-                    position: [hazard.latitude, hazard.longitude],
-                    color: '#ff6b6b',
-                    type: 'hazard',
-                    popup: (
-                      <div className="text-sm">
-                        <strong>{hazard.hazard_type}</strong>
-                        <br />
-                        {hazard.description}
-                        <br />
-                        <span className="text-xs opacity-75">
-                          Severity: {hazard.severity}
-                        </span>
-                      </div>
-                    )
-                  }));
-                  
-                  const allMarkers = [
-                    {
-                      position: userLocation,
-                      color: '#06d6a0',
-                      type: 'marker',
-                      popup: <div className="text-sm"><strong>From: Your Location</strong></div>
-                    },
-                    ...(searchedLocation ? [{
-                      position: searchedLocation.position,
-                      color: '#ef4444',
-                      type: 'marker',
-                      popup: <div className="text-sm"><strong>To: {searchedLocation.name}</strong></div>
-                    }] : []),
-                    ...hazardMarkers
-                  ];
-                  
-                  console.log('🗺️ Desktop map markers:', allMarkers.length, '(hazards:', hazardMarkers.length, ')');
-                  return allMarkers;
-                })()}
+                hazards={nearbyHazards.filter(h => h.latitude && h.longitude)}
+                markers={[
+                  {
+                    position: userLocation,
+                    color: '#06d6a0',
+                    type: 'marker',
+                    popup: <div className="text-sm"><strong>From: Your Location</strong></div>
+                  },
+                  ...(searchedLocation ? [{
+                    position: searchedLocation.position,
+                    color: '#ef4444',
+                    type: 'marker',
+                    popup: <div className="text-sm"><strong>To: {searchedLocation.name}</strong></div>
+                  }] : [])
+                ]}
                 routes={routeData ? [{
                   id: 'homepage-route',
                   coordinates: routeData.coordinates,
@@ -649,9 +627,23 @@ export default function Home() {
                       }}
                     >
                       <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#ff6b6b' }}>
-                          <span className="text-lg sm:text-xl">⚠️</span>
-                        </div>
+                        {(hazard.image_url || hazard.imageUrl) ? (
+                          <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-lg overflow-hidden shrink-0">
+                            <img 
+                              src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                              alt={hazard.hazardType || 'Hazard'}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentElement.innerHTML = '<div class="w-full h-full rounded-full flex items-center justify-center" style="background-color: #ff6b6b;"><span class="text-lg sm:text-xl">⚠️</span></div>';
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#ff6b6b' }}>
+                            <span className="text-lg sm:text-xl">⚠️</span>
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-base sm:text-lg" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
                             {hazard.hazardType || hazard.type || 'Unknown Hazard'}
@@ -880,43 +872,21 @@ export default function Home() {
                     zoom={mapZoom}
                     height="100%"
                     onMapClick={handleMapClick}
-                    markers={(() => {
-                      const hazardMarkers = nearbyHazards.map(hazard => ({
-                        position: [hazard.latitude, hazard.longitude],
-                        color: '#ff6b6b',
-                        type: 'hazard',
-                        popup: (
-                          <div className="text-sm">
-                            <strong>{hazard.hazard_type}</strong>
-                            <br />
-                            {hazard.description}
-                            <br />
-                            <span className="text-xs opacity-75">
-                              Severity: {hazard.severity}
-                            </span>
-                          </div>
-                        )
-                      }));
-                      
-                      const allMarkers = [
-                        {
-                          position: userLocation,
-                          color: '#06d6a0',
-                          type: 'marker',
-                          popup: <div className="text-sm"><strong>From: Your Location</strong></div>
-                        },
-                        ...(searchedLocation ? [{
-                          position: searchedLocation.position,
-                          color: '#ef4444',
-                          type: 'marker',
-                          popup: <div className="text-sm"><strong>To: {searchedLocation.name}</strong></div>
-                        }] : []),
-                        ...hazardMarkers
-                      ];
-                      
-                      console.log('📱 Mobile map markers:', allMarkers.length, '(hazards:', hazardMarkers.length, ')');
-                      return allMarkers;
-                    })()}
+                    hazards={nearbyHazards.filter(h => h.latitude && h.longitude)}
+                    markers={[
+                      {
+                        position: userLocation,
+                        color: '#06d6a0',
+                        type: 'marker',
+                        popup: <div className="text-sm"><strong>From: Your Location</strong></div>
+                      },
+                      ...(searchedLocation ? [{
+                        position: searchedLocation.position,
+                        color: '#ef4444',
+                        type: 'marker',
+                        popup: <div className="text-sm"><strong>To: {searchedLocation.name}</strong></div>
+                      }] : [])
+                    ]}
                     routes={routeData ? [{
                       id: 'homepage-route',
                       coordinates: routeData.coordinates,
@@ -998,9 +968,23 @@ export default function Home() {
                       }}
                     >
                       <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#ff6b6b' }}>
-                          <span className="text-lg sm:text-xl">⚠️</span>
-                        </div>
+                        {(hazard.image_url || hazard.imageUrl) ? (
+                          <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-lg overflow-hidden shrink-0">
+                            <img 
+                              src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                              alt={hazard.hazardType || 'Hazard'}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentElement.innerHTML = '<div class="w-full h-full rounded-full flex items-center justify-center" style="background-color: #ff6b6b;"><span class="text-lg sm:text-xl">⚠️</span></div>';
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#ff6b6b' }}>
+                            <span className="text-lg sm:text-xl">⚠️</span>
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-base sm:text-lg" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
                             {hazard.hazardType || hazard.type || 'Unknown Hazard'}
