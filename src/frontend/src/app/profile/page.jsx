@@ -19,14 +19,69 @@ export default function Profile() {
     name: '',
     email: '',
     phone: '',
-    address: '',
+    phoneCountryCode: '+44',
     emergencyContact: '',
+    emergencyCountryCode: '+44',
+    address: '',
     preferences: {
       preferredTransport: 'walking',
       safetyPriority: 'high',
       notifications: true
     }
   })
+
+  // Country codes with flags
+  const countryCodes = [
+    { code: '+1', country: 'US/CA', flag: '🇺🇸', name: 'United States/Canada' },
+    { code: '+44', country: 'UK', flag: '🇬🇧', name: 'United Kingdom' },
+    { code: '+91', country: 'IN', flag: '🇮🇳', name: 'India' },
+    { code: '+86', country: 'CN', flag: '🇨🇳', name: 'China' },
+    { code: '+81', country: 'JP', flag: '🇯🇵', name: 'Japan' },
+    { code: '+49', country: 'DE', flag: '🇩🇪', name: 'Germany' },
+    { code: '+33', country: 'FR', flag: '🇫🇷', name: 'France' },
+    { code: '+39', country: 'IT', flag: '🇮🇹', name: 'Italy' },
+    { code: '+34', country: 'ES', flag: '🇪🇸', name: 'Spain' },
+    { code: '+61', country: 'AU', flag: '🇦🇺', name: 'Australia' },
+    { code: '+7', country: 'RU', flag: '🇷🇺', name: 'Russia' },
+    { code: '+55', country: 'BR', flag: '🇧🇷', name: 'Brazil' },
+    { code: '+52', country: 'MX', flag: '🇲🇽', name: 'Mexico' },
+    { code: '+82', country: 'KR', flag: '🇰🇷', name: 'South Korea' },
+    { code: '+31', country: 'NL', flag: '🇳🇱', name: 'Netherlands' },
+    { code: '+46', country: 'SE', flag: '🇸🇪', name: 'Sweden' },
+    { code: '+47', country: 'NO', flag: '🇳🇴', name: 'Norway' },
+    { code: '+45', country: 'DK', flag: '🇩🇰', name: 'Denmark' },
+    { code: '+358', country: 'FI', flag: '🇫🇮', name: 'Finland' },
+    { code: '+41', country: 'CH', flag: '🇨🇭', name: 'Switzerland' },
+    { code: '+43', country: 'AT', flag: '🇦🇹', name: 'Austria' },
+    { code: '+32', country: 'BE', flag: '🇧🇪', name: 'Belgium' },
+    { code: '+351', country: 'PT', flag: '🇵🇹', name: 'Portugal' },
+    { code: '+30', country: 'GR', flag: '🇬🇷', name: 'Greece' },
+    { code: '+48', country: 'PL', flag: '🇵🇱', name: 'Poland' },
+    { code: '+420', country: 'CZ', flag: '🇨🇿', name: 'Czech Republic' },
+    { code: '+353', country: 'IE', flag: '🇮🇪', name: 'Ireland' },
+    { code: '+64', country: 'NZ', flag: '🇳🇿', name: 'New Zealand' },
+    { code: '+65', country: 'SG', flag: '🇸🇬', name: 'Singapore' },
+    { code: '+60', country: 'MY', flag: '🇲🇾', name: 'Malaysia' },
+    { code: '+66', country: 'TH', flag: '🇹🇭', name: 'Thailand' },
+    { code: '+63', country: 'PH', flag: '🇵🇭', name: 'Philippines' },
+    { code: '+84', country: 'VN', flag: '🇻🇳', name: 'Vietnam' },
+    { code: '+62', country: 'ID', flag: '🇮🇩', name: 'Indonesia' },
+    { code: '+20', country: 'EG', flag: '🇪🇬', name: 'Egypt' },
+    { code: '+27', country: 'ZA', flag: '🇿🇦', name: 'South Africa' },
+    { code: '+234', country: 'NG', flag: '🇳🇬', name: 'Nigeria' },
+    { code: '+254', country: 'KE', flag: '🇰🇪', name: 'Kenya' },
+    { code: '+971', country: 'AE', flag: '🇦🇪', name: 'United Arab Emirates' },
+    { code: '+966', country: 'SA', flag: '🇸🇦', name: 'Saudi Arabia' },
+    { code: '+974', country: 'QA', flag: '🇶🇦', name: 'Qatar' },
+    { code: '+965', country: 'KW', flag: '🇰🇼', name: 'Kuwait' },
+    { code: '+962', country: 'JO', flag: '🇯🇴', name: 'Jordan' },
+    { code: '+961', country: 'LB', flag: '🇱🇧', name: 'Lebanon' },
+    { code: '+90', country: 'TR', flag: '🇹🇷', name: 'Turkey' },
+    { code: '+98', country: 'IR', flag: '🇮🇷', name: 'Iran' },
+    { code: '+92', country: 'PK', flag: '🇵🇰', name: 'Pakistan' },
+    { code: '+880', country: 'BD', flag: '🇧🇩', name: 'Bangladesh' },
+    { code: '+94', country: 'LK', flag: '🇱🇰', name: 'Sri Lanka' }
+  ]
 
   const [validationErrors, setValidationErrors] = useState({
     phone: '',
@@ -58,12 +113,28 @@ export default function Profile() {
       const response = await authService.getProfile()
       if (response.success) {
         setUser(response.data.user)
+        
+        // Parse phone number to extract country code
+        const parsePhone = (phoneStr) => {
+          if (!phoneStr) return { code: '+44', number: '' }
+          const match = countryCodes.find(c => phoneStr.startsWith(c.code))
+          if (match) {
+            return { code: match.code, number: phoneStr.substring(match.code.length).trim() }
+          }
+          return { code: '+44', number: phoneStr }
+        }
+        
+        const parsedPhone = parsePhone(response.data.user.phone)
+        const parsedEmergency = parsePhone(response.data.user.emergency_contact)
+        
         setFormData({
           name: response.data.user.name || '',
           email: response.data.user.email || '',
-          phone: response.data.user.phone || '',
+          phone: parsedPhone.number,
+          phoneCountryCode: parsedPhone.code,
+          emergencyContact: parsedEmergency.number,
+          emergencyCountryCode: parsedEmergency.code,
           address: response.data.user.address || '',
-          emergencyContact: response.data.user.emergency_contact || '',
           preferences: {
             preferredTransport: response.data.user.preferred_transport || 'walking',
             safetyPriority: response.data.user.safety_priority || 'high',
@@ -98,8 +169,10 @@ export default function Profile() {
 
   const validatePhone = (phone) => {
     if (!phone) return '' // Optional field
-    const ukPhoneRegex = /^(\+44\s?7\d{3}|\(?07\d{3}\)?)\s?\d{3}\s?\d{3}$/
-    return ukPhoneRegex.test(phone.replace(/\s/g, '')) ? '' : 'Invalid UK phone format (e.g., +44 7xxx xxx xxx or 07xxx xxx xxx)'
+    // Remove spaces and check if it's a valid number (digits and optional + at start)
+    const cleaned = phone.replace(/\s/g, '')
+    const phoneRegex = /^[\d\s()-]+$/
+    return phoneRegex.test(cleaned) && cleaned.length >= 7 ? '' : 'Invalid phone number format'
   }
 
   const handleInputChange = (e) => {
@@ -142,6 +215,8 @@ export default function Profile() {
       const response = await authService.uploadProfilePicture(file);
       if (response.success) {
         await loadProfile();
+        // Notify Navbar to refresh user data
+        window.dispatchEvent(new Event('profileUpdated'));
         setSuccess('Profile picture updated successfully!');
         setTimeout(() => setSuccess(''), 3000);
       }
@@ -159,6 +234,8 @@ export default function Profile() {
       const response = await authService.deleteProfilePicture();
       if (response.success) {
         await loadProfile();
+        // Notify Navbar to refresh user data
+        window.dispatchEvent(new Event('profileUpdated'));
         setSuccess('Profile picture deleted successfully!');
         setTimeout(() => setSuccess(''), 3000);
       }
@@ -189,11 +266,15 @@ export default function Profile() {
     }
 
     try {
+      // Combine country code with phone number
+      const fullPhone = formData.phone ? `${formData.phoneCountryCode} ${formData.phone}` : ''
+      const fullEmergency = formData.emergencyContact ? `${formData.emergencyCountryCode} ${formData.emergencyContact}` : ''
+      
       const updateData = {
         name: formData.name,
-        phone: formData.phone,
+        phone: fullPhone,
         address: formData.address,
-        emergency_contact: formData.emergencyContact,
+        emergency_contact: fullEmergency,
         preferred_transport: formData.preferences.preferredTransport,
         safety_priority: formData.preferences.safetyPriority,
         notifications: formData.preferences.notifications
@@ -376,46 +457,40 @@ export default function Profile() {
                         marginBottom: '10px'
                       }}>
                         <h3 className="text-lg sm:text-xl font-bold" style={{ color: isDark ? '#f8fafc' : '#334155' }}>
-                          <span style={{ color: '#06d6a0', marginRight: '6px', fontSize: '1.1em' }}>■</span>
                           Personal Information
                         </h3>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
                           <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
-                            <span style={{ opacity: 0.8, marginRight: '6px' }}>◉</span>
                             Full Name
                           </label>
-                        <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.name || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
-                          <span style={{ opacity: 0.8, marginRight: '6px' }}>@</span>
-                          Email
-                        </label>
-                        <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.email}</p>
-                      </div>
-                      <div>
-                        <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
-                          <span style={{ opacity: 0.8, marginRight: '6px' }}>☎</span>
-                          Phone
-                        </label>
-                        <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.phone || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
-                          <span style={{ opacity: 0.8, marginRight: '6px' }}>⚠</span>
-                          Emergency Contact
-                        </label>
-                        <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.emergency_contact || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
-                          <span style={{ opacity: 0.8, marginRight: '6px' }}>⌖</span>
-                          Address
-                        </label>
-                        <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.address || 'Not provided'}</p>
-                      </div>
+                          <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.name || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
+                            Email
+                          </label>
+                          <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.email}</p>
+                        </div>
+                        <div>
+                          <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
+                            Phone
+                          </label>
+                          <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.phone || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
+                            Emergency Contact
+                          </label>
+                          <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.emergency_contact || 'Not provided'}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
+                            Address
+                          </label>
+                          <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>{user?.address || 'Not provided'}</p>
+                        </div>
                       </div>
                     </div>
 
@@ -430,14 +505,12 @@ export default function Profile() {
                         marginBottom: '10px'
                       }}>
                         <h3 className="text-lg sm:text-xl font-bold" style={{ color: isDark ? '#f8fafc' : '#334155' }}>
-                          <span style={{ color: '#06d6a0', marginRight: '6px', fontSize: '1.1em' }}>■</span>
                           Safety Preferences
                         </h3>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2.5">
                         <div>
                           <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
-                            <span style={{ opacity: 0.8, marginRight: '6px' }}>➤</span>
                             Preferred Transport
                           </label>
                           <div className="flex gap-2 mt-1">
@@ -489,7 +562,6 @@ export default function Profile() {
                         </div>
                         <div>
                           <label className="text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', display: 'block', marginBottom: '4px' }}>
-                            <span style={{ opacity: 0.8, marginRight: '6px' }}>◈</span>
                             Notifications
                           </label>
                           <p className="text-lg" style={{ color: isDark ? '#f8fafc' : '#334155', lineHeight: '1.5' }}>
@@ -517,10 +589,9 @@ export default function Profile() {
                 ) : (
                   // Edit Mode
                   <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div className="grid md:grid-cols-4 gap-2.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                       <div>
                         <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
-                          <span style={{ opacity: 0.8, marginRight: '6px' }}>◉</span>
                           Full Name
                         </label>
                         <input
@@ -542,7 +613,6 @@ export default function Profile() {
                       </div>
                       <div>
                         <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
-                          <span style={{ opacity: 0.8, marginRight: '6px' }}>@</span>
                           Email
                         </label>
                         <input
@@ -560,25 +630,53 @@ export default function Profile() {
                       </div>
                       <div>
                         <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
-                          <span style={{ opacity: 0.8, marginRight: '6px' }}>☎</span>
                           Phone
                         </label>
-                        <input
-                          type="tel"
-                          name="phone"
-                          value={formData.phone}
-                          onChange={handleInputChange}
-                          className="w-full p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
-                          style={{
-                            backgroundColor: isDark ? '#334155' : '#ffffff',
-                            borderColor: validationErrors.phone ? '#ef4444' : (isDark ? '#475569' : '#e5e7eb'),
-                            color: isDark ? '#f8fafc' : '#0f172a',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
-                          onBlur={(e) => e.target.style.transform = 'scale(1)'}
-                          placeholder="+44 7xxx xxx xxx"
-                        />
+                        <div className="flex gap-2">
+                          <select
+                            value={formData.phoneCountryCode}
+                            onChange={(e) => setFormData({ ...formData, phoneCountryCode: e.target.value })}
+                            className="p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
+                            style={{
+                              backgroundColor: isDark ? '#334155' : '#ffffff',
+                              borderColor: isDark ? '#475569' : '#e5e7eb',
+                              color: isDark ? '#f8fafc' : '#0f172a',
+                              width: '110px',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
+                            onBlur={(e) => e.target.style.transform = 'scale(1)'}
+                          >
+                            {countryCodes.map(country => (
+                              <option 
+                                key={country.code} 
+                                value={country.code}
+                                style={{
+                                  backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                  color: isDark ? '#f8fafc' : '#0f172a'
+                                }}
+                              >
+                                {country.flag} {country.code}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="tel"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleInputChange}
+                            className="flex-1 p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
+                            style={{
+                              backgroundColor: isDark ? '#334155' : '#ffffff',
+                              borderColor: validationErrors.phone ? '#ef4444' : (isDark ? '#475569' : '#e5e7eb'),
+                              color: isDark ? '#f8fafc' : '#0f172a',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
+                            onBlur={(e) => e.target.style.transform = 'scale(1)'}
+                            placeholder="7xxx xxx xxx"
+                          />
+                        </div>
                         {validationErrors.phone && (
                           <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
                             {validationErrors.phone}
@@ -587,63 +685,88 @@ export default function Profile() {
                       </div>
                       <div>
                         <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
-                          <span style={{ opacity: 0.8, marginRight: '6px' }}>⚠</span>
                           Emergency Contact
                         </label>
-                        <input
-                          type="tel"
-                          name="emergencyContact"
-                          value={formData.emergencyContact}
-                          onChange={handleInputChange}
-                          className="w-full p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
-                          style={{
-                            backgroundColor: isDark ? '#334155' : '#ffffff',
-                            borderColor: validationErrors.emergencyContact ? '#ef4444' : (isDark ? '#475569' : '#e5e7eb'),
-                            color: isDark ? '#f8fafc' : '#0f172a',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
-                          onBlur={(e) => e.target.style.transform = 'scale(1)'}
-                          placeholder="+44 7xxx xxx xxx"
-                        />
+                        <div className="flex gap-2">
+                          <select
+                            value={formData.emergencyCountryCode}
+                            onChange={(e) => setFormData({ ...formData, emergencyCountryCode: e.target.value })}
+                            className="p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
+                            style={{
+                              backgroundColor: isDark ? '#334155' : '#ffffff',
+                              borderColor: isDark ? '#475569' : '#e5e7eb',
+                              color: isDark ? '#f8fafc' : '#0f172a',
+                              width: '110px',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
+                            onBlur={(e) => e.target.style.transform = 'scale(1)'}
+                          >
+                            {countryCodes.map(country => (
+                              <option 
+                                key={country.code} 
+                                value={country.code}
+                                style={{
+                                  backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                  color: isDark ? '#f8fafc' : '#0f172a'
+                                }}
+                              >
+                                {country.flag} {country.code}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="tel"
+                            name="emergencyContact"
+                            value={formData.emergencyContact}
+                            onChange={handleInputChange}
+                            className="flex-1 p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
+                            style={{
+                              backgroundColor: isDark ? '#334155' : '#ffffff',
+                              borderColor: validationErrors.emergencyContact ? '#ef4444' : (isDark ? '#475569' : '#e5e7eb'),
+                              color: isDark ? '#f8fafc' : '#0f172a',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
+                            onBlur={(e) => e.target.style.transform = 'scale(1)'}
+                            placeholder="7xxx xxx xxx"
+                          />
+                        </div>
                         {validationErrors.emergencyContact && (
                           <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
                             {validationErrors.emergencyContact}
                           </p>
                         )}
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
-                        <span style={{ opacity: 0.8, marginRight: '6px' }}>⌖</span>
-                        Address
-                      </label>
-                      <textarea
-                        name="address"
-                        value={formData.address}
-                        onChange={handleInputChange}
-                        rows={2}
-                        className="w-full p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
-                        style={{
-                          backgroundColor: isDark ? '#334155' : '#ffffff',
-                          borderColor: isDark ? '#475569' : '#e5e7eb',
-                          color: isDark ? '#f8fafc' : '#0f172a',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
-                        onBlur={(e) => e.target.style.transform = 'scale(1)'}
-                        placeholder="Your home address"
-                      />
+                      <div className="md:col-span-2">
+                        <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
+                          Address
+                        </label>
+                        <textarea
+                          name="address"
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          rows={2}
+                          className="w-full p-2 border-2 rounded-lg focus:outline-none focus:border-accent"
+                          style={{
+                            backgroundColor: isDark ? '#334155' : '#ffffff',
+                            borderColor: isDark ? '#475569' : '#e5e7eb',
+                            color: isDark ? '#f8fafc' : '#0f172a',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onFocus={(e) => e.target.style.transform = 'scale(1.02)'}
+                          onBlur={(e) => e.target.style.transform = 'scale(1)'}
+                          placeholder="Your home address"
+                        />
+                      </div>
                     </div>
 
                     {/* Preferences */}
                     <div className="border-t" style={{ borderColor: isDark ? '#334155' : '#e5e7eb', paddingTop: '10px', marginTop: '10px' }}>
                       <h3 className="text-xl font-semibold" style={{ color: isDark ? '#f8fafc' : '#0f172a', marginBottom: '10px' }}>Safety Preferences</h3>
-                      <div className="grid md:grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
-                            <span style={{ opacity: 0.8, marginRight: '6px' }}>➤</span>
                             Preferred Transport
                           </label>
                           <div className="flex gap-3">
@@ -706,7 +829,6 @@ export default function Profile() {
                         </div>
                         <div>
                           <label className="block text-lg font-bold" style={{ color: isDark ? '#06d6a0' : '#059669', marginBottom: '5px' }}>
-                            <span style={{ opacity: 0.8, marginRight: '6px' }}>◈</span>
                             Notifications
                           </label>
                           <label className="flex items-center">
@@ -769,5 +891,6 @@ export default function Profile() {
         </div>
       </div>
     </ProtectedRoute>
+    
   )
 }
