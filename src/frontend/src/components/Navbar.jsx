@@ -160,9 +160,13 @@ export default function Navbar() {
                 >
                   {user?.profile_picture ? (
                     <img 
-                      src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                      src={user.profile_picture.startsWith('http') ? user.profile_picture : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${user.profile_picture}`}
                       alt="Profile" 
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error('Failed to load profile picture (desktop):', e.target.src);
+                        e.target.style.display = 'none';
+                      }}
                     />
                   ) : (
                     <svg 
@@ -235,9 +239,13 @@ export default function Navbar() {
               >
                 {user?.profile_picture ? (
                   <img 
-                    src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                    src={user.profile_picture.startsWith('http') ? user.profile_picture : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${user.profile_picture}`}
                     alt="Profile" 
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error('Failed to load profile picture (mobile):', e.target.src);
+                      e.target.style.display = 'none';
+                    }}
                   />
                 ) : (
                   <svg 
@@ -346,9 +354,13 @@ export default function Navbar() {
                   >
                     {user?.profile_picture ? (
                       <img 
-                        src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                        src={user.profile_picture.startsWith('http') ? user.profile_picture : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${user.profile_picture}`}
                         alt="Profile" 
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error('Failed to load profile picture (mobile menu):', e.target.src);
+                          e.target.style.display = 'none';
+                        }}
                       />
                     ) : (
                       <svg 
@@ -407,11 +419,12 @@ export default function Navbar() {
                     color: '#0f172a'
                   }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#07eaadff'}
                 >
                   Sign Up
                 </Link>
               </div>
+
             )}
           </nav>
         </div>

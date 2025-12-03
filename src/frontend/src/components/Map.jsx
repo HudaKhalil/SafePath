@@ -669,14 +669,29 @@ export default function Map({
                 }}
               >
                 <Tooltip direction="top" offset={[0, -20]} opacity={0.95} permanent={false}>
-                  <div className="text-xs font-semibold">
-                    <span className="capitalize">{(hazard.hazard_type || hazard.type || 'Hazard').replace(/_/g, ' ')}</span>
-                    {hazard.distance_meters && (
-                      <span className="ml-1 text-gray-600">• {Math.round(hazard.distance_meters)}m</span>
+                  <div style={{ minWidth: (hazard.image_url || hazard.imageUrl) ? '150px' : 'auto' }}>
+                    {(hazard.image_url || hazard.imageUrl) && (
+                      <div className="mb-1 rounded overflow-hidden">
+                        <img 
+                          src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                          alt="Hazard preview"
+                          style={{ width: '150px', height: '80px', objectFit: 'cover', display: 'block' }}
+                          onError={(e) => {
+                            console.error('Failed to load hazard tooltip image:', e.target.src);
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
                     )}
+                    <div className="text-xs font-semibold">
+                      <span className="capitalize">{(hazard.hazard_type || hazard.type || 'Hazard').replace(/_/g, ' ')}</span>
+                      {hazard.distance_meters && (
+                        <span className="ml-1 text-gray-600">• {Math.round(hazard.distance_meters)}m</span>
+                      )}
+                    </div>
                   </div>
                 </Tooltip>
-                <Popup>
+                <Popup maxWidth={300} className="hazard-popup">
                   <div className="text-sm">
                     <h3 className="font-semibold capitalize">
                       {(hazard.hazard_type || hazard.type || 'Unknown Hazard').replace(/_/g, ' ')}
@@ -689,7 +704,20 @@ export default function Map({
                         {hazard.severity || 'medium'}
                       </span>
                     </p>
-                    {hazard.description && <p className="mt-1">{hazard.description}</p>}
+                    {(hazard.image_url || hazard.imageUrl) && (
+                      <div className="mt-2 rounded overflow-hidden hidden sm:block">
+                        <img 
+                          src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                          alt="Hazard"
+                          className="w-full h-24 sm:h-32 object-cover"
+                          onError={(e) => {
+                            console.error('Failed to load hazard popup image:', e.target.src);
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    {hazard.description && <p className="mt-2">{hazard.description}</p>}
                     {hazard.distance_meters && (
                       <p className="text-xs text-gray-600 mt-1">
                         📍 {Math.round(hazard.distance_meters)}m away
