@@ -780,6 +780,4 @@ export default function Map({
       </MapContainer>
     </div>
   );
-  
 }
-

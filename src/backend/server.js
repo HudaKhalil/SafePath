@@ -1,15 +1,16 @@
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 // Import database connection
 const db = require('./config/database');
 const csvDataLoader = require('./lib/csvDataLoader');
+const websocketService = require('./lib/websocketService');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -22,11 +23,34 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
 
-// CORS configuration
+// CORS configuration - allow multiple origins
+const allowedOrigins = [
+  process.env.CORS_ORIGIN,
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'https://safe-path-deploy.vercel.app',
+  'https://safepath-deploy.vercel.app',
+  'https://safepath-deploy-hudakhalils-projects.vercel.app'
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      console.warn('⚠️ CORS blocked origin:', origin);
+      // For debugging, allow it but log it
+      callback(null, true);
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -43,13 +67,43 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve uploaded files as static content with explicit CORS headers
+const uploadsPath = path.join(__dirname, 'uploads');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+  console.log('📁 Created uploads directory:', uploadsPath);
+} else {
+  console.log('📁 Uploads directory exists:', uploadsPath);
+}
+
+// Static file middleware with CORS
+const staticFileHandler = express.static(uploadsPath, {
+  setHeaders: (res, filePath, stat) => {
+    // Set CORS headers for all static files
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+});
+
 app.use('/uploads', (req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  next();
-}, express.static(path.join(__dirname, 'uploads')));
+  console.log('📸 Static file request:', req.url);
+  
+  // Try to serve the static file
+  staticFileHandler(req, res, (err) => {
+    if (err) {
+      console.error('❌ Error serving static file:', err);
+      return res.status(500).send('Error serving file');
+    }
+    
+    // If static handler didn't respond, file doesn't exist
+    if (!res.headersSent) {
+      console.log('❌ File not found:', req.url);
+      return res.status(404).send('File not found');
+    }
+  });
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -90,8 +144,20 @@ app.use('/api/geocoding', geocodingRoutes);
 app.use('/api/hazards', hazardsRoutes);
 app.use('/api/buddies', buddiesRoutes);
 
-// 404 handler for unknown routes
+// 404 handler for unknown API routes (but not static files)
+app.use('/api/*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `API route ${req.originalUrl} not found`
+  });
+});
+
+// 404 handler for all other routes
 app.use('*', (req, res) => {
+  // Don't interfere with static file 404s - they're handled by express.static
+  if (req.originalUrl.startsWith('/uploads')) {
+    return res.status(404).send('File not found');
+  }
   res.status(404).json({
     success: false,
     message: `Route ${req.originalUrl} not found`
@@ -127,45 +193,8 @@ const startServer = async () => {
     // Create HTTP server
     const server = http.createServer(app);
     
-    // Setup Socket.IO for real-time features
-    const io = new Server(server, {
-      cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-        methods: ['GET', 'POST'],
-        credentials: true
-      }
-    });
-    
-    // WebSocket connection handling
-    io.on('connection', (socket) => {
-      console.log('🔌 Client connected:', socket.id);
-      
-      // Handle hazard subscriptions
-      socket.on('subscribe_hazards', (data) => {
-        const { latitude, longitude, radius } = data;
-        socket.join(`hazards_${latitude}_${longitude}`);
-        console.log(`📍 Client ${socket.id} subscribed to hazards at [${latitude}, ${longitude}]`);
-      });
-      
-      socket.on('unsubscribe_hazards', () => {
-        socket.rooms.forEach(room => {
-          if (room.startsWith('hazards_')) {
-            socket.leave(room);
-          }
-        });
-        console.log(`📍 Client ${socket.id} unsubscribed from hazards`);
-      });
-      
-      socket.on('user_position', (data) => {
-        const { latitude, longitude, radius } = data;
-        // Broadcast nearby hazards (this would query database in production)
-        socket.emit('nearby_hazards', { hazards: [] });
-      });
-      
-      socket.on('disconnect', () => {
-        console.log('🔌 Client disconnected:', socket.id);
-      });
-    });
+    // Initialize WebSocket service with authentication and all event handlers
+    const io = websocketService.initialize(server);
     
     // Make io available to routes
     app.set('io', io);

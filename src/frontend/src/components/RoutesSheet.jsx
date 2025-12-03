@@ -31,11 +31,12 @@ export default function RoutesSheet({
   // Calculate maxHeight based on screen size (95% of viewport, no hard cap for better mobile scroll)
   // Account for bottom navbar (~70px) when calculating max heights
   const bottomNavbarHeight = 70;
-  const maxHeight = propMaxHeight || Math.max(windowHeight * 0.95 - bottomNavbarHeight, minHeight);
-  // Leave space for top navbar (~80px) when in fullscreen
-  const topNavbarHeight = 80;
+  const topNavbarHeight = 220; // Main navbar + Navigation progress bar (104px + full bar height ~110px)
+  const topPadding = 10; // Small gap from top navbar
+  const maxHeight = propMaxHeight || Math.max(windowHeight - bottomNavbarHeight - topNavbarHeight - topPadding, minHeight);
+  // Leave space for top navbar when in fullscreen
   const fullScreenHeight = enableFullHeight
-    ? Math.max(windowHeight - topNavbarHeight - bottomNavbarHeight, contentMinHeight)
+    ? Math.max(windowHeight - topNavbarHeight - bottomNavbarHeight - topPadding, contentMinHeight)
     : maxHeight;
 
   const effectiveCollapsedHeight = Math.max(collapsedHeight, headerHeight + 8);
@@ -285,7 +286,7 @@ export default function RoutesSheet({
         }}></div>
         
         {/* Header row */}
-        <div className="px-4 flex items-center justify-between">
+        <div className="px-4 pt-2 md:pt-0 flex items-center justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <button
@@ -306,9 +307,17 @@ export default function RoutesSheet({
               </button>
               <h2 
                 className="text-2xl md:text-3xl font-bold transition-colors cursor-pointer" 
-                style={{ color: isDark ? '#06d6a0' : '#1e293b' }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#06d6a0'}
-                onMouseLeave={(e) => e.currentTarget.style.color = isDark ? '#06d6a0' : '#1e293b'}
+                style={typeof title === 'string' ? { color: isDark ? '#06d6a0' : '#1e293b' } : {}}
+                onMouseEnter={(e) => {
+                  if (typeof title === 'string') {
+                    e.currentTarget.style.color = '#06d6a0';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (typeof title === 'string') {
+                    e.currentTarget.style.color = isDark ? '#06d6a0' : '#1e293b';
+                  }
+                }}
               >
                 {title}
               </h2>
