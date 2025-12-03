@@ -419,12 +419,12 @@ export default function Navbar() {
                     color: '#0f172a'
                   }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#07eaadff'}
                 >
                   Sign Up
                 </Link>
               </div>
-              
+
             )}
           </nav>
         </div>
