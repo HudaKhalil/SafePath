@@ -3,7 +3,7 @@ const { body, validationResult } = require('express-validator');
 const { query, pool: getPool } = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const websocketService = require('../lib/websocketService');
-const { uploadHazard } = require('../middleware/upload');
+const { uploadHazard, uploadToCloudinary } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -72,11 +72,12 @@ router.post('/', authenticateToken, (req, res) => {
     try {
       console.log('📝 Received hazard report:', JSON.stringify(req.body, null, 2));
       
-      // Get image URL if file was uploaded
-      const imageUrl = req.file ? `/uploads/hazards/${req.file.filename}` : null;
-      
+      // Upload to Cloudinary if file was uploaded
+      let imageUrl = null;
       if (req.file) {
-        console.log('📷 Image uploaded:', req.file.filename);
+        const result = await uploadToCloudinary(req.file.buffer, 'hazards', req.user.userId);
+        imageUrl = result.secure_url;
+        console.log('📷 Image uploaded to Cloudinary:', imageUrl);
       }
 
       // Convert affectsTraffic and weatherRelated from strings to booleans
