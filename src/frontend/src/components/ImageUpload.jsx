@@ -136,6 +136,10 @@ export default function ImageUpload({
               src={imageUrl} 
               alt="Profile" 
               className="w-full h-full object-cover"
+              onError={(e) => {
+                console.error('Failed to load profile picture:', e.target.src);
+                e.target.style.display = 'none';
+              }}
             />
           ) : (
             <svg 
