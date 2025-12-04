@@ -673,11 +673,16 @@ export default function Map({
                     {(hazard.image_url || hazard.imageUrl) && (
                       <div className="mb-1 rounded overflow-hidden">
                         <img 
-                          src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                          src={(() => {
+                            const imageUrl = hazard.image_url || hazard.imageUrl;
+                            // If Cloudinary URL (starts with http), use as-is
+                            if (imageUrl.startsWith('http')) return imageUrl;
+                            // Otherwise, prepend API URL (legacy local images)
+                            return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                          })()}
                           alt="Hazard preview"
                           style={{ width: '150px', height: '80px', objectFit: 'cover', display: 'block' }}
                           onError={(e) => {
-                            console.error('Failed to load hazard tooltip image:', e.target.src);
                             e.target.style.display = 'none';
                           }}
                         />
@@ -707,11 +712,16 @@ export default function Map({
                     {(hazard.image_url || hazard.imageUrl) && (
                       <div className="mt-2 rounded overflow-hidden hidden sm:block">
                         <img 
-                          src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                          src={(() => {
+                            const imageUrl = hazard.image_url || hazard.imageUrl;
+                            // If Cloudinary URL (starts with http), use as-is
+                            if (imageUrl.startsWith('http')) return imageUrl;
+                            // Otherwise, prepend API URL (legacy local images)
+                            return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                          })()}
                           alt="Hazard"
                           className="w-full h-24 sm:h-32 object-cover"
                           onError={(e) => {
-                            console.error('Failed to load hazard popup image:', e.target.src);
                             e.target.style.display = 'none';
                           }}
                         />

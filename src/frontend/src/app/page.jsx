@@ -114,57 +114,81 @@ export default function Home() {
     setSuggestions([]);
     setShowSuggestions(false);
     
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const currentLocation = [position.coords.latitude, position.coords.longitude];
-          
-          // Save to localStorage
-          localStorage.setItem('userLocation', JSON.stringify(currentLocation));
-          
-          setUserLocation(currentLocation);
-          // Update map center to current location
-          setMapCenter(currentLocation);
-          setMapZoom(13);
-          
-          // Get address for current location
-          try {
-            const response = await geocodingService.getAddressFromCoords(
-              position.coords.latitude,
-              position.coords.longitude
-            );
-            if (response.success && response.data?.display_name) {
-              localStorage.setItem('userAddress', response.data.display_name);
-              setUserAddress(response.data.display_name);
-            }
-          } catch (error) {
-            console.log('Could not get address for current location');
-          }
-          
-          // Fetch nearby hazards within 10km
-          fetchNearbyHazards(currentLocation[0], currentLocation[1]);
-        },
-        (error) => {
-          console.log('Geolocation error:', error.message);
-          // Don't reset to London - keep the existing location from localStorage
-          // Still fetch hazards for stored location
-          const storedLocation = localStorage.getItem('userLocation');
-          if (storedLocation) {
+    const loadLocation = () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const currentLocation = [position.coords.latitude, position.coords.longitude];
+            
+            // Save to localStorage
+            localStorage.setItem('userLocation', JSON.stringify(currentLocation));
+            
+            setUserLocation(currentLocation);
+            // Update map center to current location
+            setMapCenter(currentLocation);
+            setMapZoom(13);
+            
+            // Get address for current location
             try {
-              const loc = JSON.parse(storedLocation);
-              fetchNearbyHazards(loc[0], loc[1]);
-            } catch (e) {
-              console.log('Could not parse stored location');
+              const response = await geocodingService.getAddressFromCoords(
+                position.coords.latitude,
+                position.coords.longitude
+              );
+              if (response.success && response.data?.display_name) {
+                localStorage.setItem('userAddress', response.data.display_name);
+                setUserAddress(response.data.display_name);
+              }
+            } catch (error) {
+              console.log('Could not get address for current location');
             }
+            
+            // Fetch nearby hazards within 10km
+            fetchNearbyHazards(currentLocation[0], currentLocation[1]);
+          },
+          (error) => {
+            console.log('Geolocation error:', error.message);
+            // Don't reset to London - keep the existing location from localStorage
+            // Still fetch hazards for stored location
+            const storedLocation = localStorage.getItem('userLocation');
+            if (storedLocation) {
+              try {
+                const loc = JSON.parse(storedLocation);
+                fetchNearbyHazards(loc[0], loc[1]);
+              } catch (e) {
+                console.log('Could not parse stored location');
+              }
+            }
+          },
+          {
+            timeout: 10000,
+            enableHighAccuracy: true,
+            maximumAge: 60000
           }
-        },
-        {
-          timeout: 10000,
-          enableHighAccuracy: true,
-          maximumAge: 60000
+        );
+      }
+    };
+    
+    loadLocation();
+    
+    // Listen for hazard updates (when a new hazard is created)
+    const handleHazardsUpdate = () => {
+      console.log('🔄 Hazards updated, refreshing map...');
+      const storedLocation = localStorage.getItem('userLocation');
+      if (storedLocation) {
+        try {
+          const loc = JSON.parse(storedLocation);
+          fetchNearbyHazards(loc[0], loc[1]);
+        } catch (e) {
+          console.log('Could not parse stored location');
         }
-      );
-    }
+      }
+    };
+    
+    window.addEventListener('hazardsUpdated', handleHazardsUpdate);
+    
+    return () => {
+      window.removeEventListener('hazardsUpdated', handleHazardsUpdate);
+    };
   }, []);
 
   // Fetch nearby hazards within 5km radius
@@ -630,7 +654,11 @@ export default function Home() {
                         {(hazard.image_url || hazard.imageUrl) ? (
                           <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-lg overflow-hidden shrink-0">
                             <img 
-                              src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                              src={(() => {
+                                const imageUrl = hazard.image_url || hazard.imageUrl;
+                                if (imageUrl.startsWith('http')) return imageUrl;
+                                return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                              })()}
                               alt={hazard.hazardType || 'Hazard'}
                               className="w-full h-full object-cover"
                               onError={(e) => {
@@ -668,12 +696,6 @@ export default function Home() {
                               </span>
                             )}
                           </div>
-                          <p 
-                            className="text-xs mt-2 line-clamp-2"
-                            style={{ color: isDark ? '#94a3b8' : '#64748b' }}
-                          >
-                            {hazard.description}
-                          </p>
                         </div>
                       </div>
                     </div>
@@ -971,7 +993,11 @@ export default function Home() {
                         {(hazard.image_url || hazard.imageUrl) ? (
                           <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-lg overflow-hidden shrink-0">
                             <img 
-                              src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                              src={(() => {
+                                const imageUrl = hazard.image_url || hazard.imageUrl;
+                                if (imageUrl.startsWith('http')) return imageUrl;
+                                return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                              })()}
                               alt={hazard.hazardType || 'Hazard'}
                               className="w-full h-full object-cover"
                               onError={(e) => {
@@ -1009,12 +1035,6 @@ export default function Home() {
                               </span>
                             )}
                           </div>
-                          <p 
-                            className="text-xs mt-2 line-clamp-2"
-                            style={{ color: isDark ? '#94a3b8' : '#64748b' }}
-                          >
-                            {hazard.description}
-                          </p>
                         </div>
                       </div>
                     </div>
