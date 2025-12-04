@@ -199,6 +199,10 @@ graph TD
 - **Git**
 - **npm** or **pnpm** or **yarn**
 
+### Demo
+
+👉 Try the live app: [Open SafePath](https://safepath-deploy.vercel.app)
+
 ### Installation
 
 #### 1. Clone the Repository
