@@ -549,11 +549,20 @@ router.put('/profile', authenticateToken, async (req, res) => {
 router.post('/profile/picture', authenticateToken, upload.single('profilePicture'), async (req, res) => {
   try {
     if (!req.file) {
+      console.log('❌ [AUTH] No file in request');
       return res.status(400).json({
         success: false,
         message: 'No file uploaded'
       });
     }
+    
+    console.log('✅ [AUTH] File received by multer');
+    console.log('📁 [AUTH] File info:', {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      bufferLength: req.file.buffer?.length
+    });
 
     // Get current preferences
     const currentUser = await db.query(

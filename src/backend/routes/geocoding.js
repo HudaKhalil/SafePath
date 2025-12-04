@@ -30,7 +30,12 @@ router.get('/search', async (req, res) => {
       params.countrycodes = countrycode;
     }
 
-    const response = await axios.get(nominatimUrl, { params });
+    const response = await axios.get(nominatimUrl, { 
+      params,
+      headers: {
+        'User-Agent': 'SafePath-App/1.0'
+      }
+    });
     
     const locations = response.data.map((item, index) => ({
       id: index,
@@ -89,7 +94,12 @@ router.get('/reverse', async (req, res) => {
       addressdetails: 1
     };
 
-    const response = await axios.get(nominatimUrl, { params });
+    const response = await axios.get(nominatimUrl, { 
+      params,
+      headers: {
+        'User-Agent': 'SafePath-App/1.0'
+      }
+    });
     
     if (!response.data || response.data.error) {
       return res.status(404).json({
