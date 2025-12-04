@@ -541,6 +541,7 @@ export default function FindBuddy() {
           }}
         >
           <Map
+          
             center={userLocation || [51.5074, -0.1278]}
             zoom={13}
             hazards={[]}
