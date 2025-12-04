@@ -298,6 +298,9 @@ export default function HazardReporting() {
         setShowReportForm(false)
         removeImage()
         loadRecentHazards()
+        
+        // Notify homepage to refresh hazards on map
+        window.dispatchEvent(new Event('hazardsUpdated'))
       } else {
         setToast({
           message: 'Failed to report hazard. Please try again.',
@@ -884,12 +887,17 @@ export default function HazardReporting() {
                               {(hazard.image_url || hazard.imageUrl) && (
                                 <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden">
                                   <img 
-                                    src={`${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${hazard.image_url || hazard.imageUrl}`}
+                                    src={(() => {
+                                      const imageUrl = hazard.image_url || hazard.imageUrl;
+                                      // If Cloudinary URL (starts with http), use as-is
+                                      if (imageUrl.startsWith('http')) return imageUrl;
+                                      // Otherwise, prepend API URL (legacy local images)
+                                      return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                                    })()}
                                     alt={hazard.hazardType}
                                     className="w-full h-full object-cover"
                                     onError={(e) => {
-                                      console.error('Failed to load hazard image in Recent Reports:', e.target.src);
-                                      e.target.style.display = 'none';
+                                      e.target.parentElement.style.display = 'none';
                                     }}
                                   />
                                 </div>
