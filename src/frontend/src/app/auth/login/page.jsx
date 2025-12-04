@@ -71,6 +71,28 @@ export default function Login() {
     return true;
   };
 
+  const handleResendVerification = async (email) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/auth/resend-verification`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        alert('✅ Verification email sent! Please check your inbox.');
+      } else {
+        alert('❌ ' + (data.message || 'Failed to resend email'));
+      }
+    } catch (error) {
+      console.error('Resend error:', error);
+      alert('❌ Failed to resend verification email. Please try again.');
+    }
+  };
+
   const handleSubmit = async (e) => {
     if (e) {
       e.preventDefault();
@@ -88,7 +110,6 @@ export default function Login() {
 
     console.log('✅ Validation passed, starting login...');
     setIsLoading(true);
-    // Don't clear errors here - let them persist until we get a new result
 
     try {
       const loginData = {
@@ -104,37 +125,68 @@ export default function Login() {
 
       if (result.success) {
         console.log('✅ Login successful, redirecting...');
-        // Keep loading state while redirecting
         setTimeout(() => {
           console.log('🔄 Executing redirect now');
           window.location.href = '/';
         }, 100);
+      } else if (result.requiresVerification) {
+        // Email not verified - show message with option to resend
+        console.log('⚠️ Email verification required');
+        const resend = confirm(
+          '📧 Please verify your email before logging in.\n\n' +
+          'We sent a verification link to ' + result.email + '\n\n' +
+          'Didn\'t receive it? Click OK to resend the verification email.'
+        );
+        
+        if (resend) {
+          await handleResendVerification(result.email);
+        }
+        setIsLoading(false);
       } else {
         console.log('❌ Login failed:', result.message);
         const errorMsg = result.message || 'Login failed';
         console.log('Setting errors to:', errorMsg);
         setErrors({ general: errorMsg });
         setIsLoading(false);
-        console.log('Should show error now');
       }
     } catch (error) {
       console.error('Login error:', error);
       
-      // Determine error message
       let errorMessage = 'Login failed. Please try again.';
       
       if (!error.response) {
-        // Network error or backend not running
         errorMessage = error.message || 'Cannot connect to server. Please ensure the backend is running on port 5001.';
+        setErrors({ general: errorMessage });
+        setIsLoading(false);
+      } else if (error.response?.status === 403 && error.response?.data?.requiresVerification) {
+        // Email verification required - from backend error response
+        console.log('⚠️ Email verification required (from error response)');
+        const resend = confirm(
+          '📧 Please verify your email before logging in.\n\n' +
+          'We sent a verification link to ' + (error.response?.data?.email || formData.email) + '\n\n' +
+          'Didn\'t receive it? Click OK to resend the verification email.'
+        );
+        
+        if (resend) {
+          await handleResendVerification(error.response?.data?.email || formData.email);
+        }
+        setIsLoading(false);
+        return;
       } else if (error.response?.status === 401 || error.response?.status === 400) {
-        // Invalid credentials
         errorMessage = error.response.data?.message || 'Invalid email or password';
+        setErrors({ general: errorMessage });
+        setIsLoading(false);
       } else if (error.response?.data?.message) {
-        // Other API errors
         errorMessage = error.response.data.message;
+        setErrors({ general: errorMessage });
+        setIsLoading(false);
       } else if (error.message) {
-        // Generic error with message
         errorMessage = error.message;
+        setErrors({ general: errorMessage });
+        setIsLoading(false);
+      } else {
+        setErrors({ general: 'Login failed. Please try again.' });
+        setIsLoading(false);
       }
       
       console.log('Setting error message:', errorMessage);
@@ -147,23 +199,8 @@ export default function Login() {
         });
         if (Object.keys(fieldErrors).length > 0) {
           setErrors(fieldErrors);
-        } else {
-          setErrors({ general: errorMessage });
         }
-      } else {
-        const errorState = { general: errorMessage };
-        console.log('❌ Setting error state:', errorState);
-        setErrors(errorState);
-        console.log('🔴 DO NOT CLEAR FORM - KEEP FORM DATA');
       }
-      
-      // Keep loading state false and errors visible
-      setIsLoading(false);
-      
-      // Log after state update attempt
-      setTimeout(() => {
-        console.log('📊 After 100ms - errors:', errors, 'formData:', formData);
-      }, 100);
     }
     
     console.log('🔵 handleSubmit completed');
@@ -284,25 +321,3 @@ export default function Login() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
