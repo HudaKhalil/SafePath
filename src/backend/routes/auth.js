@@ -7,7 +7,7 @@ const fs = require('fs');
 require('dotenv').config(); // Ensure environment variables are loaded
 const db = require('../config/database');
 const authenticateToken = require('../middleware/auth');
-const { uploadProfile, deleteImage } = require('../middleware/upload');
+const { uploadProfile, deleteImage, uploadToCloudinary } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -490,9 +490,15 @@ router.put('/profile', authenticateToken, [
 
 // Upload profile picture
 router.post('/profile/picture', authenticateToken, (req, res) => {
+  console.log('\n🎯 [AUTH] ========== PROFILE PICTURE UPLOAD START ==========');
+  console.log('📸 [AUTH] User ID:', req.user.userId);
+  console.log('📧 [AUTH] User email:', req.user.email);
+  
   uploadProfile(req, res, async (err) => {
+    console.log('🔄 [AUTH] Multer processing complete');
+    
     if (err) {
-      console.error('Upload error:', err);
+      console.error('❌ [AUTH] Multer error:', err);
       return res.status(400).json({
         success: false,
         message: err.message || 'Error uploading file'
@@ -500,50 +506,76 @@ router.post('/profile/picture', authenticateToken, (req, res) => {
     }
 
     if (!req.file) {
+      console.log('❌ [AUTH] No file in request');
       return res.status(400).json({
         success: false,
         message: 'No file uploaded'
       });
     }
+    
+    console.log('✅ [AUTH] File received by multer');
+    console.log('📁 [AUTH] File info:', {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      bufferLength: req.file.buffer?.length
+    });
 
     try {
+      console.log('🔍 [AUTH] Querying database for current user preferences...');
+      
       // Get current user to find old profile picture
       const currentUser = await db.query(
         'SELECT preferences FROM users WHERE user_id = $1',
         [req.user.userId]
       );
+      
+      console.log('✅ [AUTH] Database query complete');
 
       if (currentUser.rows.length === 0) {
-        // Delete uploaded file if user not found
-        deleteImage(req.file.path);
+        console.log('❌ [AUTH] User not found in database');
         return res.status(404).json({
           success: false,
           message: 'User not found'
         });
       }
+      
+      console.log('✅ [AUTH] User found in database');
 
       // Parse existing preferences
+      console.log('📋 [AUTH] Parsing user preferences...');
       let preferences = {};
       if (currentUser.rows[0].preferences) {
         try {
           preferences = typeof currentUser.rows[0].preferences === 'string'
             ? JSON.parse(currentUser.rows[0].preferences)
             : currentUser.rows[0].preferences;
+          console.log('✅ [AUTH] Preferences parsed. Has old picture:', !!preferences.profile_picture);
         } catch (e) {
-          console.error('Error parsing preferences:', e);
+          console.error('❌ [AUTH] Error parsing preferences:', e);
         }
       }
 
+      // Upload to Cloudinary
+      console.log('☁️  [AUTH] Starting Cloudinary upload...');
+      const result = await uploadToCloudinary(req.file.buffer, 'profiles', req.user.userId);
+      console.log('✅ [AUTH] Cloudinary upload complete! URL:', result.secure_url);
+
       // Delete old profile picture if exists
       if (preferences.profile_picture) {
-        const oldPath = path.join(__dirname, '..', preferences.profile_picture);
-        deleteImage(oldPath);
+        console.log('🗑️  [AUTH] Deleting old profile picture from Cloudinary...');
+        await deleteImage(preferences.profile_picture);
+        console.log('✅ [AUTH] Old picture deleted');
+      } else {
+        console.log('ℹ️  [AUTH] No old profile picture to delete');
       }
 
-      // Update preferences with new profile picture path
-      preferences.profile_picture = `/uploads/profiles/${req.file.filename}`;
+      // Update preferences with new Cloudinary URL
+      preferences.profile_picture = result.secure_url;
+      console.log('✅ [AUTH] Preferences updated with new URL');
 
       // Update database
+      console.log('💾 [AUTH] Saving to database...');
       const updateQuery = `
         UPDATE users 
         SET preferences = $1, updated_at = CURRENT_TIMESTAMP 
@@ -552,24 +584,27 @@ router.post('/profile/picture', authenticateToken, (req, res) => {
       `;
 
       await db.query(updateQuery, [JSON.stringify(preferences), req.user.userId]);
+      console.log('✅ [AUTH] Database saved successfully');
 
+      console.log('📤 [AUTH] Sending response to client...');
       res.json({
         success: true,
         message: 'Profile picture uploaded successfully',
         data: {
           profile_picture: preferences.profile_picture,
-          filename: req.file.filename
+          url: preferences.profile_picture
         }
       });
+      console.log('✅ [AUTH] ========== UPLOAD COMPLETE ==========\n');
 
     } catch (error) {
-      console.error('Database error:', error);
-      // Delete uploaded file if database update fails
-      deleteImage(req.file.path);
+      console.error('❌ [AUTH] ERROR OCCURRED:', error.message);
+      console.error('❌ [AUTH] Stack trace:', error.stack);
       res.status(500).json({
         success: false,
-        message: 'Error saving profile picture'
+        message: 'Error saving profile picture: ' + error.message
       });
+      console.log('❌ [AUTH] ========== UPLOAD FAILED ==========\n');
     }
   });
 });
@@ -609,9 +644,8 @@ router.delete('/profile/picture', authenticateToken, async (req, res) => {
       });
     }
 
-    // Delete file
-    const filePath = path.join(__dirname, '..', preferences.profile_picture);
-    deleteImage(filePath);
+    // Delete the file from filesystem
+    deleteImage(preferences.profile_picture);
 
     // Remove from preferences
     delete preferences.profile_picture;
