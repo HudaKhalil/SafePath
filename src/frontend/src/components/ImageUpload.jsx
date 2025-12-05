@@ -89,36 +89,26 @@ export default function ImageUpload({
   // Construct full image URL for backend images
   const getImageUrl = () => {
     const img = displayImage;
-    console.log('[ImageUpload] displayImage:', img);
-    console.log('[ImageUpload] currentImage:', currentImage);
-    console.log('[ImageUpload] preview:', preview);
     
     if (!img) return null;
     
     // If it's a data URL (base64 preview), use it directly
     if (img.startsWith('data:')) {
-      console.log('[ImageUpload] Using data URL');
       return img;
     }
     
-    // If it's already a full URL, use it
+    // If it's already a full URL (Cloudinary or other CDN), use it
     if (img.startsWith('http://') || img.startsWith('https://')) {
-      console.log('[ImageUpload] Using full URL:', img);
       return img;
     }
     
-    // Otherwise, construct the full URL to backend
-    // API URL is like: http://localhost:5001/api
-    // We need: http://localhost:5001/uploads/profiles/filename.jpg
+    // Otherwise, construct the full URL to backend for local files
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-    const baseUrl = apiUrl.replace(/\/api$/, ''); // Remove /api suffix
-    const fullUrl = `${baseUrl}${img}`; // img already has /uploads/profiles/...
-    console.log('[ImageUpload] Constructed URL:', fullUrl);
-    return fullUrl;
+    const baseUrl = apiUrl.replace(/\/api$/, '');
+    return `${baseUrl}${img}`;
   };
 
   const imageUrl = getImageUrl();
-  console.log('[ImageUpload] Final imageUrl:', imageUrl);
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -136,6 +126,14 @@ export default function ImageUpload({
               src={imageUrl} 
               alt="Profile" 
               className="w-full h-full object-cover"
+              onError={(e) => {
+                // Hide broken image and show placeholder instead
+                e.target.style.display = 'none';
+                // Set error message only once
+                if (!error) {
+                  setError('Profile picture not found');
+                }
+              }}
             />
           ) : (
             <svg 

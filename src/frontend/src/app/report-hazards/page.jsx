@@ -20,15 +20,12 @@ export default function HazardReporting() {
   const [isConnected, setIsConnected] = useState(false)
   const [toast, setToast] = useState(null)
   const eventSourceRef = useRef(null)
-  
- 
   const [isLightMode, setIsLightMode] = useState(false)
+  const [isMdScreen, setIsMdScreen] = useState(false)
   
   useEffect(() => {
-   
     setIsLightMode(!document.documentElement.classList.contains('dark'))
     
-  
     const observer = new MutationObserver(() => {
       setIsLightMode(!document.documentElement.classList.contains('dark'))
     })
@@ -40,6 +37,18 @@ export default function HazardReporting() {
     
     return () => observer.disconnect()
   }, [])
+
+  // Track screen size for responsive layout
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMdScreen(window.innerWidth >= 768)
+    }
+    
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
   
   const [formData, setFormData] = useState({
     type: '',
@@ -50,6 +59,10 @@ export default function HazardReporting() {
     affectsTraffic: false,
     weatherRelated: false
   })
+  
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
+  const fileInputRef = useRef(null)
 
   // Define all callbacks first before useEffect
   const getUserLocation = () => {
@@ -198,7 +211,50 @@ export default function HazardReporting() {
       latitude: latlng.lat,
       longitude: latlng.lng
     })
-    setShowReportForm(true)
+    // Auto-open form when user clicks on map
+    if (!showReportForm) {
+      setShowReportForm(true)
+    }
+  }
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setToast({
+          message: '⚠️ Please select an image file',
+          type: 'error'
+        })
+        return
+      }
+      
+      // Validate file size (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setToast({
+          message: '⚠️ Image size must be less than 5MB',
+          type: 'error'
+        })
+        return
+      }
+      
+      setImageFile(file)
+      
+      // Create preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+  
+  const removeImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -215,15 +271,14 @@ export default function HazardReporting() {
       return
     }
 
-    const submitData = {
-      ...formData,
-      latitude: lat,
-      longitude: lng
-    }
-
     try {
-      console.log('Submitting hazard data:', submitData)
-      const response = await hazardsService.reportHazard(submitData)
+      console.log('Submitting hazard data with image:', imageFile ? imageFile.name : 'no image')
+      const response = await hazardsService.reportHazard({
+        ...formData,
+        latitude: lat,
+        longitude: lng
+      }, imageFile)
+      
       console.log('Hazard submission response:', response)
       if (response.success) {
         setToast({
@@ -241,7 +296,11 @@ export default function HazardReporting() {
         })
         setSelectedLocation(null)
         setShowReportForm(false)
+        removeImage()
         loadRecentHazards()
+        
+        // Notify homepage to refresh hazards on map
+        window.dispatchEvent(new Event('hazardsUpdated'))
       } else {
         setToast({
           message: 'Failed to report hazard. Please try again.',
@@ -342,13 +401,13 @@ export default function HazardReporting() {
 <section className="relative min-h-[calc(100vh-80px)] mt-4 pb-8" style={{ backgroundColor: isLightMode ? '#ffffff' : '#0f172a' }}>
           {/* Side Panel */}
           <div 
-            className="fixed left-0 top-20 bottom-0 z-50 w-full md:w-96 transition-transform duration-300 shadow-2xl"
+            className="fixed left-0 top-20 bottom-0 z-50 w-full md:w-96 lg:w-[420px] transition-transform duration-300 shadow-2xl overflow-hidden"
             style={{
               transform: showReportForm ? 'translateX(0)' : 'translateX(-100%)',
             }}
           >
             <div className="h-full overflow-y-auto">
-              <div className="p-4">
+              <div className="p-4 pb-24">
                 <div className="border-2 rounded-2xl p-4 md:p-6" style={{ 
                   backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
                   borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
@@ -522,6 +581,65 @@ export default function HazardReporting() {
                       <div className="text-sm mt-1" style={{ color: '#9ca3af' }}>Minimum 20 characters</div>
                     </div>
 
+                    <div>
+                      <label className="flex items-center gap-2 text-base font-medium mb-2" style={{ 
+                        color: isLightMode ? '#0f172a' : '#ffffff' 
+                      }}>
+                        <span className="font-bold">📷 Photo (Optional)</span>
+                      </label>
+                      <div className="space-y-3">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                          id="hazard-image-upload"
+                        />
+                        <label
+                          htmlFor="hazard-image-upload"
+                          className="flex items-center justify-center gap-2 w-full p-4 rounded-lg border-2 border-dashed cursor-pointer transition-all duration-200 hover:border-accent"
+                          style={{
+                            backgroundColor: isLightMode ? '#f9fafb' : '#1e293b',
+                            borderColor: isLightMode ? '#d1d5db' : '#374151',
+                            color: isLightMode ? '#0f172a' : '#ffffff'
+                          }}
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          <span className="text-lg font-medium">
+                            {imageFile ? 'Change Photo' : 'Upload Photo'}
+                          </span>
+                        </label>
+                        
+                        {imagePreview && (
+                          <div className="relative rounded-lg overflow-hidden border" style={{
+                            borderColor: isLightMode ? '#d1d5db' : '#374151'
+                          }}>
+                            <img 
+                              src={imagePreview} 
+                              alt="Hazard preview" 
+                              className="w-full h-48 object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={removeImage}
+                              className="absolute top-2 right-2 p-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                              aria-label="Remove image"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                        <div className="text-sm" style={{ color: '#9ca3af' }}>
+                          Max size: 5MB. Supported formats: JPEG, PNG, GIF, WebP
+                        </div>
+                      </div>
+                    </div>
+
                     {selectedLocation && (
                       <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                         <p className="text-green-800 text-lg">
@@ -578,6 +696,7 @@ export default function HazardReporting() {
                             affectsTraffic: false,
                             weatherRelated: false
                           })
+                          removeImage()
                         }}
                         className="font-semibold py-3 px-6 rounded-lg transition-all duration-200"
                         style={{
@@ -610,9 +729,11 @@ export default function HazardReporting() {
           {/* Toggle Button */}
           <button
             onClick={() => setShowReportForm(!showReportForm)}
-            className="absolute left-4 top-4 z-20 transition-all duration-200"
+            className="absolute z-40 transition-all duration-300"
             style={{
               backgroundColor: 'transparent',
+              top: '16px',
+              left: showReportForm && isMdScreen ? '400px' : '16px',
             }}
           >
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg" style={{
@@ -642,8 +763,13 @@ export default function HazardReporting() {
           </button>
 
           {/* Main Map Area */}
-          <div className="min-h-screen">
-            <div className="space-y-4 p-4">
+          <div 
+            className="transition-all duration-300 pb-20 md:pb-8"
+            style={{
+              marginLeft: showReportForm && isMdScreen ? '384px' : '0',
+            }}
+          >
+            <div className="space-y-4 p-4 md:p-6">
               
                 <div className="border-2 rounded-2xl p-2 md:p-3" style={{ 
                   backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
@@ -681,20 +807,25 @@ export default function HazardReporting() {
                     </button>
                   </div>
                   
-                  {showReportForm && (
-                    <div className="mb-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-blue-800 text-sm">
-                        📍 Click on the map to select the hazard location
-                      </p>
-                    </div>
-                  )}
+                  <div className="mb-3 p-2.5 rounded-lg" style={{
+                    backgroundColor: selectedLocation ? '#dcfce7' : '#dbeafe',
+                    border: selectedLocation ? '1px solid #86efac' : '1px solid #93c5fd'
+                  }}>
+                    <p className="text-sm" style={{
+                      color: selectedLocation ? '#166534' : '#1e40af'
+                    }}>
+                      {selectedLocation 
+                        ? '✓ Location selected! You can click again to change it'
+                        : '📍 Click anywhere on the map to mark the hazard location'}
+                    </p>
+                  </div>
                   
                   <Map
                     center={userLocation || [51.5074, -0.1278]}
                     zoom={13}
                     hazards={hazards.filter(h => h.latitude && h.longitude)}
-                    height="650px"
-                    onMapClick={showReportForm ? handleMapClick : null}
+                    height={isMdScreen ? "calc(100vh - 280px)" : "500px"}
+                    onMapClick={handleMapClick}
                     markers={[
                       ...(userLocation && userLocation[0] && userLocation[1] ? [{
                         position: userLocation,
@@ -751,9 +882,29 @@ export default function HazardReporting() {
                           
                         return (
                           <div key={hazard.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-all duration-200 hover:border-accent/30">
-                            <div className="flex justify-between items-start">
+                            <div className="flex justify-between items-start gap-3">
+                              {/* Hazard Image (if available) */}
+                              {(hazard.image_url || hazard.imageUrl) && (
+                                <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden">
+                                  <img 
+                                    src={(() => {
+                                      const imageUrl = hazard.image_url || hazard.imageUrl;
+                                      // If Cloudinary URL (starts with http), use as-is
+                                      if (imageUrl.startsWith('http')) return imageUrl;
+                                      // Otherwise, prepend API URL (legacy local images)
+                                      return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                                    })()}
+                                    alt={hazard.hazardType}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.target.parentElement.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              
                               <div className="flex items-start gap-3 flex-1">
-                                <span className="text-xl flex-shrink-0">
+                                <span className="text-xl shrink-0">
                                   {hazardEmojis[hazard.hazardType] || '⚠️'}
                                 </span>
                                 <div className="min-w-0 flex-1">
@@ -761,6 +912,9 @@ export default function HazardReporting() {
                                     <div className="font-semibold capitalize text-sm" style={{ color: '#0f172a' }}>
                                       {hazard.hazardType.replace('_', ' ')}
                                     </div>
+                                    {(hazard.image_url || hazard.imageUrl) && (
+                                      <span className="text-xs">📷</span>
+                                    )}
                                     {hazard.priorityLevel > 3 && (
                                       <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded-full font-medium">
                                         Priority
@@ -783,7 +937,7 @@ export default function HazardReporting() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+                              <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityBadgeColor(hazard.severity)}`}>
                                   {hazard.severity}
                                 </span>
@@ -800,52 +954,6 @@ export default function HazardReporting() {
                     </div>
                   )}
                 </div>
-            </div>
-          </div>
-        </section>
-
-        {/* EMERGENCY SITUATIONS */}
-        <section className="py-8 md:py-10" style={{ backgroundColor: '#ffffff' }}>
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="max-w-5xl mx-auto bg-red-50 border-2 border-red-200 rounded-2xl p-4 md:p-6">
-              <div className="text-center mb-6">
-                <div className="text-3xl md:text-4xl mb-3">⚠️</div>
-                <h3 className="text-xl md:text-2xl font-bold text-red-800 mb-2">Emergency Situations</h3>
-                <p className="text-red-700">
-                  If you're witnessing an immediate danger or emergency situation, please contact emergency services directly instead of using this form.
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-4 gap-4">
-                <div className="bg-white rounded-lg p-4 text-center shadow-sm hover:shadow-md transition-shadow">
-                  <div className="text-2xl mb-2">📞</div>
-                  <div className="font-bold text-red-800 mb-1 text-sm">Emergency Services</div>
-                  <div className="text-xl font-bold text-red-600">999</div>
-                  <div className="text-xs text-gray-600 mt-1">Fire, Police, Ambulance</div>
-                </div>
-
-                <div className="bg-white rounded-lg p-4 text-center shadow-sm hover:shadow-md transition-shadow">
-                  <div className="text-2xl mb-2">🚔</div>
-                  <div className="font-bold text-red-800 mb-1 text-sm">Police Non-Emergency</div>
-                  <div className="text-xl font-bold text-red-600">101</div>
-                  <div className="text-xs text-gray-600 mt-1">Crime reporting</div>
-                </div>
-
-                <div className="bg-white rounded-lg p-4 text-center shadow-sm hover:shadow-md transition-shadow">
-                  <div className="text-2xl mb-2">🏛️</div>
-                  <div className="font-bold text-red-800 mb-1 text-sm">City Council</div>
-                  <div className="text-lg font-bold text-red-600">020 7XXX XXXX</div>
-                  <div className="text-xs text-gray-600 mt-1">Infrastructure issues</div>
-                </div>
-
-                <div className="bg-white rounded-lg p-4 text-center shadow-sm hover:shadow-md transition-shadow">
-                  <div className="text-2xl mb-2">🚨</div>
-                  <div className="font-bold text-red-800 mb-1 text-sm">NHS Direct</div>
-                  <div className="text-xl font-bold text-red-600">111</div>
-                  <div className="text-xs text-gray-600 mt-1">Medical advice</div>
-                </div>
-                
-              </div>
             </div>
           </div>
         </section>

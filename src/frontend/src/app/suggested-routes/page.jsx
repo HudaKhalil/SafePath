@@ -42,6 +42,22 @@ function SuggestedRoutesContent() {
     
     sessionStorage.setItem(`route_${route.id}`, JSON.stringify(routeData));
     
+    // Save complete search state for restoration
+    const searchState = {
+      fromLocation,
+      toLocation,
+      fromCoords,
+      toCoords,
+      transportMode,
+      routes,
+      backendRoutes,
+      selectedRouteId: route.id,
+      selectedRoute: route,
+      mapCenter,
+      mapZoom
+    };
+    sessionStorage.setItem('route_search_state', JSON.stringify(searchState));
+    
     const url =
       `/navigation` +
       `?routeId=${encodeURIComponent(route.id)}` +
@@ -124,6 +140,66 @@ function SuggestedRoutesContent() {
     // Load saved safety weights and preset
     setSafetyWeights(getSafetyWeights());
     setCurrentSafetyPreset(getCurrentPreset());
+    
+    // Check if returning from navigation
+    const returningFromNav = sessionStorage.getItem('returning_from_navigation');
+    const lastRouteId = sessionStorage.getItem('last_navigation_route_id');
+    
+    if (returningFromNav === 'true' && lastRouteId) {
+      // Restore route data from sessionStorage
+      try {
+        const storedRouteData = sessionStorage.getItem(`route_${lastRouteId}`);
+        const storedSearchState = sessionStorage.getItem('route_search_state');
+        
+        if (storedRouteData && storedSearchState) {
+          const routeData = JSON.parse(storedRouteData);
+          const searchState = JSON.parse(storedSearchState);
+          
+          // Restore search parameters
+          setFromLocation(searchState.fromLocation || '');
+          setToLocation(searchState.toLocation || '');
+          setFromCoords(searchState.fromCoords || null);
+          setToCoords(searchState.toCoords || null);
+          setTransportMode(searchState.transportMode || 'cycling');
+          
+          // Restore routes (this will make them visible on map)
+          if (searchState.routes) {
+            setRoutes(searchState.routes);
+          }
+          if (searchState.backendRoutes) {
+            setBackendRoutes(searchState.backendRoutes);
+          }
+          
+          // Restore selected route
+          if (searchState.selectedRouteId) {
+            setSelectedRouteId(searchState.selectedRouteId);
+            setSelectedRoute(searchState.selectedRoute || null);
+          }
+          
+          // Restore map state
+          if (searchState.mapCenter) {
+            setMapCenter(searchState.mapCenter);
+          }
+          if (searchState.mapZoom) {
+            setMapZoom(searchState.mapZoom);
+          }
+          
+          // Show route panel
+          setShowRoutePanel(true);
+          
+          console.log('Route state restored after navigation');
+        }
+        
+        // Clear the flags
+        sessionStorage.removeItem('returning_from_navigation');
+        sessionStorage.removeItem('last_navigation_route_id');
+      } catch (error) {
+        console.error('Error restoring route state:', error);
+      }
+      
+      // Skip URL parameter parsing since we restored from session
+      return;
+    }
     
     // Parse URL parameters for pre-filled route
     const fromLat = searchParams.get('fromLat');
@@ -533,6 +609,22 @@ function SuggestedRoutesContent() {
     
     sessionStorage.setItem(`route_${route.id}`, JSON.stringify(routeData));
     
+    // Save complete search state for restoration
+    const searchState = {
+      fromLocation,
+      toLocation,
+      fromCoords,
+      toCoords,
+      transportMode,
+      routes,
+      backendRoutes,
+      selectedRouteId: route.id,
+      selectedRoute: route,
+      mapCenter,
+      mapZoom
+    };
+    sessionStorage.setItem('route_search_state', JSON.stringify(searchState));
+    
     const url =
       `/navigation` +
       `?routeId=${encodeURIComponent(route.id)}` +
@@ -636,12 +728,12 @@ function SuggestedRoutesContent() {
                 background: 'transparent'
               }}>
               {/* Title and Subtitle */}
-              <div className="mb-6 flex items-center justify-between">
+              <div className="mb-6 flex items-center justify-between pt-4">
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold mb-1" style={{ color: isDark ? '#ffffff' : '#1e293b' }}>
-                    Plan Your Route
+                    Plan Your <span style={{ color: '#06d6a0' }}>Route</span>
                   </h2>
-                  <p className="text-base" style={{ color: isDark ? '#ffffff' : '#64748b' }}>
+                  <p className="text-base hidden min-[428px]:block" style={{ color: isDark ? '#ffffff' : '#64748b' }}>
                     Find the safest path
                   </p>
                 </div>
@@ -869,8 +961,12 @@ function SuggestedRoutesContent() {
           <div className="md:hidden">
             <RoutesSheet
               key={routes.length > 0 ? 'routes-active' : 'routes-empty'}
-              title="Plan Your Route"
-              subtitle="Find the safest path"
+              title={
+                <span style={{ color: isDark ? '#ffffff' : '#1e293b' }}>
+                  Plan Your <span style={{ color: '#06d6a0' }}>Route</span>
+                </span>
+              }
+              subtitle={typeof window !== 'undefined' && window.innerWidth >= 428 ? "Find the safest path" : ""}
               initialExpanded={false}
               minHeight={160}
               collapsedHeight={112}
@@ -1101,7 +1197,7 @@ function SuggestedRoutesContent() {
           </div>
 
           {/* Full screen map */}
-          <div className="w-full h-full">
+          <div className="w-full h-full px-3 md:px-0">
             <div className="w-full h-full rounded-2xl overflow-hidden shadow-2xl" style={{ backgroundColor: '#1e293b' }}>
               <div className="bg-linear-to-br from-primary-dark via-primary to-slate-700 p-3">
                 <div className="flex items-center justify-center gap-4">

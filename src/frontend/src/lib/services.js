@@ -167,11 +167,32 @@ export const routesService = {
 };
 
 export const hazardsService = {
-  // Report hazard
-  async reportHazard(hazardData) {
+  // Report hazard with optional image
+  async reportHazard(hazardData, imageFile = null) {
     try {
-      const response = await api.post("/hazards", hazardData);
-      return response.data;
+      // If image is provided, send as FormData
+      if (imageFile) {
+        const formData = new FormData();
+        
+        // Append all hazard data fields
+        Object.keys(hazardData).forEach(key => {
+          formData.append(key, hazardData[key]);
+        });
+        
+        // Append image file with field name 'hazardPhoto' (matching backend)
+        formData.append('hazardPhoto', imageFile);
+        
+        const response = await api.post("/hazards", formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        return response.data;
+      } else {
+        // No image, send as JSON
+        const response = await api.post("/hazards", hazardData);
+        return response.data;
+      }
     } catch (error) {
       throw (
         error.response?.data || { success: false, message: "Network error" }

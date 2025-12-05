@@ -143,9 +143,15 @@ export default function SignUp() {
       const result = await authService.signup(signupData);
 
       if (result.success) {
-        alert('Account created successfully! You are now logged in.');
-        // Force page refresh to update navbar state
-        window.location.href = '/';
+        if (result.requiresVerification) {
+          // Email verification required - show success message and redirect to login
+          alert('🎉 Account created successfully!\n\n📧 We\'ve sent a verification email to ' + formData.email + '\n\nPlease check your inbox and click the verification link to activate your account.');
+          router.push('/auth/login');
+        } else {
+          // Direct login (shouldn't happen with new flow, but kept for compatibility)
+          alert('Account created successfully! You are now logged in.');
+          window.location.href = '/';
+        }
       } else {
         setErrors({ general: result.message || 'Sign up failed' });
       }
@@ -410,25 +416,3 @@ export default function SignUp() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

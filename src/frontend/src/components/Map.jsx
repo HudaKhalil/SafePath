@@ -6,6 +6,7 @@ import {
   TileLayer,
   Marker,
   Popup,
+  Tooltip,
   Polyline,
   useMap,
   useMapEvents,
@@ -496,7 +497,7 @@ export default function Map({
   hazard: { symbol: '⚠️', bgColor: color, size: [28, 36] },
   buddy: { symbol: '👤', bgColor: color, size: [28, 36] },
   from: { symbol: '📍', bgColor: '#10b981', size: [32, 40] }, 
-  to: { symbol: '🎯', bgColor: '#eab308', size: [32, 40] },    
+  to: { symbol: '🎯', bgColor: '#d946ef', size: [32, 40] },    
   default: { symbol: '📍', bgColor: color, size: [26, 34] }
 
     };
@@ -636,7 +637,7 @@ export default function Map({
         )}
         {/* To Location Marker */}
         {toCoords && (
-          <Marker position={toCoords} icon={createCustomIcon("#eab308", "to")}>
+          <Marker position={toCoords} icon={createCustomIcon("#d946ef", "to")}>
             <Popup>
               <div className="text-sm">
                 <strong>Destination</strong>
@@ -648,26 +649,98 @@ export default function Map({
         {/* Hazards - filter out invalid coordinates to prevent _leaflet_pos errors */}
         {hazards
           .filter((h) => Number.isFinite(h.latitude) && Number.isFinite(h.longitude))
-          .map((hazard) => (
-          <Marker
-            key={hazard.id}
-            position={[hazard.latitude, hazard.longitude]}
-            icon={createCustomIcon("#ef4444", "hazard")}
-            eventHandlers={{
-              click: () => onHazardClick(hazard),
-            }}
-          >
-            <Popup>
-              <div className="text-sm">
-                <h3 className="font-semibold">{hazard.type?.replace('_', ' ') || 'Unknown Hazard'}</h3>
-                <p>{hazard.description}</p>
-                <p className="text-xs text-gray-500">
-                  Reported: {new Date(hazard.created_at || hazard.reportedAt).toLocaleDateString()}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+          .map((hazard) => {
+            // Determine hazard color based on severity
+            const severityColors = {
+              critical: '#dc2626',
+              high: '#ef4444',
+              medium: '#f59e0b',
+              low: '#fbbf24'
+            };
+            const hazardColor = severityColors[hazard.severity] || '#ef4444';
+            
+            return (
+              <Marker
+                key={hazard.id}
+                position={[hazard.latitude, hazard.longitude]}
+                icon={createCustomIcon(hazardColor, "hazard")}
+                eventHandlers={{
+                  click: () => onHazardClick(hazard),
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -20]} opacity={0.95} permanent={false}>
+                  <div style={{ minWidth: (hazard.image_url || hazard.imageUrl) ? '150px' : 'auto' }}>
+                    {(hazard.image_url || hazard.imageUrl) && (
+                      <div className="mb-1 rounded overflow-hidden">
+                        <img 
+                          src={(() => {
+                            const imageUrl = hazard.image_url || hazard.imageUrl;
+                            // If Cloudinary URL (starts with http), use as-is
+                            if (imageUrl.startsWith('http')) return imageUrl;
+                            // Otherwise, prepend API URL (legacy local images)
+                            return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                          })()}
+                          alt="Hazard preview"
+                          style={{ width: '150px', height: '80px', objectFit: 'cover', display: 'block' }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="text-xs font-semibold">
+                      <span className="capitalize">{(hazard.hazard_type || hazard.type || 'Hazard').replace(/_/g, ' ')}</span>
+                      {hazard.distance_meters && (
+                        <span className="ml-1 text-gray-600">• {Math.round(hazard.distance_meters)}m</span>
+                      )}
+                    </div>
+                  </div>
+                </Tooltip>
+                <Popup maxWidth={300} className="hazard-popup">
+                  <div className="text-sm">
+                    <h3 className="font-semibold capitalize">
+                      {(hazard.hazard_type || hazard.type || 'Unknown Hazard').replace(/_/g, ' ')}
+                    </h3>
+                    <p className="text-xs mt-1">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-white font-semibold ${
+                        hazard.severity === 'critical' || hazard.severity === 'high' ? 'bg-red-500' :
+                        hazard.severity === 'medium' ? 'bg-orange-500' : 'bg-yellow-500'
+                      }`}>
+                        {hazard.severity || 'medium'}
+                      </span>
+                    </p>
+                    {(hazard.image_url || hazard.imageUrl) && (
+                      <div className="mt-2 rounded overflow-hidden hidden sm:block">
+                        <img 
+                          src={(() => {
+                            const imageUrl = hazard.image_url || hazard.imageUrl;
+                            // If Cloudinary URL (starts with http), use as-is
+                            if (imageUrl.startsWith('http')) return imageUrl;
+                            // Otherwise, prepend API URL (legacy local images)
+                            return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                          })()}
+                          alt="Hazard"
+                          className="w-full h-24 sm:h-32 object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    {hazard.description && <p className="mt-2">{hazard.description}</p>}
+                    {hazard.distance_meters && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        📍 {Math.round(hazard.distance_meters)}m away
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Reported: {new Date(hazard.reported_at || hazard.created_at || hazard.reportedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
         {/* Buddies - filter out invalid coordinates to prevent _leaflet_pos errors */}
         {buddies
           .filter((b) => Number.isFinite(b.latitude) && Number.isFinite(b.longitude))

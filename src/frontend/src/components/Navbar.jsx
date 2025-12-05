@@ -19,6 +19,12 @@ export default function Navbar() {
   useEffect(() => {
     checkAuthStatus()
     
+    // Listen for profile updates
+    const handleProfileUpdate = () => {
+      checkAuthStatus()
+    }
+    window.addEventListener('profileUpdated', handleProfileUpdate)
+    
     // Track dark mode
     const checkDarkMode = () => {
       setIsDark(document.documentElement.classList.contains('dark'))
@@ -26,7 +32,11 @@ export default function Navbar() {
     checkDarkMode()
     const observer = new MutationObserver(checkDarkMode)
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
+    
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate)
+      observer.disconnect()
+    }
   }, [])
 
   // Close hamburger menu when pathname changes (user navigates via bottom nav or any other means)
@@ -143,6 +153,18 @@ export default function Navbar() {
       Find Buddy
     </Link>
     
+    {/* ABOUT LINK */}
+    <Link 
+      href="/about" 
+      className="transition-colors duration-200"
+      style={{
+        color: pathname === '/about' ? '#06d6a0' : '#94a3b8'
+      }}
+      onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+      onMouseLeave={(e) => e.target.style.color = pathname === '/about' ? '#06d6a0' : '#94a3b8'}
+    >
+      About
+    </Link>
     
 
           {isLoggedIn ? (
@@ -160,9 +182,13 @@ export default function Navbar() {
                 >
                   {user?.profile_picture ? (
                     <img 
-                      src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                      src={user.profile_picture.startsWith('http') ? user.profile_picture : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${user.profile_picture}`}
                       alt="Profile" 
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Hide broken image silently
+                        e.target.style.display = 'none';
+                      }}
                     />
                   ) : (
                     <svg 
@@ -235,9 +261,12 @@ export default function Navbar() {
               >
                 {user?.profile_picture ? (
                   <img 
-                    src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                    src={user.profile_picture.startsWith('http') ? user.profile_picture : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${user.profile_picture}`}
                     alt="Profile" 
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
                   />
                 ) : (
                   <svg 
@@ -321,6 +350,16 @@ export default function Navbar() {
               Find Buddy
             </Link>
             <Link 
+              href="/about" 
+              onClick={() => setOpen(false)} 
+              className="transition-colors duration-200 text-base font-medium"
+              style={{ color: isDark ? '#06d6a0' : '#f8fafc' }}
+              onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
+            >
+              About
+            </Link>
+            <Link 
               href="/privacy" 
               onClick={() => setOpen(false)} 
               className="transition-colors duration-200 text-base font-medium"
@@ -346,9 +385,12 @@ export default function Navbar() {
                   >
                     {user?.profile_picture ? (
                       <img 
-                        src={user.profile_picture.startsWith('http') ? user.profile_picture : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001'}${user.profile_picture}`}
+                        src={user.profile_picture.startsWith('http') ? user.profile_picture : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${user.profile_picture}`}
                         alt="Profile" 
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
                       />
                     ) : (
                       <svg 
