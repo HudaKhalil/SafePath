@@ -319,6 +319,73 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
   }
 });
 
+router.get('/nearby', async (req, res) => {
+  try {
+    const { lat, lon, radius = 5000, limit = 50 } = req.query;
+
+    if (!lat || !lon) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude are required'
+      });
+    }
+
+    console.log(`🔍 [Find Buddy] Searching hazards near (${lat}, ${lon}) within ${radius}m`);
+
+    const result = await query(`
+      SELECT 
+        h.id, 
+        h.description, 
+        h.hazard_type, 
+        h.severity,
+        h.latitude,
+        h.longitude,
+        h.reported_at,
+        h.status,
+        ST_Distance(
+          h.location::geography, 
+          ST_SetSRID(ST_Point($2, $1), 4326)::geography
+        ) as distance_meters
+      FROM hazards h
+      WHERE ST_DWithin(
+        h.location::geography, 
+        ST_SetSRID(ST_Point($2, $1), 4326)::geography, 
+        $3
+      )
+      AND (h.status IS NULL OR h.status != 'resolved')
+      ORDER BY distance_meters ASC, h.reported_at DESC
+      LIMIT $4
+    `, [lat, lon, radius, limit]);
+
+    console.log(`✅ [Find Buddy] Found ${result.rows.length} hazards`);
+
+    const hazards = result.rows.map(hazard => ({
+      id: hazard.id,
+      description: hazard.description,
+      latitude: hazard.latitude,
+      longitude: hazard.longitude,
+      hazardType: hazard.hazard_type,
+      severity: hazard.severity,
+      status: hazard.status,
+      reportedAt: hazard.reported_at,
+      distanceMeters: Math.round(hazard.distance_meters)
+    }));
+
+    res.json({
+      success: true,
+      data: { hazards }
+    });
+
+  } catch (error) {
+    console.error('[Find Buddy] Get nearby hazards error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+
 // Update hazard status (protected route)
 router.patch('/:id', authenticateToken, [
   body('isResolved').optional().isBoolean().withMessage('isResolved must be a boolean')
