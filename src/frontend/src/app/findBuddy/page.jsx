@@ -110,26 +110,35 @@ export default function FindBuddy() {
   // ==========================================
   // API CALLS
   // ==========================================
-
+// Modify the existing fetchNearbyBuddies function (around line 130):
   const fetchNearbyBuddies = async () => {
     if (!userLocation) return;
     setIsLoading(true);
     setError(null);
+    
     try {
       const token = getToken();
+      
+      // ✅ ADD THIS: Update my location FIRST so others can find me
+      await updateMyLocation();
+      
+      // Then search for buddies
       const params = new URLSearchParams({
         lat: userLocation[0].toString(),
         lon: userLocation[1].toString(),
         radius: radius.toString(),
         limit: '50'
       });
+      
       if (transportMode !== 'all') {
         params.append('transport_mode', transportMode);
       }
+      
       const response = await fetch(`${API_URL}/api/buddies/nearby?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
+      
       const data = await response.json();
       if (data.success) {
         setBuddies(data.data?.buddies || []);
@@ -141,6 +150,36 @@ export default function FindBuddy() {
       setError('Failed to connect to server');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  
+  const updateMyLocation = async () => {
+    if (!userLocation || !userLocation[0] || !userLocation[1]) return;
+    
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/api/buddies/location`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          latitude: userLocation[0],
+          longitude: userLocation[1]
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        console.log('✅ My location updated in database');
+      } else {
+        console.warn('⚠️ Failed to update location:', data.message);
+      }
+    } catch (err) {
+      console.error('Error updating location:', err);
     }
   };
 
