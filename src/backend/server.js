@@ -18,6 +18,7 @@ const routesRoutes = require('./routes/routes');
 const geocodingRoutes = require('./routes/geocoding');
 const hazardsRoutes = require('./routes/hazards');
 const buddiesRoutes = require('./routes/buddies');
+const safetyPreferencesRoutes = require('./routes/safety-preferences');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -57,9 +58,18 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Logging middleware
+// Logging middleware - filter out health check noise
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
+} else {
+  // In production, skip logging for Render health checks
+  app.use(morgan('combined', {
+    skip: (req, res) => {
+      // Skip health checks from Render's monitoring (Go-http-client)
+      const userAgent = req.get('user-agent') || '';
+      return userAgent.includes('Go-http-client');
+    }
+  }));
 }
 
 // Body parsing middleware
@@ -143,6 +153,7 @@ app.use('/api/routes', routesRoutes);
 app.use('/api/geocoding', geocodingRoutes);
 app.use('/api/hazards', hazardsRoutes);
 app.use('/api/buddies', buddiesRoutes);
+app.use('/api/safety', safetyPreferencesRoutes);
 
 // 404 handler for unknown API routes (but not static files)
 app.use('/api/*', (req, res) => {

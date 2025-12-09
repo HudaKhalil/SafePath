@@ -77,8 +77,17 @@ const testConnection = async () => {
   }
 };
 
+// Get a client from the pool for transactions
+const getClient = async () => {
+  if (!pool) {
+    throw new Error('Database not initialized. Call initializeDatabase() first.');
+  }
+  return await pool.connect();
+};
+
 module.exports = {
   query,
+  getClient, // For transactions
   pool: () => pool, // Export pool getter for advanced queries
   testConnection,
   initializeDatabase,

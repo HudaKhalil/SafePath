@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
+const lightingService = require('./lightingService');
 
 class CsvDataLoader {
   constructor() {
@@ -341,7 +342,7 @@ class CsvDataLoader {
   }
 
   /**
-   * Calculate real hazard density from database hazards
+   * Calculate real hazard density from database hazards AND TomTom traffic incidents
    * @param {number} latitude 
    * @param {number} longitude 
    * @param {number} radiusKm - Search radius in kilometers (default 0.5km)
@@ -350,14 +351,16 @@ class CsvDataLoader {
   async calculateHazardDensity(latitude, longitude, radiusKm = 0.5) {
     try {
       const db = require('../config/database');
+      const tomtomHazardsService = require('./tomtomHazardsService');
       
-      // Query hazards within radius using PostGIS
+      // Query community hazards within radius using PostGIS
       const query = `
         SELECT 
           id,
           hazard_type,
           severity,
           metadata,
+          'community' as source,
           ST_Distance(
             location::geography,
             ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
@@ -379,17 +382,37 @@ class CsvDataLoader {
         radiusKm * 1000 // Convert km to meters
       ]);
       
-      if (!result.rows || result.rows.length === 0) {
+      // Fetch TomTom traffic incidents for the same area
+      let tomtomHazards = [];
+      try {
+        const allTomTomHazards = await tomtomHazardsService.getTomTomHazards(
+          latitude,
+          longitude,
+          radiusKm * 1000 // Convert to meters
+        );
+        
+        // Filter only those within our radius
+        tomtomHazards = allTomTomHazards.filter(h => h.distance <= radiusKm * 1000);
+        console.log(`[HazardDensity] Found ${tomtomHazards.length} TomTom incident(s) within ${radiusKm}km`);
+      } catch (tomtomError) {
+        console.warn('[HazardDensity] TomTom fetch failed, using community hazards only:', tomtomError.message);
+      }
+      
+      const communityHazards = result.rows || [];
+      const totalHazards = communityHazards.length + tomtomHazards.length;
+      
+      if (totalHazards === 0) {
         return 0.1; // Low baseline hazard if no reports
       }
       
-      console.log(`[HazardDensity] Found ${result.rows.length} hazard(s) within ${radiusKm}km of [${latitude.toFixed(4)}, ${longitude.toFixed(4)}]`);
+      console.log(`[HazardDensity] Found ${communityHazards.length} community + ${tomtomHazards.length} TomTom = ${totalHazards} total hazard(s) within ${radiusKm}km of [${latitude.toFixed(4)}, ${longitude.toFixed(4)}]`);
       
       // Calculate weighted hazard score based on:
       // 1. Number of hazards
       // 2. Severity levels
       // 3. Distance (closer = higher impact)
       // 4. Priority and traffic impact
+      // 5. Source (TomTom incidents are verified, weight them higher)
       
       const severityWeights = {
         'critical': 3.0, // Critical severity - immediate danger
@@ -399,7 +422,9 @@ class CsvDataLoader {
       };
       
       let totalScore = 0;
-      result.rows.forEach(hazard => {
+      
+      // Process community hazards
+      communityHazards.forEach(hazard => {
         // Distance decay: closer hazards have more impact
         const distanceFactor = Math.max(0, 1 - (hazard.distance_km / radiusKm));
         
@@ -417,18 +442,47 @@ class CsvDataLoader {
         // Traffic impact bonus from metadata
         const trafficBonus = metadata.affectsTraffic ? 0.3 : 0;
         
-        // Combined hazard impact (simplified without priority)
+        // Combined hazard impact
         const hazardImpact = (severityWeight + trafficBonus) * distanceFactor;
         totalScore += hazardImpact;
         
-        console.log(`    - ${hazard.hazard_type} (${hazard.severity}): distance=${hazard.distance_km.toFixed(3)}km, impact=${hazardImpact.toFixed(3)}`);
+        console.log(`    - [Community] ${hazard.hazard_type} (${hazard.severity}): distance=${hazard.distance_km.toFixed(3)}km, impact=${hazardImpact.toFixed(3)}`);
+      });
+      
+      // Process TomTom traffic incidents (VERIFIED DATA - weight more heavily)
+      tomtomHazards.forEach(hazard => {
+        // Distance decay: closer hazards have more impact
+        const distanceKm = hazard.distance / 1000; // Convert meters to km
+        const distanceFactor = Math.max(0, 1 - (distanceKm / radiusKm));
+        
+        // Severity weight - default to 'high' if unknown
+        const severityWeight = severityWeights[hazard.severity] || severityWeights['high'];
+        
+        // TomTom bonus: Verified incidents from official sources are weighted 1.3x higher
+        let verifiedBonus = 1.3;
+        
+        // ACCIDENT BOOST: Accidents are immediate dangers - weight them 2x more
+        const isAccident = hazard.type === 'accident' || hazard.hazardType === 'accident';
+        if (isAccident) {
+          verifiedBonus = 2.5; // Much higher weight for accidents
+          console.log(`    🚨 ACCIDENT DETECTED - applying 2.5x boost`);
+        }
+        
+        // Traffic impact: TomTom incidents by definition affect traffic
+        const trafficBonus = isAccident ? 1.0 : 0.5; // Accidents have double traffic impact
+        
+        // Combined hazard impact with verification bonus
+        const hazardImpact = (severityWeight + trafficBonus) * distanceFactor * verifiedBonus;
+        totalScore += hazardImpact;
+        
+        console.log(`    - [TomTom] ${hazard.type} (${hazard.severity}): distance=${distanceKm.toFixed(3)}km, impact=${hazardImpact.toFixed(3)}`);
       });
       
       // Normalize to 0-1 scale
       // Assume 3+ high-severity hazards in area = maximum danger (1.0)
       const normalizedScore = Math.min(1.0, totalScore / 3.0);
       
-      console.log(`[HazardDensity] Total score: ${totalScore.toFixed(3)}, Normalized: ${normalizedScore.toFixed(3)}`);
+      console.log(`[HazardDensity] Total score: ${totalScore.toFixed(3)}, Normalized: ${normalizedScore.toFixed(3)} (${communityHazards.length} community + ${tomtomHazards.length} TomTom)`);
       
       return normalizedScore;
       
@@ -439,29 +493,32 @@ class CsvDataLoader {
     }
   }
 
-  // Stub functions for collision and lighting (return baseline values)
-  // These would be implemented with real data sources in production
-  getCollisionDensity(latitude, longitude) {
-    // Default to low collision risk (no real data available)
-    // In production, this would query collision database
-    return 0.2;
+  // Collision data - fetched dynamically from TomTom traffic incidents
+  async getCollisionDensity(latitude, longitude) {
+    try {
+      const tomtomHazardsService = require('./tomtomHazardsService');
+      const collisionDensity = await tomtomHazardsService.getCollisionDensity(latitude, longitude, 0.5);
+      return collisionDensity;
+    } catch (error) {
+      console.error('Error getting collision density, using fallback:', error.message);
+      return 0.2; // Fallback to moderate risk if TomTom unavailable
+    }
   }
 
-  getLightingIndex(latitude, longitude) {
-    // Default to moderate lighting (no real data available)
-    // In production, this would query street lighting database
-    return 0.3;
+  // Street lighting data - queries OSM via lightingService
+  async getLightingIndex(latitude, longitude) {
+    // Query OSM street lighting data from cache/API
+    try {
+      const lightingIndex = await lightingService.getLightingIndex(latitude, longitude, 100);
+      return lightingIndex;
+    } catch (error) {
+      console.error('Error getting lighting data, using fallback:', error);
+      return 0.3; // Fallback to moderate lighting
+    }
   }
 
-  // Stub functions for collision and lighting (return baseline values)
-  // These would be implemented with real data sources in production
-  getCollisionDensity(latitude, longitude) {
-    // Default to low collision risk (no real data available)
-    // In production, this would query collision database
-    return 0.2;
-  }
-
-  getLightingIndex(latitude, longitude) {
+  // DEPRECATED: Old duplicate functions below (kept for backward compatibility)
+  async _getLightingIndexLegacy(latitude, longitude) {
     // Default to moderate lighting (no real data available)
     // In production, this would query street lighting database
     return 0.3;

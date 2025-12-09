@@ -296,7 +296,7 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
 // Find routes between two points
 router.post('/find', authenticateToken, async (req, res) => {
   try {
-    const { fromLat, fromLon, toLat, toLon, mode = 'walking', userPreferences = null } = req.body;
+    const { fromLat, fromLon, toLat, toLon, mode = 'walking', userPreferences = null, timeOfDay = null } = req.body;
 
     if (!fromLat || !fromLon || !toLat || !toLon) {
       return res.status(400).json({
@@ -305,19 +305,52 @@ router.post('/find', authenticateToken, async (req, res) => {
       });
     }
 
-    // Log user preferences if provided
-    if (userPreferences) {
-      console.log('[Routes API] User safety preferences:', userPreferences.factorWeights);
+    // Fetch user's safety preferences from database
+    let finalUserPreferences = userPreferences;
+    
+    if (!finalUserPreferences) {
+      try {
+        const prefsResult = await db.query(
+          `SELECT crime_weight, collision_weight, lighting_weight, hazard_weight, 
+                  preset_name, crime_severity_weights 
+           FROM user_safety_preferences 
+           WHERE user_id = $1`,
+          [req.user.userId]
+        );
+
+        if (prefsResult.rows.length > 0) {
+          const prefs = prefsResult.rows[0];
+          finalUserPreferences = {
+            factorWeights: {
+              crime: parseFloat(prefs.crime_weight),
+              collision: parseFloat(prefs.collision_weight),
+              lighting: parseFloat(prefs.lighting_weight),
+              hazard: parseFloat(prefs.hazard_weight)
+            },
+            crimeSeverity: prefs.crime_severity_weights || {}
+          };
+          console.log('[Routes API] Using database safety preferences:', finalUserPreferences.factorWeights);
+        } else {
+          console.log('[Routes API] No user preferences found, using defaults');
+        }
+      } catch (dbError) {
+        console.error('[Routes API] Error fetching user preferences:', dbError);
+        console.log('[Routes API] Falling back to default preferences');
+      }
+    } else {
+      console.log('[Routes API] Using client-provided safety preferences:', finalUserPreferences.factorWeights);
     }
 
     // Use route calculator to get both fastest and safest routes
+    // timeOfDay will be auto-detected if not provided by client
     const result = await routeCalculator.calculateRoutes(
       parseFloat(fromLat),
       parseFloat(fromLon),
       parseFloat(toLat),
       parseFloat(toLon),
       mode,
-      userPreferences
+      finalUserPreferences,
+      timeOfDay
     );
 
     if (!result.success) {
@@ -331,7 +364,8 @@ router.post('/find', authenticateToken, async (req, res) => {
       success: true,
       data: {
         fastest: result.fastest,
-        safest: result.safest
+        safest: result.safest,
+        crossModeAlternative: result.crossModeAlternative
       },
       provider: result.provider,
       message: 'Routes calculated successfully'
