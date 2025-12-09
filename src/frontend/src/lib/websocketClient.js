@@ -23,7 +23,12 @@ class WebSocketClient {
       return;
     }
 
-    const serverUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+    // Remove /api suffix for WebSocket connection (Socket.IO expects base URL)
+    let serverUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+    if (serverUrl.endsWith('/api')) {
+      serverUrl = serverUrl.slice(0, -4);
+    }
+    
     const token = Cookies.get('auth_token');
 
     console.log('🔌 Connecting to WebSocket server:', serverUrl);

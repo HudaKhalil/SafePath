@@ -12,7 +12,7 @@ const SAFETY_RULES = {
   MODERATE_THRESHOLD: 0.6,    // Score 0.3-0.6 = MODERATE, Score > 0.6 = HIGH_RISK
   
   // Dangerous Segment Detection (Rule Category 4)
-  DANGER_ZONE_THRESHOLD: 0.35, // Segment score >= 0.35 = DANGER_ZONE (lowered for better hazard sensitivity)
+  DANGER_ZONE_THRESHOLD: 0.15, // Segment score >= 0.15 = DANGER_ZONE (lowered for hazard sensitivity)
   
   // Alternative Selection Rules (Rule Category 5)
   ACCEPT_IMPROVEMENT_LOW: 0.15,   // 15% safety improvement
@@ -85,7 +85,7 @@ class RouteCalculator {
     // Safety routing parameters (using rule constants)
     this.safetyThreshold = SAFETY_RULES.DANGER_ZONE_THRESHOLD;
     this.maxDetourFactor = SAFETY_RULES.MAX_DETOUR_FACTOR;
-    this.criticalHazardMaxDetour = 2.5; // Allow 150% longer routes for critical hazards
+    this.criticalHazardMaxDetour = 3.0; // Allow 200% longer routes for accidents/critical hazards
     this.waypointSearchRadius = 0.005; // ~500m for finding safe waypoints
   }
 
@@ -252,7 +252,96 @@ class RouteCalculator {
     };
   }
 
-  async calculateRoutes(fromLat, fromLon, toLat, toLon, mode = 'walking', userPreferences = null) {
+  /**
+   * Detect current time of day context
+   * @param {number} latitude - For timezone calculation
+   * @param {number} longitude - For timezone calculation
+   * @returns {string} - 'day', 'night', 'morning-rush', or 'evening-rush'
+   */
+  detectTimeOfDay(latitude, longitude) {
+    const now = new Date();
+    const hour = now.getUTCHours();
+    
+    // Estimate timezone based on longitude
+    const timezoneOffset = Math.round(longitude / 15);
+    const localHour = (hour + timezoneOffset + 24) % 24;
+    
+    // Morning rush hour: 7 AM - 9 AM
+    if (localHour >= 7 && localHour < 9) {
+      return 'morning-rush';
+    }
+    
+    // Evening rush hour: 5 PM - 7 PM
+    if (localHour >= 17 && localHour < 19) {
+      return 'evening-rush';
+    }
+    
+    // Night time: 8 PM - 6 AM
+    if (localHour >= 20 || localHour < 6) {
+      return 'night';
+    }
+    
+    // Daytime: 9 AM - 5 PM
+    return 'day';
+  }
+
+  /**
+   * Adjust safety factor weights based on time of day
+   * @param {Object} baseWeights - Base factor weights
+   * @param {string} timeOfDay - 'day', 'night', 'morning-rush', or 'evening-rush'
+   * @returns {Object} - Adjusted weights (still sum to 1.0)
+   */
+  adjustWeightsForTimeOfDay(baseWeights, timeOfDay) {
+    let adjusted = { ...baseWeights };
+    
+    switch (timeOfDay) {
+      case 'night':
+        // At night, lighting becomes MUCH more important
+        // Increase lighting weight by 50%, redistribute from other factors
+        const nightLightingBoost = baseWeights.lighting * 0.5;
+        adjusted.lighting = baseWeights.lighting + nightLightingBoost;
+        // Reduce crime slightly (less activity at night in some areas)
+        adjusted.crime = baseWeights.crime * 0.9;
+        // Reduce collision (less traffic at night)
+        adjusted.collision = baseWeights.collision * 0.7;
+        // Keep hazards same
+        adjusted.hazard = baseWeights.hazard;
+        break;
+        
+      case 'morning-rush':
+      case 'evening-rush':
+        // During rush hours, traffic collisions and hazards are more likely
+        // Increase collision weight by 40%, hazard by 30%
+        adjusted.collision = baseWeights.collision * 1.4;
+        adjusted.hazard = baseWeights.hazard * 1.3;
+        // Reduce crime (busy areas are safer)
+        adjusted.crime = baseWeights.crime * 0.8;
+        // Lighting doesn't matter during daylight rush hours
+        adjusted.lighting = baseWeights.lighting * 0.5;
+        break;
+        
+      case 'day':
+      default:
+        // During normal day, use base weights but reduce lighting importance
+        adjusted.lighting = baseWeights.lighting * 0.6;
+        // Slight increase to other factors to compensate
+        adjusted.crime = baseWeights.crime * 1.1;
+        adjusted.collision = baseWeights.collision * 1.1;
+        adjusted.hazard = baseWeights.hazard * 1.1;
+        break;
+    }
+    
+    // Normalize weights to sum to 1.0
+    const sum = adjusted.crime + adjusted.collision + adjusted.lighting + adjusted.hazard;
+    adjusted.crime /= sum;
+    adjusted.collision /= sum;
+    adjusted.lighting /= sum;
+    adjusted.hazard /= sum;
+    
+    return adjusted;
+  }
+
+  async calculateRoutes(fromLat, fromLon, toLat, toLon, mode = 'walking', userPreferences = null, timeOfDay = null) {
     // Validate coordinates are different (not same location)
     const distance = csvDataLoader.calculateDistance(fromLat, fromLon, toLat, toLon);
     if (distance < 0.01) { // Less than 10 meters
@@ -264,10 +353,19 @@ class RouteCalculator {
     }
     
     // Extract user-configurable weights
-    const factorWeights = this.getFactorWeights(userPreferences);
+    let factorWeights = this.getFactorWeights(userPreferences);
     const crimeSeverityWeights = this.getCrimeSeverityWeights(userPreferences);
     
-    console.log('[RouteCalculator] Using factor weights:', factorWeights);
+    // Detect time of day context if not provided
+    if (!timeOfDay) {
+      timeOfDay = this.detectTimeOfDay(fromLat, fromLon);
+    }
+    
+    // Adjust weights based on time of day context
+    factorWeights = this.adjustWeightsForTimeOfDay(factorWeights, timeOfDay);
+    
+    console.log('[RouteCalculator] Time context:', timeOfDay);
+    console.log('[RouteCalculator] Adjusted factor weights:', factorWeights);
     
     // Ensure crime data is loaded for safety scoring
     if (!csvDataLoader.isLoaded()) {
@@ -279,22 +377,59 @@ class RouteCalculator {
     
     if (!osrmRoute.success) {
       // Fallback to straight line if OSRM fails
-      return await this.calculateStraightLineRoutes(fromLat, fromLon, toLat, toLon, mode);
+      return await this.calculateStraightLineRoutes(fromLat, fromLon, toLat, toLon, mode, timeOfDay);
     }
 
     // Fastest route = pure OSRM route with safety score added (no modification to path)
-    const fastestRoute = await this.createFastestRoute(osrmRoute, mode, factorWeights);
+    const fastestRoute = await this.createFastestRoute(osrmRoute, mode, factorWeights, timeOfDay);
     
     // Safest route = intelligently route around dangerous areas using waypoints
-    // Pass factorWeights to ensure consistent scoring
+    // Pass factorWeights and timeOfDay to ensure consistent scoring
     const safestRoute = await this.calculateSafestRoute(
-      fromLat, fromLon, toLat, toLon, mode, osrmRoute, fastestRoute, factorWeights
+      fromLat, fromLon, toLat, toLon, mode, osrmRoute, fastestRoute, factorWeights, timeOfDay
     );
+
+    // Check if we should suggest cross-mode alternative (walk ↔ cycle)
+    // If the safest route in current mode is HIGH_RISK (>= 0.6), try the other mode
+    let crossModeAlternative = null;
+    const isHighRisk = safestRoute.safetyScore >= SAFETY_RULES.MODERATE_THRESHOLD; // >= 0.6
+    
+    if (isHighRisk && (mode === 'walking' || mode === 'cycling')) {
+      const alternativeMode = mode === 'walking' ? 'cycling' : 'walking';
+      console.log(`[RouteCalculator] Current mode (${mode}) is HIGH_RISK (${safestRoute.safetyScore.toFixed(3)}), checking ${alternativeMode} alternative...`);
+      
+      try {
+        // Get route in alternative mode
+        const altOsrmRoute = await this.getOSRMRoute(fromLat, fromLon, toLat, toLon, alternativeMode);
+        
+        if (altOsrmRoute.success) {
+          const altFastestRoute = await this.createFastestRoute(altOsrmRoute, alternativeMode, factorWeights, timeOfDay);
+          
+          // Only suggest if alternative mode is significantly safer (at least 15% improvement)
+          const safetyImprovement = (safestRoute.safetyScore - altFastestRoute.safetyScore) / safestRoute.safetyScore;
+          
+          if (safetyImprovement >= 0.15) {
+            crossModeAlternative = {
+              ...altFastestRoute,
+              type: 'cross-mode-alternative',
+              alternativeMode: alternativeMode,
+              safetyImprovement: parseFloat((safetyImprovement * 100).toFixed(1))
+            };
+            console.log(`[RouteCalculator] ✅ Cross-mode alternative (${alternativeMode}) is ${(safetyImprovement * 100).toFixed(1)}% safer - suggesting to user`);
+          } else {
+            console.log(`[RouteCalculator] Cross-mode alternative (${alternativeMode}) not significantly safer (${(safetyImprovement * 100).toFixed(1)}% improvement)`);
+          }
+        }
+      } catch (error) {
+        console.warn(`[RouteCalculator] Failed to get cross-mode alternative:`, error.message);
+      }
+    }
 
     return {
       success: true,
       fastest: fastestRoute,
       safest: safestRoute,
+      crossModeAlternative: crossModeAlternative,
       provider: 'osrm'
     };
   }
@@ -305,8 +440,9 @@ class RouteCalculator {
    * @param {Object} osrmRoute - The OSRM route data
    * @param {string} mode - Transport mode (walking, cycling)
    * @param {Object} factorWeights - User-configurable factor weights
+   * @param {string} timeOfDay - Time context for safety calculation
    */
-  async createFastestRoute(osrmRoute, mode, factorWeights = null) {
+  async createFastestRoute(osrmRoute, mode, factorWeights = null, timeOfDay = 'day') {
     const coordinates = osrmRoute.coordinates;
     const distance = osrmRoute.distance / 1000; // Convert meters to km
     const duration = osrmRoute.duration / 60; // Convert seconds to minutes
@@ -315,7 +451,7 @@ class RouteCalculator {
     const weights = factorWeights || DEFAULT_FACTOR_WEIGHTS;
     
     // Calculate safety score along the route (rule-based, from crime data + REAL hazards)
-    const safetyScore = await this.calculateRouteSafetyScore(coordinates, weights);
+    const safetyScore = await this.calculateRouteSafetyScore(coordinates, weights, timeOfDay);
     
     // Convert safety score (0-1 where 0 is safest) to rating (0-10 where 10 is safest)
     const safetyRating = Math.max(0, Math.min(10, (1 - safetyScore) * 10));
@@ -343,9 +479,10 @@ class RouteCalculator {
    * 
    * @param {Array} coordinates - Route coordinates [[lat, lon], ...]
    * @param {Object} factorWeights - User-configurable weights { crime, collision, lighting, hazard }
+   * @param {string} timeOfDay - Time context: 'day', 'night', 'morning-rush', 'evening-rush'
    * @returns {Promise<number>} - Safety score 0-1 (lower is safer)
    */
-  async calculateRouteSafetyScore(coordinates, factorWeights = null) {
+  async calculateRouteSafetyScore(coordinates, factorWeights = null, timeOfDay = 'day') {
     if (!coordinates || coordinates.length === 0) {
       return 0.1; // Default to safe if no coordinates
     }
@@ -361,17 +498,31 @@ class RouteCalculator {
     }
 
     // Get detailed safety metrics for each sampled point (with REAL hazard data)
+    const lightingService = require('./lightingService');
     const safetyDataPromises = samplePoints.map(async coord => {
       const metrics = csvDataLoader.getSafetyMetrics(coord[0], coord[1]);
       
-      // Get REAL hazard density from database (overrides simulated value)
+      // Get REAL hazard density from database (includes both community + TomTom hazards)
       const realHazardDensity = await csvDataLoader.calculateHazardDensity(coord[0], coord[1], 0.5);
       
-      // Calculate weighted score using user-configurable weights with REAL hazards
+      // Get REAL collision density from TomTom traffic incidents (accidents, jams, breakdowns)
+      const realCollisionDensity = await csvDataLoader.getCollisionDensity(coord[0], coord[1]);
+      
+      // Get accurate lighting index based on time of day
+      let lightingIndex = metrics.lightingIndex;
+      if (timeOfDay === 'night') {
+        // At night, get real lighting data from OSM
+        lightingIndex = await lightingService.getLightingIndex(coord[0], coord[1], 100);
+      } else {
+        // During day/rush hours, lighting is less critical
+        lightingIndex = 0.1; // Well-lit equivalent
+      }
+      
+      // Calculate weighted score using user-configurable weights with ALL REAL DATA
       const weightedScore = (metrics.crimeRate * weights.crime) +
-                           (metrics.collisionDensity * weights.collision) +
-                           (metrics.lightingIndex * weights.lighting) +
-                           (realHazardDensity * weights.hazard); // Use real hazards!
+                           (realCollisionDensity * weights.collision) +  // NOW DYNAMIC from TomTom!
+                           (lightingIndex * weights.lighting) +
+                           (realHazardDensity * weights.hazard); // Includes TomTom + community!
       
       return Math.min(1.0, weightedScore);
     });
@@ -429,8 +580,9 @@ class RouteCalculator {
    * 4. Compare candidates and return the safest viable route
    * 
    * @param {Object} factorWeights - User-configurable weights for consistent scoring
+   * @param {string} timeOfDay - Time context for safety calculation
    */
-  async calculateSafestRoute(fromLat, fromLon, toLat, toLon, mode, originalRoute, fastestRoute, factorWeights = null) {
+  async calculateSafestRoute(fromLat, fromLon, toLat, toLon, mode, originalRoute, fastestRoute, factorWeights = null, timeOfDay = 'day') {
     console.log('[SafestRoute] Calculating safest route...');
     
     // Use provided weights or defaults for consistent scoring
@@ -449,7 +601,7 @@ class RouteCalculator {
     try {
       const altRoutes = await this.getOSRMAlternatives(fromLat, fromLon, toLat, toLon, mode);
       for (const altRoute of altRoutes) {
-        const safetyScore = await this.calculateRouteSafetyScore(altRoute.coordinates, weights);
+        const safetyScore = await this.calculateRouteSafetyScore(altRoute.coordinates, weights, timeOfDay);
         const safetyRating = Math.max(0, Math.min(10, (1 - safetyScore) * 10));
         
         candidateRoutes.push({
@@ -472,7 +624,7 @@ class RouteCalculator {
 
     // Strategy 2: Identify dangerous segments and generate waypoint-based routes
     // Use weighted score for consistency with user preferences
-    const dangerousSegmentsResult = await this.identifyDangerousSegments(originalRoute.coordinates, weights);
+    const dangerousSegmentsResult = await this.identifyDangerousSegments(fastestRoute.coordinates, weights, timeOfDay);
     const dangerousSegments = dangerousSegmentsResult.segments;
     const hasCriticalHazard = dangerousSegmentsResult.hasCriticalHazard;
     console.log(`[SafestRoute] Found ${dangerousSegments.length} dangerous segments${hasCriticalHazard ? ' (CRITICAL hazard detected)' : ''}`);
@@ -492,7 +644,7 @@ class RouteCalculator {
           );
           
           if (waypointRoute.success) {
-            const safetyScore = await this.calculateRouteSafetyScore(waypointRoute.coordinates, weights);
+            const safetyScore = await this.calculateRouteSafetyScore(waypointRoute.coordinates, weights, timeOfDay);
             const safetyRating = Math.max(0, Math.min(10, (1 - safetyScore) * 10));
             const distance = waypointRoute.distance / 1000;
             
@@ -527,7 +679,7 @@ class RouteCalculator {
       console.log(`[SafestRoute] Generated ${offsetRoutes.length} offset routes`);
       for (const offsetRoute of offsetRoutes) {
         if (offsetRoute.success) {
-          const safetyScore = await this.calculateRouteSafetyScore(offsetRoute.coordinates, weights);
+          const safetyScore = await this.calculateRouteSafetyScore(offsetRoute.coordinates, weights, timeOfDay);
           const safetyRating = Math.max(0, Math.min(10, (1 - safetyScore) * 10));
           const distance = offsetRoute.distance / 1000;
           
@@ -559,20 +711,33 @@ class RouteCalculator {
     // Pass weights so selection can adjust based on user's safety priority
     console.log(`[SafestRoute] Total candidate routes: ${candidateRoutes.length}`);
     candidateRoutes.forEach((route, i) => {
-      console.log(`  Candidate ${i + 1}: ${route.routeType}, safety: ${route.safetyRating}/10, distance: ${route.distance}km`);
+      console.log(`  Candidate ${i + 1}: ${route.routeType}, safety: ${route.safetyRating}/10 (score: ${route.safetyScore}), distance: ${route.distance}km`);
     });
     
     const bestRoute = this.selectBestSafeRoute(candidateRoutes, fastestRoute, weights);
     
-    console.log(`[SafestRoute] Selected route: ${bestRoute.routeType}, safety: ${bestRoute.safetyRating}/10, distance: ${bestRoute.distance}km`);
+    console.log(`[SafestRoute] Selected route: ${bestRoute.routeType}, safety: ${bestRoute.safetyRating}/10 (score: ${bestRoute.safetyScore}), distance: ${bestRoute.distance}km`);
     
     // Check if the safest route is the same as fastest
-    const isSameAsFastest = this.routesAreSimilar(bestRoute.coordinates, fastestRoute.coordinates);
+    // First check by route type - if it's 'fastest-baseline', it's definitely the same
+    const isSameAsFastest = bestRoute.routeType === 'fastest-baseline' || 
+                            this.routesAreSimilar(bestRoute.coordinates, fastestRoute.coordinates);
+    
+    // Additional context logging
+    if (isSameAsFastest && dangerousSegments.length > 0) {
+      console.log(`[SafestRoute] ⚠️  Note: ${dangerousSegments.length} dangerous segment(s) detected, but no safer alternatives available.`);
+      console.log(`[SafestRoute] All ${candidateRoutes.length} candidate routes evaluated - fastest route is also the safest option.`);
+    } else if (!isSameAsFastest) {
+      const improvement = ((fastestRoute.safetyScore - bestRoute.safetyScore) / fastestRoute.safetyScore * 100).toFixed(1);
+      console.log(`[SafestRoute] ✅ Safer alternative found: ${improvement}% safety improvement`);
+    }
     
     return {
       ...bestRoute,
       sameAsFastest: isSameAsFastest,
-      isPureOSRM: bestRoute.routeType === 'fastest-baseline'
+      isPureOSRM: bestRoute.routeType === 'fastest-baseline',
+      dangerousSegmentsDetected: dangerousSegments.length,
+      alternativesEvaluated: candidateRoutes.length
     };
   }
 
@@ -619,8 +784,9 @@ class RouteCalculator {
    * Identify dangerous segments along a route using weighted scoring
    * @param {Array} coordinates - Route coordinates
    * @param {Object} factorWeights - User-configurable weights for scoring
+   * @param {string} timeOfDay - Time context for lighting calculation
    */
-  async identifyDangerousSegments(coordinates, factorWeights = null) {
+  async identifyDangerousSegments(coordinates, factorWeights = null, timeOfDay = 'day') {
     const segments = [];
     const sampledPoints = this.sampleRoutePoints(coordinates, 0.2); // Every 200m
     const weights = factorWeights || DEFAULT_FACTOR_WEIGHTS;
@@ -628,15 +794,45 @@ class RouteCalculator {
     let inDangerousZone = false;
     let segmentStart = null;
     let hasCriticalHazard = false;
+    let hasAccident = false; // Track if we detect any accidents
     
     for (let i = 0; i < sampledPoints.length; i++) {
       const point = sampledPoints[i];
       
       // Get ALL safety factors including real-time hazards
       const crimeScore = csvDataLoader.getSafetyScoreForLocation(point[0], point[1]);
-      const collisionDensity = csvDataLoader.getCollisionDensity(point[0], point[1]);
-      const lightingIndex = csvDataLoader.getLightingIndex(point[0], point[1]);
+      const collisionDensity = await csvDataLoader.getCollisionDensity(point[0], point[1]);
+      
+      // Get lighting index based on time of day
+      const lightingService = require('./lightingService');
+      let lightingIndex;
+      if (timeOfDay === 'night') {
+        // At night, use real OSM lighting data
+        lightingIndex = await lightingService.getLightingIndex(point[0], point[1], 100);
+      } else {
+        // During day, lighting doesn't matter
+        lightingIndex = 0.1;
+      }
+      
+      // Get REAL hazard density (includes TomTom + community hazards)
       const realHazardDensity = await csvDataLoader.calculateHazardDensity(point[0], point[1], 0.5);
+      
+      // Check specifically for accidents (TomTom data)
+      const tomtomHazardsService = require('./tomtomHazardsService');
+      const nearbyIncidents = await tomtomHazardsService.getTomTomHazards(point[0], point[1], 500); // 500m radius
+      const nearbyAccidents = nearbyIncidents.filter(h => 
+        (h.type === 'accident' || h.hazardType === 'accident') && 
+        h.distanceMeters <= 500
+      );
+      
+      if (nearbyAccidents.length > 0 && i === 0) {
+        console.log(`🚨 [AccidentDetection] Found ${nearbyAccidents.length} accident(s) within 500m:`);
+        nearbyAccidents.forEach(a => {
+          console.log(`    - ${a.description} (${a.severity}) at ${a.distanceMeters}m`);
+        });
+        hasCriticalHazard = true; // Any accident = critical
+        hasAccident = true;
+      }
       
       // Calculate weighted score with ALL factors
       let weightedScore = 
@@ -646,35 +842,53 @@ class RouteCalculator {
         (realHazardDensity * weights.hazard);
       
       // ADAPTIVE BOOST: Scale hazard impact based on severity
-      // For low-crime areas, hazards should dominate the safety calculation
-      if (crimeScore < 0.2) {
+      // For low-to-moderate crime areas, hazards should strongly influence routing
+      if (crimeScore < 0.3) {  // Expanded from 0.2 to 0.3 to cover more areas
         let hazardBoost = 0;
         
+        // ACCIDENT OVERRIDE: If accidents detected, apply massive boost
+        if (hasAccident || nearbyAccidents.length > 0) {
+          hazardBoost = 2.0; // Massive boost to guarantee avoidance
+          hasCriticalHazard = true;
+          if (i === 0) console.log(`🚨 [DangerDetection] ACCIDENT DETECTED - FORCING AVOIDANCE (boost: +${hazardBoost.toFixed(3)})`);
+        }
         // Different boost based on hazard density (which reflects severity)
-        if (realHazardDensity >= 0.6) {
+        else if (realHazardDensity >= 0.6) {
           // Critical: Very high density or multiple high-severity hazards
           // Force route avoidance by making score always exceed threshold
-          hazardBoost = 1.0; // Guarantee score > 0.4 threshold
+          hazardBoost = 1.0; // Guarantee score > 0.15 threshold
           hasCriticalHazard = true; // Flag for extended detour limits
           if (i === 0) console.log(`[DangerDetection] CRITICAL hazard level - forcing avoidance (boost: +${hazardBoost.toFixed(3)})`);
         } else if (realHazardDensity >= 0.4) {
           // High risk: High severity hazards nearby
           // Strong boost to ensure alternative routes are considered
-          hazardBoost = realHazardDensity * 3.0; // 3x multiplier
+          hazardBoost = realHazardDensity * 4.0; // Increased from 3x to 4x
           if (i === 0) console.log(`[DangerDetection] HIGH RISK hazard - strong avoidance (boost: +${hazardBoost.toFixed(3)})`);
         } else if (realHazardDensity >= 0.2) {
           // Medium risk: Medium severity or distant high severity
           // Moderate boost to prefer alternatives if available
-          hazardBoost = realHazardDensity * 2.0; // 2x multiplier
+          hazardBoost = realHazardDensity * 2.5; // Increased from 2x to 2.5x
           if (i === 0) console.log(`[DangerDetection] MEDIUM RISK hazard - prefer alternatives (boost: +${hazardBoost.toFixed(3)})`);
-        } else if (realHazardDensity >= 0.15) {
+        } else if (realHazardDensity >= 0.1) {  // Lowered from 0.15 to 0.1
           // Low risk: Low severity or very distant hazards
-          // Minor boost, only avoid if easy alternatives exist
-          hazardBoost = realHazardDensity * 1.0; // 1x multiplier
+          // Minor boost, but enough to trigger alternative search
+          hazardBoost = realHazardDensity * 1.5; // Increased from 1x to 1.5x
           if (i === 0) console.log(`[DangerDetection] LOW RISK hazard - minor avoidance (boost: +${hazardBoost.toFixed(3)})`);
+        } else if (realHazardDensity >= 0.05) {  // NEW: Very low risk threshold
+          // Very low risk: Minor hazards or very distant
+          // Small boost to at least consider alternatives
+          hazardBoost = realHazardDensity * 1.0;
+          if (i === 0) console.log(`[DangerDetection] VERY LOW RISK hazard - slight avoidance (boost: +${hazardBoost.toFixed(3)})`);
         }
         
         weightedScore += hazardBoost;
+      } else {
+        // Even in higher crime areas, significant hazards should still matter
+        if (realHazardDensity >= 0.3) {
+          const hazardBoost = realHazardDensity * 1.5; // Boost for significant hazards
+          weightedScore += hazardBoost;
+          if (i === 0) console.log(`[DangerDetection] HIGH CRIME + HAZARD area - additional boost (boost: +${hazardBoost.toFixed(3)})`);
+        }
       }
       
       // Debug logging for first point
@@ -924,17 +1138,19 @@ class RouteCalculator {
   routesAreSimilar(coords1, coords2) {
     if (!coords1 || !coords2) return false;
     
-    // Compare lengths
-    if (Math.abs(coords1.length - coords2.length) > coords1.length * 0.2) {
+    // Compare lengths - if they differ by more than 10%, they're different
+    if (Math.abs(coords1.length - coords2.length) > coords1.length * 0.1) {
       return false;
     }
     
-    // Sample and compare points
+    // Sample and compare points (every 300m)
     const samples1 = this.sampleRoutePoints(coords1, 0.3);
     const samples2 = this.sampleRoutePoints(coords2, 0.3);
     
+    if (samples1.length === 0 || samples2.length === 0) return false;
+    
     let matchCount = 0;
-    const threshold = 0.001; // ~100m
+    const threshold = 0.0005; // ~50m (stricter threshold)
     
     for (const p1 of samples1) {
       for (const p2 of samples2) {
@@ -945,7 +1161,11 @@ class RouteCalculator {
       }
     }
     
-    return matchCount >= samples1.length * 0.8;
+    // Require 90% of points to match (stricter than 80%)
+    const matchPercentage = matchCount / samples1.length;
+    console.log(`[RouteSimilarity] Match: ${matchCount}/${samples1.length} points (${(matchPercentage * 100).toFixed(1)}%) - Threshold: 90%`);
+    
+    return matchPercentage >= 0.9;
   }
 
   /**
@@ -1044,13 +1264,13 @@ class RouteCalculator {
     return { success: false };
   }
 
-  async calculateStraightLineRoutes(fromLat, fromLon, toLat, toLon, mode) {
+  async calculateStraightLineRoutes(fromLat, fromLon, toLat, toLon, mode, timeOfDay = 'day') {
     const distance = csvDataLoader.calculateDistance(fromLat, fromLon, toLat, toLon);
     const speed = this.getSpeedForMode(mode);
     const duration = (distance / speed) * 60; // minutes
     
     const coordinates = [[fromLat, fromLon], [toLat, toLon]];
-    const safetyScore = await this.calculateRouteSafetyScore(coordinates);
+    const safetyScore = await this.calculateRouteSafetyScore(coordinates, null, timeOfDay);
     const safetyRating = Math.max(0, Math.min(10, (1 - safetyScore) * 10));
     
     const routeData = {

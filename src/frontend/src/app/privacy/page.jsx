@@ -71,7 +71,7 @@ export default function Privacy() {
               }}
             >
               <img 
-                src="/grangegorman.jpg" 
+                src="/Grangegorman.jpg" 
                 alt="Technological University Dublin - Grangegorman Campus"
                 className="w-full h-auto"
                 style={{ display: 'block' }}

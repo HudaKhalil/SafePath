@@ -22,9 +22,9 @@ const sendVerificationEmail = async (email, username, verificationToken) => {
     const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${verificationToken}`;
     
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'SafePath <noreply@safepath.app>',
+      from: process.env.EMAIL_FROM || "SafePath <noreply@safepath.app>",
       to: email,
-      subject: 'Verify Your SafePath Account',
+      subject: "Verify Your SafePath Account",
       html: `
         <!DOCTYPE html>
         <html>
@@ -41,7 +41,7 @@ const sendVerificationEmail = async (email, username, verificationToken) => {
               padding: 20px;
             }
             .header {
-              background: linear-gradient(135deg, #06d6a0 0%, #059669 100%);
+              background: #0f172a;
               padding: 30px;
               text-align: center;
               border-radius: 10px 10px 0 0;
@@ -60,7 +60,7 @@ const sendVerificationEmail = async (email, username, verificationToken) => {
               display: inline-block;
               padding: 15px 30px;
               background: #06d6a0;
-              color: white !important;
+              color: #0f172a !important;
               text-decoration: none;
               border-radius: 5px;
               font-weight: bold;
@@ -82,30 +82,33 @@ const sendVerificationEmail = async (email, username, verificationToken) => {
         </head>
         <body>
           <div class="header">
-            <h1>🛡️ SafePath</h1>
+            <h1 style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+              <img src="${process.env.FRONTEND_URL}/logo.png" alt="SafePath" style="width: 40px; height: 40px;">
+              <span style="color: white;">SafePath</span>
+            </h1>
           </div>
           <div class="content">
-            <h2>Welcome to SafePath, ${username}! 👋</h2>
-            <p>Thank you for signing up! We're excited to help you navigate safely through London.</p>
+            <h2>Welcome to <span style="color: #06d6a0;">SafePath</span>, ${username}! 👋</h2>
+            <p style="font-size: 16px;">Thanks for joining our community! Together you'll discover safer routes, report hazards, and help make every journey a little more secure.</p>
             
-            <p>To complete your registration and start using SafePath, please verify your email address by clicking the button below:</p>
+            <p style="font-size: 16px;">To complete your registration and start using SafePath, please verify your email address by clicking the button below:</p>
             
             <div style="text-align: center;">
-              <a href="${verificationUrl}" class="button">Verify Email Address</a>
+              <a href="${verificationUrl}" class="button" target="_blank" rel="noopener noreferrer">Verify Email Address</a>
             </div>
             
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #06d6a0;">${verificationUrl}</p>
+            <p style="font-size: 16px;">Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #1e3a8a; font-size: 16px;">${verificationUrl}</p>
             
             <div class="warning">
-              <strong>⚠️ Important:</strong> This verification link will expire in 24 hours.
+              <strong style="font-size: 16px;">⚠️ Important:</strong> <span style="font-size: 16px;">This verification link will expire in 24 hours.</span>
             </div>
             
-            <p>If you didn't create a SafePath account, you can safely ignore this email.</p>
+            <p style="font-size: 16px;">If you didn't create a SafePath account, you can safely ignore this email.</p>
           </div>
           <div class="footer">
-            <p>SafePath - Your Safety, Our Priority</p>
-            <p>TUD Grangegorman Campus, Dublin, Ireland</p>
+            <p>Your Safety, Our Priority</p>
+            <p>SafePath Development Team, Dublin, Ireland</p>
           </div>
         </body>
         </html>
@@ -122,7 +125,7 @@ This link will expire in 24 hours.
 If you didn't create a SafePath account, you can safely ignore this email.
 
 SafePath - Your Safety, Our Priority
-      `.trim()
+      `.trim(),
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -158,7 +161,7 @@ const sendWelcomeEmail = async (email, username) => {
               padding: 20px;
             }
             .header {
-              background: linear-gradient(135deg, #06d6a0 0%, #059669 100%);
+              background: #0f172a;
               padding: 30px;
               text-align: center;
               border-radius: 10px 10px 0 0;
@@ -179,34 +182,38 @@ const sendWelcomeEmail = async (email, username) => {
               background: white;
               border-radius: 5px;
             }
+            .login-button {
+              display: inline-block;
+              padding: 15px 30px;
+              background: #06d6a0;
+              color: #0f172a !important;
+              text-decoration: none;
+              border-radius: 5px;
+              font-weight: bold;
+              margin: 20px 0;
+            }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>🎉 Welcome to SafePath!</h1>
+            <h1 style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+              <img src="${process.env.FRONTEND_URL}/logo.png" alt="SafePath" style="width: 40px; height: 40px;">
+              <span style="color: white;">SafePath</span>
+            </h1>
           </div>
           <div class="content">
-            <h2>Your account is now active, ${username}!</h2>
-            <p>You can now enjoy all the features SafePath has to offer:</p>
+            <h2>Welcome to <span style="color: #06d6a0;">SafePath</span>, ${username}! 🎉</h2>
+            <p style="font-size: 16px;">Your account is now verified and ready to go.</p>
             
-            <div class="feature">
-              <strong>🗺️ Safe Route Planning</strong>
-              <p>Get personalized routes based on real-time safety data</p>
-            </div>
+            <ul style="line-height: 2; font-size: 16px;">
+              <li>Plan safer routes</li>
+              <li>Report and view hazards</li>
+              <li>Find travel buddies</li>
+            </ul>
             
-            <div class="feature">
-              <strong>⚠️ Hazard Reporting</strong>
-              <p>Report and view hazards to help keep the community safe</p>
-            </div>
+            <p style="font-size: 16px;">Ready to start? <a href="${process.env.FRONTEND_URL}/auth/login" style="color: #06d6a0; text-decoration: none; font-weight: bold;">Log in</a> and plan your first safe journey with <a href="https://safepath-deploy.vercel.app" style="color: #06d6a0; text-decoration: none; font-weight: bold;" target="_blank" rel="noopener noreferrer">SafePath</a>.</p>
             
-            <div class="feature">
-              <strong>👥 Find Travel Buddies</strong>
-              <p>Connect with others traveling similar routes</p>
-            </div>
-            
-            <p>Ready to start your safe journey? Log in now and explore!</p>
-            
-            <p style="margin-top: 30px;">Stay safe,<br><strong>The SafePath Team</strong></p>
+            <p style="margin-top: 30px; font-size: 16px;">Stay safe,<br><strong>SafePath Development Team</strong></p>
           </div>
         </body>
         </html>
@@ -223,7 +230,124 @@ const sendWelcomeEmail = async (email, username) => {
   }
 };
 
+// Send password reset email
+const sendPasswordResetEmail = async (email, username, resetToken) => {
+  try {
+    const transporter = createTransporter();
+    
+    const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`;
+    
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || "SafePath <noreply@safepath.app>",
+      to: email,
+      subject: "Reset Your SafePath Password",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background: #0f172a;
+              padding: 30px;
+              text-align: center;
+              border-radius: 10px 10px 0 0;
+            }
+            .header h1 {
+              color: white;
+              margin: 0;
+              font-size: 28px;
+            }
+            .content {
+              background: #f8f9fa;
+              padding: 30px;
+              border-radius: 0 0 10px 10px;
+            }
+            .button {
+              display: inline-block;
+              padding: 15px 30px;
+              background: #06d6a0;
+              color: #0f172a !important;
+              text-decoration: none;
+              border-radius: 5px;
+              font-weight: bold;
+              margin: 20px 0;
+            }
+            .warning {
+              background: #fff3cd;
+              border-left: 4px solid #ffc107;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .info {
+              background: #e7f3ff;
+              border-left: 4px solid #2196f3;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+              <img src="${process.env.FRONTEND_URL}/logo.png" alt="SafePath" style="width: 40px; height: 40px;">
+              <span style="color: white;">SafePath</span>
+            </h1>
+          </div>
+          <div class="content">
+            <h2>Password Reset Request 🔐</h2>
+            <p style="font-size: 16px;">Hi ${username},</p>
+            <p style="font-size: 16px;">We received a request to reset your password for your SafePath account. Click the button below to create a new password:</p>
+            
+            <div style="text-align: center;">
+              <a href="${resetUrl}" class="button" target="_blank" rel="noopener noreferrer">Reset Password</a>
+            </div>
+            
+            <p style="font-size: 16px;">Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; background: white; padding: 10px; border-radius: 5px; font-size: 14px;">${resetUrl}</p>
+            
+            <div class="warning">
+              <strong>⚠️ Important:</strong>
+              <ul style="margin: 10px 0;">
+                <li>This link will expire in <strong>1 hour</strong></li>
+                <li>If you didn't request this reset, you can safely ignore this email</li>
+                <li>Your password will remain unchanged unless you click the link above</li>
+              </ul>
+            </div>
+            
+            <div class="info">
+              <strong>🛡️ Security Tip:</strong> Never share your password with anyone. SafePath will never ask for your password via email.
+            </div>
+            
+            <p style="margin-top: 30px; font-size: 16px;">Stay safe,<br><strong>SafePath Security Team</strong></p>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Password reset email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('❌ Error sending password reset email:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendVerificationEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendPasswordResetEmail
 };

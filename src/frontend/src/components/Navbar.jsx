@@ -90,17 +90,16 @@ export default function Navbar() {
       }}
     >
       <div className="container mx-auto px-8 py-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 [@media(max-width:356px)]:gap-2 [@media(max-width:356px)]:-ml-4">
           <div className="w-12 h-12 flex items-center justify-center" title="SafePath - Navigate Safely">
             <img 
               src="/logo.png" 
               alt="SafePath Logo" 
-              className="w-12 h-12 object-contain"
-            />
-          </div>
- <div style={{ color: '#f8fafc' }} className="font-bold text-2xl hidden sm:block">SafePath</div>        </Link>
-
-        <nav className="hidden md:flex gap-8 items-center font-bold">
+            className="w-12 h-12 object-contain"
+          />
+        </div>
+        <div style={{ color: '#f8fafc' }} className="font-bold text-2xl hidden [@media(min-width:356px)]:block">SafePath</div>
+      </Link>        <nav className="hidden md:flex gap-8 items-center font-bold">
           <ThemeToggle />
           <Link 
       href="/" 
@@ -114,17 +113,17 @@ export default function Navbar() {
       Home
     </Link>
     
-    {/* SUGGESTED ROUTES LINK - UPDATED */}
+    {/* ROUTES LINK - UPDATED */}
     <Link 
       href="/suggested-routes" 
       className="transition-colors duration-200"
       style={{
         color: pathname === '/suggested-routes' ? '#06d6a0' : '#94a3b8'
       }}
-      onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+      onMouseEnter={(e) => e.target.style.color = '#06d6a0'}
       onMouseLeave={(e) => e.target.style.color = pathname === '/suggested-routes' ? '#06d6a0' : '#94a3b8'}
     >
-      Suggested Routes
+      Routes
     </Link>
     
     {/* REPORT HAZARDS LINK - UPDATED */}
@@ -327,7 +326,7 @@ export default function Navbar() {
               onMouseEnter={(e) => e.target.style.color = '#ffffff'}
               onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
             >
-              Suggested Routes
+              Routes
             </Link>
             <Link 
               href="/report-hazards" 
@@ -368,6 +367,16 @@ export default function Navbar() {
               onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
             >
               Privacy Policy
+            </Link>
+            <Link 
+              href="/terms" 
+              onClick={() => setOpen(false)} 
+              className="transition-colors duration-200 text-base font-medium"
+              style={{ color: isDark ? '#06d6a0' : '#f8fafc' }}
+              onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#f8fafc'}
+            >
+              Terms of Use
             </Link>
 
             {isLoggedIn ? (

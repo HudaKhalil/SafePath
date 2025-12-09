@@ -2,10 +2,19 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import ProtectedRoute from '../../components/auth/ProtectedRoute';
-import Toast from '../../components/Toast';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import Toast from '@/components/Toast';
+import { hazardsService } from '../../lib/services';
+import { 
+  getStoredLocation, 
+  getStoredMapCenter, 
+  getStoredMapZoom,
+  getCurrentLocation,
+  saveMapView 
+} from '../../lib/locationManager';
+import { LOCATION_CONFIG } from '../../lib/locationConfig';
 
-const Map = dynamic(() => import('../../components/Map'), { ssr: false });
+const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
 
@@ -18,7 +27,9 @@ export default function FindBuddy() {
   const [activeTab, setActiveTab] = useState('nearby');
   
   // Location state
-  const [userLocation, setUserLocation] = useState([51.5074, -0.1278]);
+  const [userLocation, setUserLocation] = useState(() => getStoredLocation() || [51.5074, -0.1278]);
+  const [mapCenter, setMapCenter] = useState(() => getStoredMapCenter() || getStoredLocation() || [51.5074, -0.1278]);
+  const [mapZoom, setMapZoom] = useState(() => getStoredMapZoom());
   
   // Buddies state
   const [buddies, setBuddies] = useState([]);
@@ -63,7 +74,12 @@ export default function FindBuddy() {
   // Get auth token
   const getToken = () => {
     if (typeof window !== 'undefined') {
-      return document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
+      const token = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
+      if (!token || token === 'undefined' || token === 'null') {
+        console.warn('⚠️ Invalid or missing auth token. User may need to login again.');
+        return null;
+      }
+      return token;
     }
     return null;
   };
@@ -89,22 +105,40 @@ export default function FindBuddy() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Get user location
+  // Get user location with persistence
   useEffect(() => {
-    console.log('⏱️ Getting user location in background...');
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location = [position.coords.latitude, position.coords.longitude];
-          console.log('✓ Real location obtained:', location);
+    const getUserLocation = async () => {
+      try {
+        // Check stored location first (GDPR-compliant sessionStorage)
+        let location = getStoredLocation();
+        
+        if (location) {
+          console.log('📍 Using stored location in FindBuddy:', location);
           setUserLocation(location);
-        },
-        (error) => {
-          console.log(`ℹ️ Using default location (geolocation ${error.message.toLowerCase()})`);
-        },
-        { timeout: 3000, enableHighAccuracy: false, maximumAge: 300000 }
-      );
-    }
+          if (!mapCenter) {
+            setMapCenter(location);
+            saveMapView(location, mapZoom);
+          }
+        } else {
+          console.log('📍 No stored location, requesting GPS in FindBuddy...');
+          location = await getCurrentLocation({ autoSave: true });
+          setUserLocation(location);
+          if (!mapCenter) {
+            setMapCenter(location);
+            saveMapView(location, mapZoom);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user location:', error);
+        const storedLoc = getStoredLocation() || LOCATION_CONFIG.DEFAULT_CENTER;
+        setUserLocation(storedLoc);
+        if (!mapCenter) {
+          setMapCenter(storedLoc);
+        }
+      }
+    };
+    
+    getUserLocation();
   }, []);
 
   // ==========================================
@@ -118,6 +152,12 @@ export default function FindBuddy() {
     
     try {
       const token = getToken();
+      if (!token) {
+        console.warn('⚠️ No valid token, skipping nearby buddies fetch');
+        setError('Please login to view nearby buddies');
+        setIsLoading(false);
+        return;
+      }
       
       // ✅ ADD THIS: Update my location FIRST so others can find me
       await updateMyLocation();
@@ -134,10 +174,17 @@ export default function FindBuddy() {
         params.append('transport_mode', transportMode);
       }
       
-      const response = await fetch(`${API_URL}/api/buddies/nearby?${params}`, {
+      const response = await fetch(`${API_URL}/buddies/nearby?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
+      
+      if (response.status === 403 || response.status === 401) {
+        console.error('❌ Authentication failed');
+        setError('Session expired. Please login again.');
+        setIsLoading(false);
+        return;
+      }
       
       const data = await response.json();
       if (data.success) {
@@ -159,7 +206,7 @@ export default function FindBuddy() {
     
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/api/buddies/location`, {
+      const response = await fetch(`${API_URL}/buddies/location`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -167,8 +214,8 @@ export default function FindBuddy() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          latitude: userLocation[0],
-          longitude: userLocation[1]
+          lat: userLocation[0],
+          lon: userLocation[1]
         })
       });
       
@@ -186,23 +233,47 @@ export default function FindBuddy() {
   const fetchPendingRequests = async () => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/api/buddies/requests?status=pending`, {
+      if (!token) {
+        console.warn('⚠️ No valid token, skipping pending requests fetch');
+        setToast({ message: 'Please login again to view buddy requests', type: 'warning' });
+        return;
+      }
+      
+      console.log('🔍 Fetching pending requests...');
+      const response = await fetch(`${API_URL}/buddies/requests?status=pending`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
+      
+      console.log('Response status:', response.status);
+      
+      if (response.status === 403 || response.status === 401) {
+        console.error('❌ Authentication failed - token may be expired');
+        setToast({ message: 'Session expired. Please login again.', type: 'warning' });
+        return;
+      }
+      
       const data = await response.json();
+      console.log('Pending requests response:', data);
+      
       if (data.success) {
-        setPendingRequests(data.data?.requests || []);
+        const requests = data.data?.requests || [];
+        console.log(`✅ Found ${requests.length} pending requests`);
+        setPendingRequests(requests);
+      } else {
+        console.error('❌ Failed to fetch requests:', data.message);
+        setToast({ message: data.message || 'Failed to fetch pending requests', type: 'error' });
       }
     } catch (err) {
-      console.error('Error fetching requests:', err);
+      console.error('❌ Error fetching requests:', err);
+      setToast({ message: 'Failed to fetch pending requests', type: 'error' });
     }
   };
 
   const fetchAcceptedBuddies = async () => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/api/buddies/accepted`, {
+      const response = await fetch(`${API_URL}/buddies/accepted`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
@@ -218,7 +289,7 @@ export default function FindBuddy() {
   const fetchGroupRoutes = async () => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/api/buddies/group-routes`, {
+      const response = await fetch(`${API_URL}/buddies/group-routes`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
@@ -234,27 +305,31 @@ export default function FindBuddy() {
   const fetchHazards = useCallback(async () => {
     if (!userLocation) return;
     try {
-      const token = getToken();
-      const response = await fetch(
-        `${API_URL}/api/hazards/nearby?lat=${userLocation[0]}&lon=${userLocation[1]}&radius=10000&limit=50`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-          credentials: 'include'
-        }
-      );
-      const data = await response.json();
-      if (data.success) {
-        setHazards(data.data?.hazards || []);
+      console.log(`Loading combined hazards (community + TomTom) for FindBuddy: lat=${userLocation[0]}, lng=${userLocation[1]}, radius=10000`);
+      const response = await hazardsService.getCombinedHazards(userLocation[0], userLocation[1], { 
+        radius: 10000, 
+        limit: 100, 
+        includeTomTom: true 
+      });
+      console.log('Combined hazards API response:', response);
+      if (response.success) {
+        const hazardsData = response.data?.hazards || [];
+        setHazards(hazardsData);
+        console.log(`Loaded ${hazardsData.length} combined hazards (community + TomTom):`, hazardsData);
+      } else {
+        console.warn('Failed to load combined hazards:', response);
+        setHazards([]);
       }
     } catch (err) {
       console.error('Error fetching hazards:', err);
+      setHazards([]);
     }
   }, [userLocation]);
 
   const sendBuddyRequest = async (receiverId) => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/api/buddies/requests`, {
+      const response = await fetch(`${API_URL}/buddies/requests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -283,7 +358,7 @@ export default function FindBuddy() {
   const respondToRequest = async (requestId, action) => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/api/buddies/requests/${requestId}`, {
+      const response = await fetch(`${API_URL}/buddies/requests/${requestId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -387,7 +462,7 @@ export default function FindBuddy() {
 
         // Fetch buddies along route
         const token = getToken();
-        const response = await fetch(`${API_URL}/api/buddies/along-route`, {
+        const response = await fetch(`${API_URL}/buddies/along-route`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -425,7 +500,7 @@ export default function FindBuddy() {
 
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/api/buddies/group-routes`, {
+      const response = await fetch(`${API_URL}/buddies/group-routes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -462,7 +537,7 @@ export default function FindBuddy() {
   const joinRoute = async (routeId) => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/api/buddies/group-routes/${routeId}/join`, {
+      const response = await fetch(`${API_URL}/buddies/group-routes/${routeId}/join`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
@@ -544,16 +619,28 @@ export default function FindBuddy() {
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-            {(buddy.name || buddy.sender_name || buddy.buddy_name || 'UN').substring(0, 2).toUpperCase()}
-          </div>
+          {(buddy.profile_picture || buddy.sender_profile_picture || buddy.buddy_profile_picture) && (
+            <img
+              src={buddy.profile_picture || buddy.sender_profile_picture || buddy.buddy_profile_picture}
+              alt={(buddy.name || buddy.sender_name || buddy.buddy_name || 'User')}
+              className="w-12 h-12 rounded-full object-cover border-2"
+              style={{ borderColor: '#06d6a0' }}
+            />
+          )}
           <div>
-            <h3 className="font-semibold" style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>
+            <h3 className="font-semibold text-lg" style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>
               {buddy.name || buddy.sender_name || buddy.buddy_name || 'Unknown'}
             </h3>
-            <div className="flex items-center gap-1 text-sm" style={{ color: isLightMode ? '#64748b' : '#9ca3af' }}>
+            <div className="flex items-center gap-1 text-base" style={{ color: isLightMode ? '#64748b' : '#9ca3af' }}>
               <span>📍</span>
-              <span>{buddy.distance_km || '0.00'} km away</span>
+              <span>
+                {(() => {
+                  const distKm = parseFloat(buddy.distance_km || 0);
+                  return distKm < 1 
+                    ? `${Math.round(distKm * 1000)} m away`
+                    : `${distKm.toFixed(2)} km away`;
+                })()}
+              </span>
             </div>
           </div>
         </div>
@@ -567,22 +654,114 @@ export default function FindBuddy() {
         )}
       </div>
 
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <span
-          className="px-3 py-1 rounded-full text-sm capitalize"
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer relative group"
+            style={{
+              backgroundColor: '#06d6a0',
+              color: '#0f172a'
+            }}
+            title={(() => {
+              const mode = buddy.transport_mode || buddy.sender_transport_mode || buddy.buddy_transport_mode || 'walking';
+              return mode.charAt(0).toUpperCase() + mode.slice(1);
+            })()}
+          >
+            {(() => {
+              const mode = buddy.transport_mode || buddy.sender_transport_mode || buddy.buddy_transport_mode || 'walking';
+              if (mode === 'cycling') {
+                return (
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    className="w-5 h-5"
+                  >
+                    <circle cx="18.5" cy="17.5" r="3.5"/>
+                    <circle cx="5.5" cy="17.5" r="3.5"/>
+                    <circle cx="15" cy="5" r="1"/>
+                    <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+                  </svg>
+                );
+              } else {
+                return (
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    viewBox="0 0 24 24" 
+                    fill="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path d="M13.5 5.5c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                  </svg>
+                );
+              }
+            })()}
+            {/* Tooltip */}
+            <span
+              className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+              style={{
+                backgroundColor: isLightMode ? '#0f172a' : '#1e293b',
+                color: '#ffffff',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+              }}
+            >
+              {(() => {
+                const mode = buddy.transport_mode || buddy.sender_transport_mode || buddy.buddy_transport_mode || 'walking';
+                return mode.charAt(0).toUpperCase() + mode.slice(1);
+              })()}
+            </span>
+          </div>
+          <span
+            className="px-3 py-1 rounded-full text-base"
+            style={(() => {
+              const safetyPercent = (buddy.safety_priority || 0.5) * 100;
+              if (safetyPercent >= 70) {
+                return { backgroundColor: '#d1fae5', color: '#065f46' }; // Light green
+              } else if (safetyPercent >= 40) {
+                return { backgroundColor: '#fef3c7', color: '#92400e' }; // Light amber
+              } else {
+                return { backgroundColor: '#fee2e2', color: '#991b1b' }; // Light red
+              }
+            })()}
+          >
+            Safety: {((buddy.safety_priority || 0.5) * 100).toFixed(0)}%
+          </span>
+        </div>
+        
+        {/* Profile button */}
+        <button
+          onClick={() => setSelectedBuddy(buddy)}
+          className="w-10 h-10 rounded-full font-medium text-base transition-colors flex items-center justify-center relative group"
           style={{
-            backgroundColor: isLightMode ? '#f3f4f6' : '#374151',
-            color: isLightMode ? '#374151' : '#d1d5db'
+            backgroundColor: '#3b82f6'
           }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
         >
-          {buddy.transport_mode || buddy.sender_transport_mode || buddy.buddy_transport_mode || 'walking'}
-        </span>
-        <span
-          className="px-3 py-1 rounded-full text-sm"
-          style={{ backgroundColor: '#fef3c7', color: '#92400e' }}
-        >
-          Safety: {((buddy.safety_priority || 0.5) * 100).toFixed(0)}%
-        </span>
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            viewBox="0 0 24 24" 
+            fill="#ffffff"
+            className="w-5 h-5"
+          >
+            <path fillRule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clipRule="evenodd" />
+          </svg>
+          {/* Tooltip */}
+          <span
+            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+            style={{
+              backgroundColor: isLightMode ? '#0f172a' : '#1e293b',
+              color: '#ffffff',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            Buddy Profile
+          </span>
+        </button>
       </div>
 
       <div className="flex gap-2">
@@ -591,7 +770,7 @@ export default function FindBuddy() {
           <>
             <button
               onClick={() => respondToRequest(buddy.id || buddy.request_id, 'accept')}
-              className="flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+              className="flex-1 px-4 py-2 rounded-lg font-medium text-base transition-colors"
               style={{ backgroundColor: '#10b981', color: '#ffffff' }}
               onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
               onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
@@ -600,7 +779,7 @@ export default function FindBuddy() {
             </button>
             <button
               onClick={() => respondToRequest(buddy.id || buddy.request_id, 'reject')}
-              className="flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+              className="flex-1 px-4 py-2 rounded-lg font-medium text-base transition-colors"
               style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
               onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
               onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
@@ -619,48 +798,21 @@ export default function FindBuddy() {
                 setSelectedBuddiesForRoute([...selectedBuddiesForRoute, buddy.buddy_id]);
               }
             }}
-            className="flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 rounded-lg font-medium text-base transition-colors flex items-center justify-center gap-2"
             style={{ backgroundColor: '#8b5cf6', color: '#ffffff' }}
             onMouseEnter={(e) => e.target.style.backgroundColor = '#7c3aed'}
             onMouseLeave={(e) => e.target.style.backgroundColor = '#8b5cf6'}
           >
-            🗺️ Plan Route
-          </button>
-        )}
-
-        {/* Send Request button for nearby buddies */}
-        {!isRequest && !isAccepted && !buddy.request_status && (
-          <button
-            onClick={() => sendBuddyRequest(buddy.id)}
-            className="flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-colors"
-            style={{ backgroundColor: '#3b82f6', color: '#ffffff' }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
-          >
-            Send Request
+            Plan Route
           </button>
         )}
 
         {/* Pending indicator */}
         {buddy.request_status === 'pending' && buddy.is_sender && (
-          <span className="flex-1 px-4 py-2 rounded-lg font-medium text-sm text-center bg-yellow-100 text-yellow-800">
+          <span className="flex-1 px-4 py-2 rounded-lg font-medium text-base text-center bg-yellow-100 text-yellow-800">
             Pending
           </span>
         )}
-
-        {/* Profile button */}
-        <button
-          onClick={() => setSelectedBuddy(buddy)}
-          className="px-4 py-2 rounded-lg font-medium text-sm transition-colors"
-          style={{
-            backgroundColor: isLightMode ? '#f3f4f6' : '#374151',
-            color: isLightMode ? '#374151' : '#d1d5db'
-          }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = isLightMode ? '#e5e7eb' : '#4b5563'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = isLightMode ? '#f3f4f6' : '#374151'}
-        >
-          Profile
-        </button>
       </div>
     </div>
   );
@@ -798,12 +950,54 @@ export default function FindBuddy() {
 
          {/* Side Panel - Wider and properly positioned */}
           <div
-            className="fixed left-0 top-23 bottom-0 z-50 w-[90vw] md:w-[450px] lg:w-[500px] transition-transform duration-300 shadow-2xl"
+            className="fixed left-0 top-23 bottom-0 z-50 w-[65vw] md:w-[340px] lg:w-[360px] transition-transform duration-300 shadow-2xl"
             style={{
               transform: showBuddyPanel ? 'translateX(0)' : 'translateX(-100%)',
               backgroundColor: isLightMode ? '#ffffff' : '#0f172a',
             }}
           >
+            {/* Toggle Button attached to right edge of panel, aligned with map header */}
+            <button
+              onClick={() => setShowBuddyPanel(!showBuddyPanel)}
+              className="absolute z-[65] transition-all duration-300 shadow-lg"
+              style={{ 
+                top: '5.9rem',
+                right: showBuddyPanel ? '-3rem' : '-9rem'
+              }}
+              title="Buddy Cards"
+            >
+              <div
+                className="flex items-center gap-2 py-2 px-3"
+                style={{
+                  backgroundColor: isLightMode ? '#0f172a' : '#06d6a0',
+                  borderRadius: '0 8px 8px 0',
+                }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={isLightMode ? '#ffffff' : '#0f172a'}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-6 h-6 transition-transform duration-200"
+                  style={{ transform: showBuddyPanel ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                >
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                {!showBuddyPanel && (
+                  <span 
+                    className="text-sm font-semibold whitespace-nowrap"
+                    style={{ 
+                      color: isLightMode ? '#ffffff' : '#0f172a'
+                    }}
+                  >
+                    Buddy Cards
+                  </span>
+                )}
+              </div>
+            </button>
+
             <div className="h-full overflow-y-auto custom-scrollbar">
 
               <div className="p-4 pb-24">
@@ -872,13 +1066,13 @@ export default function FindBuddy() {
                     {[
                       { id: 'nearby', label: `Nearby (${buddies.length})` },
                       { id: 'pending', label: `Requests (${pendingRequests.filter(r => r.is_receiver).length})` },
-                      { id: 'accepted', label: `My Buddies (${acceptedBuddies.length})` },
-                      { id: 'routes', label: '🗺️ Routes', hasIcon: true }
+                      { id: 'accepted', label: `Buddies (${acceptedBuddies.length})` },
+                      { id: 'routes', label: 'Routes', hasIcon: true }
                     ].map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 px-2 py-3 text-xs font-medium ${activeTab === tab.id ? 'border-b-2' : ''}`}
+                        className={`flex-1 px-2 py-3 text-base font-medium ${activeTab === tab.id ? 'border-b-2' : ''} flex items-start justify-center`}
                         style={{
                           color: activeTab === tab.id ? '#06d6a0' : (isLightMode ? '#6b7280' : '#9ca3af'),
                           borderColor: activeTab === tab.id ? '#06d6a0' : 'transparent'
@@ -1146,9 +1340,14 @@ export default function FindBuddy() {
                                       onChange={() => toggleBuddySelection(buddy.buddy_id)}
                                       className="w-4 h-4 rounded"
                                     />
-                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                                      {(buddy.buddy_name || 'UN').substring(0, 2).toUpperCase()}
-                                    </div>
+                                    {buddy.buddy_profile_picture && (
+                                      <img
+                                        src={buddy.buddy_profile_picture}
+                                        alt={buddy.buddy_name || 'User'}
+                                        className="w-8 h-8 rounded-full object-cover border"
+                                        style={{ borderColor: '#06d6a0' }}
+                                      />
+                                    )}
                                     <span style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>
                                       {buddy.buddy_name}
                                     </span>
@@ -1230,50 +1429,10 @@ export default function FindBuddy() {
             </div>
           </div>
 
-          {/* Toggle Button - Always visible, higher z-index, positioned lower */}
-            <button
-              onClick={() => setShowBuddyPanel(!showBuddyPanel)}
-              className="fixed z-[70] top-28 transition-all duration-300 shadow-2xl"
-              style={{
-                left: showBuddyPanel 
-                  ? (isLgScreen ? '500px' : isMdScreen ? '450px' : '90vw') 
-                  : '0px',
-              }}
-            >
-            <div
-              className="flex items-center gap-2 px-4 py-4"
-              style={{
-                backgroundColor: isLightMode ? '#0f172a' : '#06d6a0',
-                borderRadius: '0 16px 16px 0',
-              }}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={isLightMode ? '#ffffff' : '#0f172a'}
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-6 h-6 transition-transform duration-200"
-                style={{ transform: showBuddyPanel ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              >
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-              {!showBuddyPanel && (
-                <span 
-                  className="font-semibold text-base pr-1 whitespace-nowrap" 
-                  style={{ color: isLightMode ? '#ffffff' : '#0f172a' }}
-                >
-                  Find Buddy
-                </span>
-              )}
-            </div>
-          </button>
-
           {/* Map Area */}
           <div
             className="transition-all duration-300"
-            style={{ marginLeft: showBuddyPanel && isMdScreen ? (isLgScreen ? '500px' : '450px') : '0' }}
+            style={{ marginLeft: showBuddyPanel && isMdScreen ? (isLgScreen ? '360px' : '340px') : '0' }}
           >
             <div className="space-y-2 p-2">
               <div
@@ -1283,13 +1442,16 @@ export default function FindBuddy() {
                   borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
                 }}
               >
-                {/* Map Header */}
+                {/* Map Header with London Button */}
                 <div className="flex items-center justify-end mb-2">
+                  {/* London Button */}
                   <button
                     onClick={(e) => {
                       e.preventDefault();
                       const londonCenter = [51.5074, -0.1278];
                       setUserLocation(londonCenter);
+                      setMapCenter(londonCenter);
+                      saveMapView(londonCenter, mapZoom);
                       fetchNearbyBuddies();
                       fetchHazards();
                       const span = e.currentTarget.querySelector('.london-text');
@@ -1318,11 +1480,16 @@ export default function FindBuddy() {
                 </div>
 
                 <Map
-                  center={userLocation || [51.5074, -0.1278]}
-                  zoom={13}
+                  center={mapCenter || userLocation || [51.5074, -0.1278]}
+                  zoom={mapZoom || 13}
                   hazards={hazards.filter(h => h.latitude && h.longitude)}
                   height={isMdScreen ? "calc(100vh - 200px)" : "550px"}
                   routeCoordinates={routeCoordinates}
+                  onViewChange={(center, zoom) => {
+                    setMapCenter(center);
+                    setMapZoom(zoom);
+                    saveMapView(center, zoom);
+                  }}
                   markers={[
                     // User location
                     ...(userLocation && userLocation[0] && userLocation[1] ? [{
@@ -1332,15 +1499,22 @@ export default function FindBuddy() {
                       popup: <div className="text-sm"><strong>You</strong><br/>Your current location</div>
                     }] : []),
                     // Buddy markers
-                    ...(buddies.map(buddy => ({
-                      position: [
-                        buddy.lat || userLocation[0] + (Math.random() - 0.5) * 0.02,
-                        buddy.lon || userLocation[1] + (Math.random() - 0.5) * 0.02
-                      ],
-                      color: '#3b82f6',
-                      type: 'buddy',
-                      popup: <div className="text-sm"><strong>{buddy.name || buddy.buddy_name}</strong><br/>{buddy.distance_km} km away</div>
-                    }))),
+                    ...(buddies.map(buddy => {
+                      const distKm = parseFloat(buddy.distance_km || 0);
+                      const distanceText = distKm < 1 
+                        ? `${Math.round(distKm * 1000)} m away`
+                        : `${distKm.toFixed(2)} km away`;
+                      
+                      return {
+                        position: [
+                          buddy.lat || userLocation[0] + (Math.random() - 0.5) * 0.02,
+                          buddy.lon || userLocation[1] + (Math.random() - 0.5) * 0.02
+                        ],
+                        color: '#3b82f6',
+                        type: 'buddy',
+                        popup: <div className="text-sm"><strong>{buddy.name || buddy.buddy_name}</strong><br/>{distanceText}</div>
+                      };
+                    })),
                     // Start marker
                     ...(startCoords ? [{
                       position: startCoords,
@@ -1375,9 +1549,14 @@ export default function FindBuddy() {
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-xl">
-                    {(selectedBuddy.name || selectedBuddy.buddy_name || 'UN').substring(0, 2).toUpperCase()}
-                  </div>
+                  {(selectedBuddy.profile_picture || selectedBuddy.buddy_profile_picture) && (
+                    <img
+                      src={selectedBuddy.profile_picture || selectedBuddy.buddy_profile_picture}
+                      alt={selectedBuddy.name || selectedBuddy.buddy_name || 'User'}
+                      className="w-16 h-16 rounded-full object-cover border-2"
+                      style={{ borderColor: '#06d6a0' }}
+                    />
+                  )}
                   <div>
                     <h3 className="text-xl font-bold" style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>
                       {selectedBuddy.name || selectedBuddy.buddy_name}
@@ -1395,18 +1574,61 @@ export default function FindBuddy() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2" style={{ color: isLightMode ? '#374151' : '#d1d5db' }}>
                   <span>📍</span>
-                  <span>{selectedBuddy.distance_km || '0.00'} km away</span>
+                  <span>
+                    {(() => {
+                      const distKm = parseFloat(selectedBuddy.distance_km || 0);
+                      return distKm < 1 
+                        ? `${Math.round(distKm * 1000)} m away`
+                        : `${distKm.toFixed(2)} km away`;
+                    })()}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span
-                    className="px-3 py-1 rounded-full text-sm capitalize"
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
                     style={{
-                      backgroundColor: isLightMode ? '#f3f4f6' : '#374151',
-                      color: isLightMode ? '#374151' : '#d1d5db'
+                      backgroundColor: '#06d6a0',
+                      color: '#0f172a'
                     }}
+                    title={(() => {
+                      const mode = selectedBuddy.transport_mode || selectedBuddy.buddy_transport_mode || 'walking';
+                      return mode.charAt(0).toUpperCase() + mode.slice(1);
+                    })()}
                   >
-                    {selectedBuddy.transport_mode || selectedBuddy.buddy_transport_mode || 'walking'}
-                  </span>
+                    {(() => {
+                      const mode = selectedBuddy.transport_mode || selectedBuddy.buddy_transport_mode || 'walking';
+                      if (mode === 'cycling') {
+                        return (
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                            className="w-5 h-5"
+                          >
+                            <circle cx="18.5" cy="17.5" r="3.5"/>
+                            <circle cx="5.5" cy="17.5" r="3.5"/>
+                            <circle cx="15" cy="5" r="1"/>
+                            <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+                          </svg>
+                        );
+                      } else {
+                        return (
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                            className="w-5 h-5"
+                          >
+                            <path d="M13.5 5.5c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
+                          </svg>
+                        );
+                      }
+                    })()}
+                  </div>
                   <span className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>
                     Safety: {((selectedBuddy.safety_priority || 0.5) * 100).toFixed(0)}%
                   </span>

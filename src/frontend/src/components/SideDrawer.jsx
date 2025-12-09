@@ -41,11 +41,13 @@ export default function SideDrawer({ open, onClose }) {
   return (
     <>
       {/* overlay */}
-      <div
-        className={`fixed inset-0 z-50 bg-black/30 transition-opacity ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      {open && (
+        <div
+          className="fixed inset-0 z-50 bg-black/30 transition-opacity opacity-100"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
       {/* panel */}
       <aside
         ref={panelRef}

@@ -272,6 +272,7 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
         $3
       )
       AND (h.status IS NULL OR h.status != 'resolved')
+      AND h.reported_at > NOW() - INTERVAL '6 months'
       ORDER BY distance_meters ASC, h.reported_at DESC
       LIMIT $4
     `, [latitude, longitude, radius, limit]);
@@ -318,73 +319,6 @@ router.get('/near/:latitude/:longitude', async (req, res) => {
     });
   }
 });
-
-router.get('/nearby', async (req, res) => {
-  try {
-    const { lat, lon, radius = 5000, limit = 50 } = req.query;
-
-    if (!lat || !lon) {
-      return res.status(400).json({
-        success: false,
-        message: 'Latitude and longitude are required'
-      });
-    }
-
-    console.log(`🔍 [Find Buddy] Searching hazards near (${lat}, ${lon}) within ${radius}m`);
-
-    const result = await query(`
-      SELECT 
-        h.id, 
-        h.description, 
-        h.hazard_type, 
-        h.severity,
-        h.latitude,
-        h.longitude,
-        h.reported_at,
-        h.status,
-        ST_Distance(
-          h.location::geography, 
-          ST_SetSRID(ST_Point($2, $1), 4326)::geography
-        ) as distance_meters
-      FROM hazards h
-      WHERE ST_DWithin(
-        h.location::geography, 
-        ST_SetSRID(ST_Point($2, $1), 4326)::geography, 
-        $3
-      )
-      AND (h.status IS NULL OR h.status != 'resolved')
-      ORDER BY distance_meters ASC, h.reported_at DESC
-      LIMIT $4
-    `, [lat, lon, radius, limit]);
-
-    console.log(`✅ [Find Buddy] Found ${result.rows.length} hazards`);
-
-    const hazards = result.rows.map(hazard => ({
-      id: hazard.id,
-      description: hazard.description,
-      latitude: hazard.latitude,
-      longitude: hazard.longitude,
-      hazardType: hazard.hazard_type,
-      severity: hazard.severity,
-      status: hazard.status,
-      reportedAt: hazard.reported_at,
-      distanceMeters: Math.round(hazard.distance_meters)
-    }));
-
-    res.json({
-      success: true,
-      data: { hazards }
-    });
-
-  } catch (error) {
-    console.error('[Find Buddy] Get nearby hazards error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
-  }
-});
-
 
 // Update hazard status (protected route)
 router.patch('/:id', authenticateToken, [
@@ -449,6 +383,73 @@ router.patch('/:id', authenticateToken, [
 
   } catch (error) {
     console.error('Update hazard error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Get nearby hazards (query param version for flexibility)
+router.get('/nearby', async (req, res) => {
+  try {
+    const { lat, lon, radius = 5000, limit = 50 } = req.query;
+
+    if (!lat || !lon) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude are required'
+      });
+    }
+
+    console.log(`🔍 [Find Buddy] Searching hazards near (${lat}, ${lon}) within ${radius}m`);
+
+    const result = await query(`
+      SELECT 
+        h.id, 
+        h.description, 
+        h.hazard_type, 
+        h.severity,
+        h.latitude,
+        h.longitude,
+        h.reported_at,
+        h.status,
+        ST_Distance(
+          h.location::geography, 
+          ST_SetSRID(ST_Point($2, $1), 4326)::geography
+        ) as distance_meters
+      FROM hazards h
+      WHERE ST_DWithin(
+        h.location::geography, 
+        ST_SetSRID(ST_Point($2, $1), 4326)::geography, 
+        $3
+      )
+      AND (h.status IS NULL OR h.status != 'resolved')
+      ORDER BY distance_meters ASC, h.reported_at DESC
+      LIMIT $4
+    `, [lat, lon, radius, limit]);
+
+    console.log(`✅ [Find Buddy] Found ${result.rows.length} hazards`);
+
+    const hazards = result.rows.map(hazard => ({
+      id: hazard.id,
+      description: hazard.description,
+      latitude: hazard.latitude,
+      longitude: hazard.longitude,
+      hazardType: hazard.hazard_type,
+      severity: hazard.severity,
+      status: hazard.status,
+      reportedAt: hazard.reported_at,
+      distanceMeters: Math.round(hazard.distance_meters)
+    }));
+
+    res.json({
+      success: true,
+      data: { hazards }
+    });
+
+  } catch (error) {
+    console.error('[Find Buddy] Get nearby hazards error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'
@@ -678,5 +679,144 @@ router.get('/stats', async (req, res) => {
     });
   }
 });
+
+// Get combined hazards (community + TomTom Traffic) - Proof of Concept for Academic Project
+// Demonstrates multi-source data aggregation for comprehensive hazard detection
+const tomtomHazardsService = require('../lib/tomtomHazardsService');
+
+router.get('/combined/:latitude/:longitude', async (req, res) => {
+  try {
+    const { latitude, longitude } = req.params;
+    const { radius = 5000, limit = 100, includeTomTom = 'true' } = req.query;
+
+    console.log(`🔄 [PoC] Fetching combined hazards (community + TomTom) near (${latitude}, ${longitude})`);
+
+    // Fetch community-reported hazards from database
+    // Only show hazards from last 6 months (old hazards likely resolved/outdated)
+    const communityResult = await query(`
+      SELECT 
+        h.id, 
+        h.description, 
+        h.hazard_type, 
+        h.severity,
+        h.latitude,
+        h.longitude,
+        h.image_url,
+        h.reported_at,
+        h.status,
+        ST_Distance(
+          h.location::geography, 
+          ST_SetSRID(ST_Point($2, $1), 4326)::geography
+        ) as distance_meters
+      FROM hazards h
+      WHERE ST_DWithin(
+        h.location::geography, 
+        ST_SetSRID(ST_Point($2, $1), 4326)::geography, 
+        $3
+      )
+      AND (h.status IS NULL OR h.status != 'resolved')
+      AND h.reported_at > NOW() - INTERVAL '6 months'
+      ORDER BY distance_meters ASC, h.reported_at DESC
+      LIMIT $4
+    `, [latitude, longitude, radius, limit]);
+
+    const communityHazards = communityResult.rows.map(hazard => ({
+      id: hazard.id,
+      source: 'community',
+      description: hazard.description,
+      latitude: hazard.latitude,
+      longitude: hazard.longitude,
+      type: hazard.hazard_type,
+      severity: hazard.severity,
+      status: hazard.status,
+      image_url: hazard.image_url,
+      reportedAt: hazard.reported_at,
+      distanceMeters: Math.round(hazard.distance_meters),
+      verified: false // Community reports pending verification
+    }));
+
+    console.log(`✅ Found ${communityHazards.length} community-reported hazards`);
+
+    // Fetch TomTom traffic incidents if requested (for academic demonstration)
+    let tomtomHazards = [];
+    if (includeTomTom === 'true') {
+      console.log(`🚦 [PoC] Querying TomTom Traffic API for incidents...`);
+      tomtomHazards = await tomtomHazardsService.getTomTomHazards(
+        parseFloat(latitude), 
+        parseFloat(longitude), 
+        parseInt(radius)
+      );
+      
+      console.log(`✅ Found ${tomtomHazards.length} TomTom traffic incidents`);
+    }
+
+    // Merge hazards (remove duplicates within 50m)
+    const mergedHazards = mergeHazards(communityHazards, tomtomHazards);
+
+    // Sort by distance
+    mergedHazards.sort((a, b) => (a.distanceMeters || 0) - (b.distanceMeters || 0));
+
+    res.json({
+      success: true,
+      data: {
+        hazards: mergedHazards,
+        searchLocation: {
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude)
+        },
+        radiusMeters: parseInt(radius),
+        stats: {
+          total: mergedHazards.length,
+          community: communityHazards.length,
+          tomtom: tomtomHazards.length,
+          merged: mergedHazards.length
+        },
+        note: 'Academic Proof of Concept - Demonstrates integration of multiple data sources'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get combined hazards error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Merge hazards from different sources, removing duplicates
+ * Two hazards are considered duplicates if they're within 50m and same type
+ */
+function mergeHazards(communityHazards, tomtomHazards) {
+  const merged = [...communityHazards];
+  const duplicateThreshold = 50; // meters
+
+  for (const tomtomHazard of tomtomHazards) {
+    let isDuplicate = false;
+    
+    for (const communityHazard of communityHazards) {
+      const distance = tomtomHazardsService.calculateDistance(
+        tomtomHazard.latitude,
+        tomtomHazard.longitude,
+        communityHazard.latitude,
+        communityHazard.longitude
+      );
+      
+      // Same type and within 50m = duplicate
+      if (distance < duplicateThreshold && tomtomHazard.type === communityHazard.type) {
+        isDuplicate = true;
+        break;
+      }
+    }
+    
+    if (!isDuplicate) {
+      merged.push(tomtomHazard);
+    }
+  }
+
+  return merged;
+}
 
 module.exports = router;

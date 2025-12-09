@@ -26,6 +26,16 @@
   background: #64748b;
 }
 
+/* Hide scrollbar for buddy cards horizontal scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
 /* COLORS THAT STAY THE SAME IN BOTH LIGHT AND DARK MODE */
 :root {
   /* BUTTONS, TEXT, ICONS will be same in both modes */
@@ -300,5 +310,102 @@ input[type="number"]:focus {
   outline: none;
   border-color: #06d6a0;
   box-shadow: 0 0 0 2px rgba(6, 214, 160, 0.2);
+}
+
+/* About Page Route Animations */
+@keyframes drawPath {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes dashRoute {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 50;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-draw-path path {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: drawPath 2s ease-in-out forwards;
+}
+
+.animate-dash path {
+  animation: dashRoute 2s linear infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 1s ease-out forwards;
+}
+
+.animate-pop-in {
+  animation: popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animation-delay-300 {
+  animation-delay: 0.3s;
+}
+
+.animation-delay-500 {
+  animation-delay: 0.5s;
+}
+
+.animation-delay-1000 {
+  animation-delay: 1s;
+}
+
+.animation-delay-1200 {
+  animation-delay: 1.2s;
+}
+
+@keyframes slideLeftToRight {
+  0%, 10% {
+    transform: translateX(-50%);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  90%, 100% {
+    transform: translateX(50%);
+    opacity: 0.5;
+  }
+}
+
+.animate-slide-left-to-right {
+  animation: slideLeftToRight 4s linear infinite;
 }
 
