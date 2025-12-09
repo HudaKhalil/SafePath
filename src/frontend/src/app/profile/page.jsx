@@ -424,6 +424,7 @@ export default function Profile() {
               <div className="p-3 flex items-center" style={{ backgroundColor: '#0f172a', gap: editing ? '8px' : '16px' }}>
                 <div className="flex-shrink-0">
                   <ImageUpload 
+                    key={user?.profile_picture || 'no-image'}
                     currentImage={user?.profile_picture}
                     onUpload={handleImageUpload}
                     onDelete={handleImageDelete}
@@ -891,6 +892,5 @@ export default function Profile() {
         </div>
       </div>
     </ProtectedRoute>
-    
   )
 }

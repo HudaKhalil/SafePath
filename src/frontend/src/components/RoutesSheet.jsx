@@ -5,7 +5,7 @@ import { ChevronUp, ChevronDown, Maximize2, Minimize2, X } from 'lucide-react';
 
 export default function RoutesSheet({
   children,
-  title = "Plan Your Route",
+  title = "Plan Route",
   subtitle = "Find the safest path",
   initialExpanded = false,
   minHeight = 180,
@@ -274,19 +274,19 @@ export default function RoutesSheet({
       {/* Drag Handle */}
       <div
         ref={headerRef}
-        className="w-full py-3 cursor-grab active:cursor-grabbing"
+        className="w-full py-1 cursor-grab active:cursor-grabbing"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onMouseDown={handleMouseDown}
       >
         {/* Handle bar */}
-        <div className="w-12 h-1 rounded-full mx-auto mb-2" style={{ 
+        <div className="w-12 h-1 rounded-full mx-auto mb-1" style={{ 
           backgroundColor: isDark ? '#475569' : '#cbd5e1' 
         }}></div>
         
         {/* Header row */}
-        <div className="px-4 pt-2 md:pt-0 flex items-center justify-between">
+        <div className="px-3 pt-1 md:pt-0 flex items-center justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <button
@@ -306,7 +306,7 @@ export default function RoutesSheet({
                 )}
               </button>
               <h2 
-                className="text-2xl md:text-3xl font-bold transition-colors cursor-pointer" 
+                className="text-xl md:text-2xl font-bold transition-colors cursor-pointer" 
                 style={typeof title === 'string' ? { color: isDark ? '#06d6a0' : '#1e293b' } : {}}
                 onMouseEnter={(e) => {
                   if (typeof title === 'string') {
@@ -322,7 +322,7 @@ export default function RoutesSheet({
                 {title}
               </h2>
             </div>
-            <p className="text-lg ml-8" style={{ color: isDark ? '#06d6a0' : '#64748b' }}>{subtitle}</p>
+            <p className="text-base ml-8" style={{ color: isDark ? '#06d6a0' : '#64748b' }}>{subtitle}</p>
           </div>
           
           {/* Settings button (if provided) */}

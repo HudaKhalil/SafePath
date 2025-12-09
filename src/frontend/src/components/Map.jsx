@@ -33,10 +33,17 @@ function PreserveMapView({ lockView = false }) {
       // Save view after user interaction completes
       setTimeout(() => {
         isUserInteractingRef.current = false;
-        savedViewRef.current = {
-          center: map.getCenter(),
-          zoom: map.getZoom()
-        };
+        // Only save if map is properly initialized
+        if (map && map.getCenter) {
+          try {
+            savedViewRef.current = {
+              center: map.getCenter(),
+              zoom: map.getZoom()
+            };
+          } catch (err) {
+            console.warn('Could not save map view:', err);
+          }
+        }
       }, 100);
     };
 
@@ -52,12 +59,16 @@ function PreserveMapView({ lockView = false }) {
       }
     };
 
-    // Save initial view
-    if (!savedViewRef.current) {
-      savedViewRef.current = {
-        center: map.getCenter(),
-        zoom: map.getZoom()
-      };
+    // Save initial view - only if map is properly initialized
+    if (!savedViewRef.current && map && map.getCenter) {
+      try {
+        savedViewRef.current = {
+          center: map.getCenter(),
+          zoom: map.getZoom()
+        };
+      } catch (err) {
+        console.warn('Could not save initial map view:', err);
+      }
     }
 
     map.on('mousedown', handleInteractionStart);
@@ -421,13 +432,13 @@ function RoadFollowingRoute({ route, onRouteClick, getRouteColor }) {
       opacity={lineOpacity}
       dashArray={dashArray}
       eventHandlers={{
-        click: () => onRouteClick(route),
+        mouseover: () => onRouteClick(route),
       }}
     >
       <Popup>
         <div className="text-sm">
           <h3 className="font-semibold">{route.name}</h3>
-          <p>Safety Rating: {route.safetyRating}/10</p>
+          <p>Safety Rating: {Number(route.safetyRating).toFixed(2)}/10</p>
           <p>Distance: {route.distance} km</p>
           <p>Duration: {route.estimatedTime} min</p>
           
@@ -470,6 +481,111 @@ function ClickCatcher({ onMapClick, onPlaceSelect }) {
   return null;
 }
 
+// Separate component to handle hazard marker with popup control
+function HazardMarkerWithPopup({ hazard, hazardColor, onHazardClick, isSelected, createCustomIcon }) {
+  const markerRef = useRef(null);
+
+  useEffect(() => {
+    // Open popup when this hazard is selected
+    if (isSelected && markerRef.current) {
+      markerRef.current.openPopup();
+    }
+  }, [isSelected]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[hazard.latitude, hazard.longitude]}
+      icon={createCustomIcon(hazardColor, "hazard")}
+      eventHandlers={{
+        mouseover: (e) => {
+          onHazardClick(hazard);
+          e.target.openPopup();
+        },
+        mouseout: (e) => {
+          e.target.closePopup();
+        },
+      }}
+    >
+      <Popup maxWidth={300} minWidth={200} className="hazard-popup">
+        <div className="text-sm">
+          {/* Source Badge - Amber for OSM, Green for Community, Orange for TomTom */}
+          {hazard.source === 'osm' && (
+            <div 
+              className="mb-2 inline-block px-2 py-1 rounded text-xs font-semibold"
+              style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}
+            >
+              🗺️ OSM Data
+            </div>
+          )}
+          {hazard.source === 'community' && (
+            <div 
+              className="mb-2 inline-block px-2 py-1 rounded text-xs font-semibold"
+              style={{ backgroundColor: '#06d6a0', color: '#0f172a' }}
+            >
+              👤 Community Report
+            </div>
+          )}
+          {hazard.source === 'tomtom' && (
+            <div 
+              className="mb-2 inline-block px-2 py-1 rounded text-xs font-semibold"
+              style={{ backgroundColor: '#ff9800', color: '#ffffff' }}
+            >
+              🚦 TomTom Traffic
+            </div>
+          )}
+          {/* Image and Info Container - Flexible Layout */}
+          <div className="flex flex-col sm:flex-col gap-2">
+            {/* Image Section - Show on all screens */}
+            {(hazard.image_url || hazard.imageUrl) && (
+              <div className="rounded overflow-hidden flex-shrink-0">
+                <img 
+                  src={(() => {
+                    const imageUrl = hazard.image_url || hazard.imageUrl;
+                    // If Cloudinary URL (starts with http), use as-is
+                    if (imageUrl.startsWith('http')) return imageUrl;
+                    // Otherwise, prepend API URL (legacy local images)
+                    return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
+                  })()}
+                  alt="Hazard"
+                  className="w-full h-20 sm:h-32 object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Info Section */}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold capitalize text-sm sm:text-base">
+                {(hazard.hazard_type || hazard.hazardType || hazard.type || 'Unknown Hazard').replace(/_/g, ' ')}
+              </h3>
+              <p className="text-xs mt-1">
+                <span className={`inline-block px-2 py-0.5 rounded-full text-white font-semibold ${
+                  hazard.severity === 'critical' || hazard.severity === 'high' ? 'bg-red-500' :
+                  hazard.severity === 'medium' ? 'bg-orange-500' : 'bg-yellow-500'
+                }`}>
+                  {hazard.severity || 'medium'}
+                </span>
+              </p>
+              {hazard.description && <p className="mt-1.5 text-xs sm:text-sm">{hazard.description}</p>}
+              {hazard.distance_meters && (
+                <p className="text-xs text-gray-600 mt-1">
+                  📍 {Math.round(hazard.distance_meters)}m away
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Reported: {new Date(hazard.reported_at || hazard.created_at || hazard.reportedAt || hazard.start_date).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 export default function Map({
   center = LOCATION_CONFIG.DEFAULT_CENTER, // London coordinates
   zoom = LOCATION_CONFIG.DEFAULT_ZOOM,
@@ -490,6 +606,7 @@ export default function Map({
   onPlaceSelect = null,
   routeColor = "#3b82f6", // Default light blue color
   autoFitBounds = false,
+  selectedHazardId = null,
 }) {
   // Create improved custom icons with better fallback
   const createCustomIcon = (color, type) => {
@@ -650,97 +767,29 @@ export default function Map({
         {hazards
           .filter((h) => Number.isFinite(h.latitude) && Number.isFinite(h.longitude))
           .map((hazard) => {
-            // Determine hazard color based on severity
+            // Determine hazard color based on severity (same for both OSM and community)
             const severityColors = {
               critical: '#dc2626',
               high: '#ef4444',
               medium: '#f59e0b',
               low: '#fbbf24'
             };
+            
+            // Use severity colors for all hazards
             const hazardColor = severityColors[hazard.severity] || '#ef4444';
             
             return (
-              <Marker
+              <HazardMarkerWithPopup
                 key={hazard.id}
-                position={[hazard.latitude, hazard.longitude]}
-                icon={createCustomIcon(hazardColor, "hazard")}
-                eventHandlers={{
-                  click: () => onHazardClick(hazard),
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -20]} opacity={0.95} permanent={false}>
-                  <div style={{ minWidth: (hazard.image_url || hazard.imageUrl) ? '150px' : 'auto' }}>
-                    {(hazard.image_url || hazard.imageUrl) && (
-                      <div className="mb-1 rounded overflow-hidden">
-                        <img 
-                          src={(() => {
-                            const imageUrl = hazard.image_url || hazard.imageUrl;
-                            // If Cloudinary URL (starts with http), use as-is
-                            if (imageUrl.startsWith('http')) return imageUrl;
-                            // Otherwise, prepend API URL (legacy local images)
-                            return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
-                          })()}
-                          alt="Hazard preview"
-                          style={{ width: '150px', height: '80px', objectFit: 'cover', display: 'block' }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="text-xs font-semibold">
-                      <span className="capitalize">{(hazard.hazard_type || hazard.type || 'Hazard').replace(/_/g, ' ')}</span>
-                      {hazard.distance_meters && (
-                        <span className="ml-1 text-gray-600">• {Math.round(hazard.distance_meters)}m</span>
-                      )}
-                    </div>
-                  </div>
-                </Tooltip>
-                <Popup maxWidth={300} className="hazard-popup">
-                  <div className="text-sm">
-                    <h3 className="font-semibold capitalize">
-                      {(hazard.hazard_type || hazard.type || 'Unknown Hazard').replace(/_/g, ' ')}
-                    </h3>
-                    <p className="text-xs mt-1">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-white font-semibold ${
-                        hazard.severity === 'critical' || hazard.severity === 'high' ? 'bg-red-500' :
-                        hazard.severity === 'medium' ? 'bg-orange-500' : 'bg-yellow-500'
-                      }`}>
-                        {hazard.severity || 'medium'}
-                      </span>
-                    </p>
-                    {(hazard.image_url || hazard.imageUrl) && (
-                      <div className="mt-2 rounded overflow-hidden hidden sm:block">
-                        <img 
-                          src={(() => {
-                            const imageUrl = hazard.image_url || hazard.imageUrl;
-                            // If Cloudinary URL (starts with http), use as-is
-                            if (imageUrl.startsWith('http')) return imageUrl;
-                            // Otherwise, prepend API URL (legacy local images)
-                            return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '')}${imageUrl}`;
-                          })()}
-                          alt="Hazard"
-                          className="w-full h-24 sm:h-32 object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    {hazard.description && <p className="mt-2">{hazard.description}</p>}
-                    {hazard.distance_meters && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        📍 {Math.round(hazard.distance_meters)}m away
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      Reported: {new Date(hazard.reported_at || hazard.created_at || hazard.reportedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
+                hazard={hazard}
+                hazardColor={hazardColor}
+                onHazardClick={onHazardClick}
+                isSelected={selectedHazardId === hazard.id}
+                createCustomIcon={createCustomIcon}
+              />
             );
           })}
+
         {/* Buddies - filter out invalid coordinates to prevent _leaflet_pos errors */}
         {buddies
           .filter((b) => Number.isFinite(b.latitude) && Number.isFinite(b.longitude))
@@ -753,7 +802,13 @@ export default function Map({
               "buddy"
             )}
             eventHandlers={{
-              click: () => onBuddyClick(buddy),
+              mouseover: (e) => {
+                onBuddyClick(buddy);
+                e.target.openPopup();
+              },
+              mouseout: (e) => {
+                e.target.closePopup();
+              },
             }}
           >
             <Popup>
@@ -783,6 +838,10 @@ export default function Map({
                 ? createCustomIcon(marker.color, marker.type)
                 : undefined
             }
+            eventHandlers={marker.popup ? {
+              mouseover: (e) => e.target.openPopup(),
+              mouseout: (e) => e.target.closePopup(),
+            } : undefined}
           >
             {marker.popup && <Popup>{marker.popup}</Popup>}
           </Marker>

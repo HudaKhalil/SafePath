@@ -1,13 +1,15 @@
 import api from './api';
 import Cookies from 'js-cookie';
 import { LOCATION_CONFIG } from './locationConfig';
+import { clearStoredLocation } from './locationManager';
 
 export const authService = {
   // Sign up
   async signup(userData) {
     try {
       const response = await api.post('/auth/signup', userData);
-      if (response.data.success && response.data.data.token) {
+      // Only set token if provided (for backward compatibility)
+      if (response.data.success && response.data.data?.token) {
         Cookies.set('auth_token', response.data.data.token, { expires: 1 }); // 1 day
       }
       return response.data;
@@ -31,6 +33,17 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
+      // Check if email verification is required
+      if (error.response?.status === 403 && error.response?.data?.requiresVerification) {
+        // Return the error data instead of throwing
+        return {
+          success: false,
+          requiresVerification: true,
+          email: error.response.data.email,
+          message: error.response.data.message
+        };
+      }
+      
       // Preserve the original error structure for better error handling
       if (error.response?.data?.message) {
         error.message = error.response.data.message;
@@ -44,6 +57,8 @@ export const authService = {
   // Log out
   logout() {
     Cookies.remove('auth_token');
+    // Clear sensitive location data on logout (GDPR-compliant)
+    clearStoredLocation();
   },
 
   // Get current user profile
@@ -238,6 +253,26 @@ export const hazardsService = {
     try {
       const response = await api.get(`/hazards/near/${latitude}/${longitude}`, {
         params,
+      });
+      return response.data;
+    } catch (error) {
+      throw (
+        error.response?.data || { success: false, message: "Network error" }
+      );
+    }
+  },
+
+  // Get combined hazards (community + TomTom traffic incidents)
+  async getCombinedHazards(latitude, longitude, params = {}) {
+    try {
+      const queryParams = {
+        radius: params.radius || 5000,
+        limit: params.limit || 100,
+        includeTomTom: params.includeTomTom !== false ? 'true' : 'false',
+        ...params,
+      };
+      const response = await api.get(`/hazards/combined/${latitude}/${longitude}`, {
+        params: queryParams,
       });
       return response.data;
     } catch (error) {
@@ -698,7 +733,7 @@ export const buddyService = {
     }
   },
 
-  // Respond to a buddy request (placeholder for future implementation)
+  // Respond to a buddy request
   async respondToRequest(requestId, action) {
     try {
       if (!requestId || !action) {
@@ -707,6 +742,122 @@ export const buddyService = {
 
       const response = await api.put(`/buddies/requests/${requestId}`, {
         action // 'accept' or 'reject'
+      });
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Get accepted/connected buddies
+  async getAcceptedBuddies() {
+    try {
+      const response = await api.get('/buddies/accepted');
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Find buddies along a route
+  async getBuddiesAlongRoute(routeData) {
+    try {
+      const { start_lat, start_lon, end_lat, end_lon, radius = 5000 } = routeData;
+      
+      if (!start_lat || !start_lon || !end_lat || !end_lon) {
+        throw new Error('Start and end coordinates are required');
+      }
+
+      const response = await api.post('/buddies/along-route', {
+        start_lat,
+        start_lon,
+        end_lat,
+        end_lon,
+        radius
+      });
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Create a group route
+  async createGroupRoute(routeData) {
+    try {
+      const { name, start_location, end_location, start_lat, start_lon, end_lat, end_lon, invited_buddies = [] } = routeData;
+      
+      if (!start_lat || !start_lon || !end_lat || !end_lon) {
+        throw new Error('Start and end coordinates are required');
+      }
+
+      const response = await api.post('/buddies/group-routes', {
+        name: name || 'My Route',
+        start_location,
+        end_location,
+        start_lat,
+        start_lon,
+        end_lat,
+        end_lon,
+        invited_buddies
+      });
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Get user's group routes
+  async getGroupRoutes() {
+    try {
+      const response = await api.get('/buddies/group-routes');
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Join a group route
+  async joinGroupRoute(routeId) {
+    try {
+      if (!routeId) {
+        throw new Error('Route ID is required');
+      }
+
+      const response = await api.post(`/buddies/group-routes/${routeId}/join`);
+      return response.data;
+    } catch (error) {
+      const payload = error.response?.data || { success: false, message: 'Network error' };
+      const err = new Error(payload.message || 'Network error');
+      err.data = payload;
+      throw err;
+    }
+  },
+
+  // Update user's location
+  async updateLocation(lat, lon) {
+    try {
+      if (!lat || !lon) {
+        throw new Error('Latitude and longitude are required');
+      }
+
+      const response = await api.put('/buddies/location', {
+        lat,
+        lon
       });
       return response.data;
     } catch (error) {

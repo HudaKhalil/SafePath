@@ -192,7 +192,7 @@ export default function ImageUpload({
                 </svg>
               </button>
               <span 
-                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10"
                 style={{
                   backgroundColor: isDark ? '#1e293b' : '#0f172a',
                   color: '#ffffff'
@@ -235,7 +235,7 @@ export default function ImageUpload({
                   </svg>
                 </button>
                 <span 
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                  className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10"
                   style={{
                     backgroundColor: isDark ? '#1e293b' : '#0f172a',
                     color: '#ffffff'

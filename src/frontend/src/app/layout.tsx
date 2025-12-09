@@ -12,7 +12,7 @@ export const metadata = {
     apple: '/logo.png',
   },
   openGraph: {
-    title: 'London Safety Routing System',
+    title: 'SafePath - Safety Routing System',
     description: 'Find safer routes across London with intelligent routing, community insights, and real-time hazard awareness.',
     images: ['/logo.png'],
   },

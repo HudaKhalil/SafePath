@@ -5,15 +5,22 @@ import { hazardsService } from '../../lib/services'
 import ProtectedRoute from '../../components/auth/ProtectedRoute'
 import HazardAlert from '../../components/HazardAlert'
 import Toast from '../../components/Toast'
+import { 
+  getStoredLocation, 
+  getStoredMapCenter,
+  getCurrentLocation 
+} from '../../lib/locationManager'
 
 const Map = dynamic(() => import('../../components/Map'), { ssr: false })
 
 export default function HazardReporting() {
   const [hazards, setHazards] = useState([])
   const [loading, setLoading] = useState(false) // Start false, only set true when fetching hazards
-  const [userLocation, setUserLocation] = useState([51.5074, -0.1278]) // Default location immediately
+  const [userLocation, setUserLocation] = useState(() => getStoredMapCenter() || getStoredLocation()) // Use stored location immediately
   const [showReportForm, setShowReportForm] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState(null)
+  const [selectedAddress, setSelectedAddress] = useState('')
+  const [loadingAddress, setLoadingAddress] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [realTimeAlerts, setRealTimeAlerts] = useState([])
@@ -65,28 +72,26 @@ export default function HazardReporting() {
   const fileInputRef = useRef(null)
 
   // Define all callbacks first before useEffect
-  const getUserLocation = () => {
+  const getUserLocation = async () => {
     const startTime = performance.now()
-    console.log('⏱️ Getting user location in background...')
+    console.log('⏱️ Getting user location...')
     
-    if (navigator.geolocation) {
-      // Get location in background without blocking UI
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location = [position.coords.latitude, position.coords.longitude]
-          console.log(`✓ Real location obtained in ${(performance.now() - startTime).toFixed(0)}ms:`, location)
-          setUserLocation(location) // This will trigger reload of hazards with real location
-        },
-        (error) => {
-          console.log(`ℹ️ Using default location (geolocation ${error.message.toLowerCase()})`)
-          // Keep default location, no need to set again
-        },
-        {
-          timeout: 3000, // Reduced to 3 seconds
-          enableHighAccuracy: false,
-          maximumAge: 300000
-        }
-      )
+    try {
+      // Check stored location first (GDPR sessionStorage)
+      let location = getStoredLocation();
+      
+      if (location) {
+        console.log(`✓ Using stored location (${(performance.now() - startTime).toFixed(0)}ms):`, location);
+      } else {
+        console.log('📍 No stored location, requesting GPS...');
+        location = await getCurrentLocation({ autoSave: true });
+        console.log(`✓ GPS location obtained in ${(performance.now() - startTime).toFixed(0)}ms:`, location);
+      }
+      
+      setUserLocation(location) // This will trigger reload of hazards with real location
+    } catch (error) {
+      console.log(`ℹ️ Using stored/default location`)
+      // Keep current location from state initialization
     }
   }
 
@@ -94,16 +99,17 @@ export default function HazardReporting() {
     if (!userLocation) return
     
     const startTime = performance.now()
-    console.log('⏱️ Loading hazards...')
+    console.log('⏱️ Loading combined hazards (community + TomTom)...')
     
     try {
       setLoading(true)
-      const response = await hazardsService.getNearbyHazards(
+      const response = await hazardsService.getCombinedHazards(
         userLocation[0], 
         userLocation[1], 
-        { radius: 10000, limit: 20 }
+        { radius: 10000, limit: 50, includeTomTom: true }
       )
       console.log(`✓ Hazards loaded in ${(performance.now() - startTime).toFixed(0)}ms:`, response.data?.hazards?.length || 0, 'hazards')
+      console.log('📊 Stats:', response.data?.stats)
       
       if (response.success) {
         setHazards(response.data?.hazards || [])
@@ -112,7 +118,7 @@ export default function HazardReporting() {
         setHazards([])
       }
     } catch (error) {
-      console.error('Error loading recent hazards:', error)
+      console.error('Error loading combined hazards:', error)
       setError('Failed to load hazards')
       setHazards([])
     } finally {
@@ -204,13 +210,43 @@ export default function HazardReporting() {
     setRealTimeAlerts(prev => prev.filter(alert => alert.id !== alertId))
   }
 
-  const handleMapClick = (latlng) => {
+  const handleMapClick = async (latlng) => {
     setSelectedLocation([latlng.lat, latlng.lng])
     setFormData({
       ...formData,
       latitude: latlng.lat,
       longitude: latlng.lng
     })
+    
+    // Reverse geocode to get address
+    setLoadingAddress(true)
+    setSelectedAddress('Loading address...')
+    
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'SafePath App',
+            'Accept-Language': 'en'
+          }
+        }
+      )
+      
+      if (response.ok) {
+        const data = await response.json()
+        const address = data.display_name || 'Address not found'
+        setSelectedAddress(address)
+      } else {
+        setSelectedAddress(`${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`)
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error)
+      setSelectedAddress(`${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`)
+    } finally {
+      setLoadingAddress(false)
+    }
+    
     // Auto-open form when user clicks on map
     if (!showReportForm) {
       setShowReportForm(true)
@@ -344,36 +380,36 @@ export default function HazardReporting() {
     <ProtectedRoute>
       <div className="min-h-screen pt-5">
         {/*WHITE IN LIGHT MODE, DARK IN DARK MODE */}
-        <section className="relative overflow-hidden py-4 md:py-3" style={{ 
+        <section className="relative overflow-hidden py-2 md:py-3" style={{ 
   background: isLightMode ? '#ffffff' : 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%)'
 }}>
-          <div className="container mx-auto px-4 md:px-6 text-center">
-            <h1 className="text-3xl md:text-3xl font-bold mb-2">
+          <div className="container mx-auto px-3 md:px-6 text-center">
+            <h1 className="text-2xl md:text-3xl font-bold mb-1">
               <span style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>Report a </span>
               <span style={{ color: '#06d6a0' }}>Hazard</span>
             </h1>
-            <p className="text-lg md:text-xl mb-1" style={{ 
+            <p className="text-sm md:text-lg mb-2 md:mb-3" style={{ 
               color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
             }}>
               Help keep community safe by reporting hazards and incidents in your area
             </p>
 
-            <div className="flex justify-center gap-6 md:gap-12">
+            <div className="flex justify-center gap-4 md:gap-12">
               <div className="text-center">
-                <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>{Array.isArray(hazards) ? hazards.length : 0}+</div>
-                <div className="text-base" style={{ 
+                <div className="text-2xl md:text-3xl font-bold" style={{ color: '#06d6a0' }}>{Array.isArray(hazards) ? hazards.length : 0}+</div>
+                <div className="text-xs md:text-base" style={{ 
                   color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
                 }}>Reports Filed</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>95%</div>
-                <div className="text-base" style={{ 
+                <div className="text-2xl md:text-3xl font-bold" style={{ color: '#06d6a0' }}>95%</div>
+                <div className="text-xs md:text-base" style={{ 
                   color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
                 }}>Response Rate</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold" style={{ color: '#06d6a0' }}>24h</div>
-                <div className="text-base" style={{ 
+                <div className="text-2xl md:text-3xl font-bold" style={{ color: '#06d6a0' }}>24h</div>
+                <div className="text-xs md:text-base" style={{ 
                   color: isLightMode ? '#475569' : 'rgba(255, 255, 255, 0.8)' 
                 }}>Avg Response</div>
               </div>
@@ -398,25 +434,25 @@ export default function HazardReporting() {
           />
         )}
 
-<section className="relative min-h-[calc(100vh-80px)] mt-4 pb-8" style={{ backgroundColor: isLightMode ? '#ffffff' : '#0f172a' }}>
+<section className="relative min-h-[calc(100vh-80px)] mt-4 pb-4" style={{ backgroundColor: isLightMode ? '#ffffff' : '#0f172a' }}>
           {/* Side Panel */}
           <div 
-            className="fixed left-0 top-20 bottom-0 z-50 w-full md:w-96 lg:w-[420px] transition-transform duration-300 shadow-2xl overflow-hidden"
+            className="fixed left-0 top-10 bottom-0 z-50 w-full md:w-96 lg:w-[420px] transition-transform duration-300 shadow-2xl overflow-hidden"
             style={{
               transform: showReportForm ? 'translateX(0)' : 'translateX(-100%)',
             }}
           >
             <div className="h-full overflow-y-auto">
               <div className="p-4 pb-24">
-                <div className="border-2 rounded-2xl p-4 md:p-6" style={{ 
+                <div className="border-2 rounded-2xl p-2 md:p-6" style={{ 
                   backgroundColor: isLightMode ? '#ffffff' : '#1e293b',
                   borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
                 }}>
-                  <div className="mb-4">
-                    <h3 className="text-2xl font-bold" style={{ 
+                  <div className="mb-3 md:mb-4">
+                    <h3 className="text-xl md:text-2xl font-bold" style={{ 
                       color: isLightMode ? '#0f172a' : '#06d6a0' 
                     }}>Report a Hazard</h3>
-                    <p className="text-sm mt-1" style={{ 
+                    <p className="text-xs md:text-sm mt-1" style={{ 
                       color: isLightMode ? '#64748b' : '#06d6a0' 
                     }}>Help keep community safe</p>
                   </div>
@@ -642,8 +678,20 @@ export default function HazardReporting() {
 
                     {selectedLocation && (
                       <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-green-800 text-lg">
-                          📍 Location selected: {selectedLocation[0].toFixed(6)}, {selectedLocation[1].toFixed(6)}
+                        <p className="text-green-800 text-sm font-medium mb-1">
+                          📍 Location selected
+                        </p>
+                        {loadingAddress ? (
+                          <p className="text-green-700 text-sm animate-pulse">
+                            🔄 Loading address...
+                          </p>
+                        ) : (
+                          <p className="text-green-700 text-sm">
+                            {selectedAddress}
+                          </p>
+                        )}
+                        <p className="text-green-600 text-xs mt-1">
+                          {selectedLocation[0].toFixed(6)}, {selectedLocation[1].toFixed(6)}
                         </p>
                       </div>
                     )}
@@ -687,6 +735,7 @@ export default function HazardReporting() {
                         onClick={() => {
                           setShowReportForm(false)
                           setSelectedLocation(null)
+                          setSelectedAddress('')
                           setFormData({
                             type: '',
                             severity: 'medium',
@@ -815,8 +864,8 @@ export default function HazardReporting() {
                       color: selectedLocation ? '#166534' : '#1e40af'
                     }}>
                       {selectedLocation 
-                        ? '✓ Location selected! You can click again to change it'
-                        : '📍 Click anywhere on the map to mark the hazard location'}
+                        ? '✓ Location selected! Address shown in form. Click again to change it'
+                        : '📍 Click anywhere on the map to mark the hazard location and see its address'}
                     </p>
                   </div>
                   
@@ -905,12 +954,12 @@ export default function HazardReporting() {
                               
                               <div className="flex items-start gap-3 flex-1">
                                 <span className="text-xl shrink-0">
-                                  {hazardEmojis[hazard.hazardType] || '⚠️'}
+                                  {hazardEmojis[hazard.hazardType || hazard.type] || '⚠️'}
                                 </span>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 mb-1">
                                     <div className="font-semibold capitalize text-sm" style={{ color: '#0f172a' }}>
-                                      {hazard.hazardType.replace('_', ' ')}
+                                      {(hazard.hazardType || hazard.type || 'unknown').replace(/_/g, ' ')}
                                     </div>
                                     {(hazard.image_url || hazard.imageUrl) && (
                                       <span className="text-xs">📷</span>

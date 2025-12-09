@@ -671,7 +671,7 @@ export default function NavigationClient() {
                 routeSafety >= 5 ? 'bg-yellow-500 text-gray-900' : 
                 'bg-red-500 text-white'
               }`}>
-                Safety: {parseFloat(routeSafety).toFixed(1)}/10
+                Safety: {parseFloat(routeSafety).toFixed(2)}/10
               </div>
             </div>
             
@@ -717,8 +717,14 @@ export default function NavigationClient() {
 
       {/* Arrival Modal */}
       {hasArrived && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-bounce">
+        <div 
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={exitNavigation}
+        >
+          <div 
+            className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-bounce"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="text-6xl mb-4">🏁</div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">You've Arrived!</h2>
             <p className="text-gray-600 mb-6">You have reached your destination</p>

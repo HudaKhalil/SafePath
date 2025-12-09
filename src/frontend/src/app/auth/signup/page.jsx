@@ -90,7 +90,7 @@ export default function SignUp() {
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!formData.password) {
@@ -145,7 +145,11 @@ export default function SignUp() {
       if (result.success) {
         if (result.requiresVerification) {
           // Email verification required - show success message and redirect to login
-          alert('🎉 Account created successfully!\n\n📧 We\'ve sent a verification email to ' + formData.email + '\n\nPlease check your inbox and click the verification link to activate your account.');
+          alert(
+            'Account created successfully!\n\n📧 We\'ve sent a verification email to ' +
+              formData.email +
+              '\n\nPlease check your inbox and click the verification link to activate your account.'
+          );
           router.push('/auth/login');
         } else {
           // Direct login (shouldn't happen with new flow, but kept for compatibility)
@@ -157,13 +161,29 @@ export default function SignUp() {
       }
     } catch (error) {
       console.error('Signup error:', error);
-      if (error.errors) {
+      
+      // Handle validation errors from backend
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        const fieldErrors = {};
+        error.response.data.errors.forEach(err => {
+          fieldErrors[err.path || err.param] = err.msg || err.message;
+        });
+        setErrors(fieldErrors);
+      } 
+      // Handle general error messages
+      else if (error.response?.data?.message) {
+        setErrors({ general: error.response.data.message });
+      }
+      // Handle error.errors (alternative structure)
+      else if (error.errors) {
         const fieldErrors = {};
         error.errors.forEach(err => {
           fieldErrors[err.path] = err.msg;
         });
         setErrors(fieldErrors);
-      } else {
+      } 
+      // Fallback to error.message
+      else {
         setErrors({ general: error.message || 'Sign up failed. Please try again.' });
       }
     } finally {
@@ -191,7 +211,7 @@ export default function SignUp() {
           </p>
         </div>
 
-        <form className="mt-2 space-y-2" onSubmit={handleSubmit}>
+        <form className="mt-2 space-y-2" onSubmit={handleSubmit} noValidate>
           <div className="space-y-2">
             {/* Name */}
             <div>
@@ -374,6 +394,13 @@ export default function SignUp() {
             </div>
           </div>
 
+          {/* Success Message */}
+          {errors.success && (
+            <div className="bg-green-900/20 border border-green-500 text-green-400 px-4 py-3 rounded relative">
+              {errors.success}
+            </div>
+          )}
+
           {/* General Error */}
           {errors.general && (
             <div className="bg-red-900/20 border border-red-500 text-red-400 px-4 py-3 rounded relative">
@@ -416,3 +443,25 @@ export default function SignUp() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

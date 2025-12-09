@@ -5,6 +5,15 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Cookies from 'js-cookie';
 import { geocodingService, routingService } from '../lib/services';
+import { 
+  getStoredLocation, 
+  getStoredMapCenter, 
+  getStoredMapZoom, 
+  getStoredAddress,
+  getCurrentLocation,
+  saveLocation,
+  saveMapView 
+} from '../lib/locationManager';
 
 const Map = dynamic(() => import('../components/Map'), { ssr: false });
 
@@ -16,50 +25,34 @@ export default function Home() {
   const router = useRouter();
   const [isDark, setIsDark] = useState(false);
   
-  // Initialize location from localStorage or default to London
-  const [userLocation, setUserLocation] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('userLocation');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          return [51.5074, -0.1278];
-        }
-      }
-    }
-    return [51.5074, -0.1278];
-  });
-  
-  const [userAddress, setUserAddress] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userAddress') || 'Current Location';
-    }
-    return 'Current Location';
-  });
-  
+  // Initialize location from centralized location manager
+  const [userLocation, setUserLocation] = useState(() => getStoredLocation() || getStoredMapCenter());
+  const [userAddress, setUserAddress] = useState(() => getStoredAddress());
   const [searchDestination, setSearchDestination] = useState('');
   const [searchedLocation, setSearchedLocation] = useState(null);
-  const [mapCenter, setMapCenter] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('userLocation');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          return [51.5074, -0.1278];
-        }
-      }
-    }
-    return [51.5074, -0.1278];
-  });
-  const [mapZoom, setMapZoom] = useState(13);
+  const [transportMode, setTransportMode] = useState('cycling');
+  const [mapCenter, setMapCenter] = useState(() => getStoredMapCenter() || getStoredLocation());
+  const [mapZoom, setMapZoom] = useState(() => getStoredMapZoom());
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [routeData, setRouteData] = useState(null);
   const [nearbyHazards, setNearbyHazards] = useState([]);
+  const [selectedHazardId, setSelectedHazardId] = useState(null);
+  const [nearbyBuddiesCount, setNearbyBuddiesCount] = useState(0);
+  const [hazardTypeFilter, setHazardTypeFilter] = useState('all');
+  const [hazardSourceFilter, setHazardSourceFilter] = useState('all');
   const skipAutocomplete = useRef(false);
+
+  // Filter hazards based on selected filters
+  const filteredHazards = nearbyHazards.filter(hazard => {
+    const matchesType = hazardTypeFilter === 'all' || 
+      (hazard.hazardType || hazard.type || '').toLowerCase().includes(hazardTypeFilter.toLowerCase());
+    const matchesSource = hazardSourceFilter === 'all' || 
+      (hazardSourceFilter === 'community' && hazard.source !== 'tomtom') ||
+      (hazardSourceFilter === 'traffic' && hazard.source === 'tomtom');
+    return matchesType && matchesSource;
+  });
 
   // Track dark mode changes
   useEffect(() => {
@@ -114,57 +107,47 @@ export default function Home() {
     setSuggestions([]);
     setShowSuggestions(false);
     
-    const loadLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const currentLocation = [position.coords.latitude, position.coords.longitude];
-            
-            // Save to localStorage
-            localStorage.setItem('userLocation', JSON.stringify(currentLocation));
-            
-            setUserLocation(currentLocation);
-            // Update map center to current location
-            setMapCenter(currentLocation);
-            setMapZoom(13);
-            
-            // Get address for current location
-            try {
-              const response = await geocodingService.getAddressFromCoords(
-                position.coords.latitude,
-                position.coords.longitude
-              );
-              if (response.success && response.data?.display_name) {
-                localStorage.setItem('userAddress', response.data.display_name);
-                setUserAddress(response.data.display_name);
-              }
-            } catch (error) {
-              console.log('Could not get address for current location');
-            }
-            
-            // Fetch nearby hazards within 10km
-            fetchNearbyHazards(currentLocation[0], currentLocation[1]);
-          },
-          (error) => {
-            console.log('Geolocation error:', error.message);
-            // Don't reset to London - keep the existing location from localStorage
-            // Still fetch hazards for stored location
-            const storedLocation = localStorage.getItem('userLocation');
-            if (storedLocation) {
-              try {
-                const loc = JSON.parse(storedLocation);
-                fetchNearbyHazards(loc[0], loc[1]);
-              } catch (e) {
-                console.log('Could not parse stored location');
-              }
-            }
-          },
-          {
-            timeout: 10000,
-            enableHighAccuracy: true,
-            maximumAge: 60000
+    const loadLocation = async () => {
+      try {
+        // Check if we have a stored location first (GDPR-compliant sessionStorage)
+        let currentLocation = getStoredLocation();
+        
+        if (currentLocation) {
+          console.log('📍 Using stored location:', currentLocation);
+        } else {
+          console.log('📍 No stored location, requesting GPS...');
+          currentLocation = await getCurrentLocation({ autoSave: true });
+        }
+        
+        setUserLocation(currentLocation);
+        setMapCenter(currentLocation);
+        setMapZoom(13);
+        saveMapView(currentLocation, 13);
+        
+        // Get address for current location
+        try {
+          const response = await geocodingService.getAddressFromCoords(
+            currentLocation[0],
+            currentLocation[1]
+          );
+          if (response.success && response.data?.display_name) {
+            saveLocation(currentLocation[0], currentLocation[1], response.data.display_name);
+            setUserAddress(response.data.display_name);
           }
-        );
+        } catch (error) {
+          console.log('Could not get address for current location');
+        }
+        
+        // Fetch nearby hazards and buddies within 10km
+        fetchNearbyHazards(currentLocation[0], currentLocation[1]);
+        fetchNearbyBuddies(currentLocation[0], currentLocation[1]);
+      } catch (error) {
+        console.log('Error loading location:', error);
+        // Fallback handled by getCurrentLocation
+        if (userLocation) {
+          fetchNearbyHazards(userLocation[0], userLocation[1]);
+          fetchNearbyBuddies(userLocation[0], userLocation[1]);
+        }
       }
     };
     
@@ -191,12 +174,50 @@ export default function Home() {
     };
   }, []);
 
-  // Fetch nearby hazards within 5km radius
+  // Fetch nearby buddies count (cycling or walking)
+  const fetchNearbyBuddies = async (latitude, longitude) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+      const token = Cookies.get('auth_token');
+      
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${API_URL}/buddies/nearby?lat=${latitude}&lon=${longitude}&radius=5000&limit=100`, {
+        headers,
+        credentials: token ? 'include' : 'omit'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data?.buddies) {
+          // Count only cycling or walking buddies
+          const count = data.data.buddies.filter(buddy => 
+            buddy.transport_mode === 'cycling' || buddy.transport_mode === 'walking'
+          ).length;
+          setNearbyBuddiesCount(count);
+        } else {
+          setNearbyBuddiesCount(0);
+        }
+      } else {
+        setNearbyBuddiesCount(0);
+      }
+    } catch (error) {
+      console.log('Error fetching nearby buddies:', error);
+      setNearbyBuddiesCount(0);
+    }
+  };
+
+  // Fetch nearby hazards within 5km radius (including TomTom traffic incidents)
   const fetchNearbyHazards = async (latitude, longitude) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-      console.log('🔍 Fetching hazards near:', latitude, longitude);
-      const response = await fetch(`${API_URL}/hazards/near/${latitude}/${longitude}?radius=5000&limit=100`, {
+      console.log('🔍 Fetching combined hazards (community + TomTom) near:', latitude, longitude);
+      const response = await fetch(`${API_URL}/hazards/combined/${latitude}/${longitude}?radius=5000&limit=100&includeTomTom=true`, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -223,6 +244,37 @@ export default function Home() {
       setNearbyHazards([]);
     }
   };
+
+  // Re-fetch route when transport mode changes
+  useEffect(() => {
+    const refetchRoute = async () => {
+      if (searchedLocation && userLocation) {
+        console.log('🚶‍♂️🚴 Re-fetching route for mode:', transportMode);
+        try {
+          const route = await routingService.getRoute(
+            userLocation[0],
+            userLocation[1],
+            searchedLocation.position[0],
+            searchedLocation.position[1],
+            transportMode
+          );
+          
+          if (route.success && route.coordinates) {
+            setRouteData({
+              coordinates: route.coordinates,
+              distance: route.distance,
+              duration: route.duration,
+              mode: transportMode // Add mode to trigger re-render
+            });
+          }
+        } catch (error) {
+          console.error('Error re-fetching route:', error);
+        }
+      }
+    };
+    
+    refetchRoute();
+  }, [transportMode, searchedLocation, userLocation]);
 
   const handleProtectedAction = (e, path) => {
     e.preventDefault();
@@ -261,14 +313,15 @@ export default function Home() {
         userLocation[1],
         newLocation[0],
         newLocation[1],
-        'walking'
+        transportMode
       );
       
       if (route.success && route.coordinates) {
         setRouteData({
           coordinates: route.coordinates,
           distance: route.distance,
-          duration: route.duration
+          duration: route.duration,
+          mode: transportMode
         });
         
         // Adjust map to show full route
@@ -325,14 +378,15 @@ export default function Home() {
         userLocation[1],
         newLocation[0],
         newLocation[1],
-        'walking'
+        transportMode
       );
       
       if (route.success && route.coordinates) {
         setRouteData({
           coordinates: route.coordinates,
           distance: route.distance,
-          duration: route.duration
+          duration: route.duration,
+          mode: transportMode
         });
         
         // Adjust map to show full route
@@ -348,12 +402,12 @@ export default function Home() {
   };
   return (
     <main style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff', minHeight: '100vh' }} className="w-full">
-      <Section className="overflow-visible pt-4 sm:pt-4 md:pt-6 lg:pt-8 pb-20 sm:pb-16 md:pb-8 lg:pb-8 mb-0">
-        <div className="container mx-auto max-w-5xl px-3 sm:px-4 md:px-6 lg:px-8 animate-fadeIn w-full mb-0">
+      <Section className="overflow-visible pt-1 sm:pt-2 md:pt-4 lg:pt-6 pb-16 sm:pb-12 md:pb-6 lg:pb-6 mb-0">
+        <div className="container mx-auto max-w-5xl px-2 sm:px-4 md:px-6 lg:px-8 animate-fadeIn w-full mb-0">
           {/* New Layout for MD and larger screens */}
           <div className="hidden md:block">
             {/* Title */}
-            <div className="text-center mb-4 sm:mb-5 lg:mb-6">
+            <div className="text-center mb-2 sm:mb-5 lg:mb-6">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
                 Find Your <span style={{ color: '#06d6a0' }}>Safer</span> Way
               </h1>
@@ -362,99 +416,59 @@ export default function Home() {
               </h2>
             </div>
 
-            {/* Quick Actions */}
-            <div className="mb-4 sm:mb-5 lg:mb-6 flex gap-3 sm:gap-4 max-w-2xl mx-auto">
-              <button
-                onClick={(e) => handleProtectedAction(e, '/suggested-routes')}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.border = isDark ? '2px solid #ffffff' : '2px solid #1e293b';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.border = 'none';
-                }}
-                title="Plan a safe journey with suggested routes"
-                className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base transition-all duration-200 hover:scale-[1.02]"
-                style={{
-                  backgroundColor: isDark ? '#06d6a0' : '#06d6a0',
-                  color: '#0f172a'
-                }}
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                Go Safe
-              </button>
-              <button
-                onClick={(e) => handleProtectedAction(e, '/report-hazards')}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.border = isDark ? '2px solid #ffffff' : '2px solid #1e293b';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.border = 'none';
-                }}
-                title="Report hazards to help keep others safe"
-                className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base transition-all duration-200 hover:scale-[1.02]"
-                style={{
-                  backgroundColor: isDark ? '#ef4444' : '#ef4444',
-                  color: '#ffffff'
-                }}
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Report Hazard
-              </button>
-            </div>
 
-            {/* Search Bar */}
-            <div className="mb-3 sm:mb-4 max-w-2xl mx-auto relative">
-              {/* Search bar - Continue from above */}
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!searchDestination.trim()) return;
-                  
-                  // Check authentication
-                  const token = Cookies.get('auth_token');
-                  if (!token) {
-                    router.push('/auth/login');
-                    return;
-                  }
-                  
-                  // Always fetch current location address to ensure we have the real address
-                  let fromAddress = userAddress;
-                  try {
-                    const addressResponse = await geocodingService.getAddressFromCoords(userLocation[0], userLocation[1]);
-                    if (addressResponse.success && addressResponse.data?.display_name) {
-                      fromAddress = addressResponse.data.display_name;
+
+            {/* Search Bar with Transport Mode Icons */}
+            <div className="mb-2 sm:mb-4 max-w-3xl mx-auto">
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Search Form */}
+                <div className="flex-1 relative">
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!searchDestination.trim()) return;
+                    
+                    // Check authentication
+                    const token = Cookies.get('auth_token');
+                    if (!token) {
+                      router.push('/auth/login');
+                      return;
                     }
-                  } catch (error) {
-                    console.log('Could not get address for current location');
-                  }
-                  
-                  // Check if we already have the searched location (route already drawn)
-                  if (searchedLocation && searchedLocation.position) {
-                    // Use the already-found location
-                    router.push(`/suggested-routes?fromLat=${userLocation[0]}&fromLng=${userLocation[1]}&fromAddress=${encodeURIComponent(fromAddress)}&toLat=${searchedLocation.position[0]}&toLng=${searchedLocation.position[1]}&toAddress=${encodeURIComponent(searchedLocation.name)}&mode=walk`);
-                    return;
-                  }
-                  
-                  // Otherwise, geocode the destination and redirect to suggested-routes
-                  try {
-                    const response = await geocodingService.searchLocations(searchDestination, { limit: 1 });
-                    if (response.success && response.data?.locations && response.data.locations.length > 0) {
-                      const location = response.data.locations[0];
-                      const newLocation = [parseFloat(location.lat), parseFloat(location.lon)];
-                      
-                      // Navigate to suggested-routes with pre-filled data
-                      router.push(`/suggested-routes?fromLat=${userLocation[0]}&fromLng=${userLocation[1]}&fromAddress=${encodeURIComponent(fromAddress)}&toLat=${newLocation[0]}&toLng=${newLocation[1]}&toAddress=${encodeURIComponent(location.display_name)}&mode=walk`);
-                    } else {
-                      alert('Could not find that location. Please try again.');
+                    
+                    // Always fetch current location address to ensure we have the real address
+                    let fromAddress = userAddress;
+                    try {
+                      const addressResponse = await geocodingService.getAddressFromCoords(userLocation[0], userLocation[1]);
+                      if (addressResponse.success && addressResponse.data?.display_name) {
+                        fromAddress = addressResponse.data.display_name;
+                      }
+                    } catch (error) {
+                      console.log('Could not get address for current location');
                     }
-                  } catch (error) {
-                    console.error('Geocoding error:', error);
-                    alert('Error finding location. Please try again.');
-                  }
-                }} className="relative">
+                    
+                    // Check if we already have the searched location (route already drawn)
+                    if (searchedLocation && searchedLocation.position) {
+                      // Use the already-found location
+                      router.push(`/suggested-routes?fromLat=${userLocation[0]}&fromLng=${userLocation[1]}&fromAddress=${encodeURIComponent(fromAddress)}&toLat=${searchedLocation.position[0]}&toLng=${searchedLocation.position[1]}&toAddress=${encodeURIComponent(searchedLocation.name)}&mode=walk`);
+                      return;
+                    }
+                    
+                    // Otherwise, geocode the destination and redirect to suggested-routes
+                    try {
+                      const response = await geocodingService.searchLocations(searchDestination, { limit: 1 });
+                      if (response.success && response.data?.locations && response.data.locations.length > 0) {
+                        const location = response.data.locations[0];
+                        const newLocation = [parseFloat(location.lat), parseFloat(location.lon)];
+                        
+                        // Navigate to suggested-routes with pre-filled data
+                        router.push(`/suggested-routes?fromLat=${userLocation[0]}&fromLng=${userLocation[1]}&fromAddress=${encodeURIComponent(fromAddress)}&toLat=${newLocation[0]}&toLng=${newLocation[1]}&toAddress=${encodeURIComponent(location.display_name)}&mode=walk`);
+                      } else {
+                        alert('Could not find that location. Please try again.');
+                      }
+                    } catch (error) {
+                      console.error('Geocoding error:', error);
+                      alert('Error finding location. Please try again.');
+                    }
+                  }} className="relative">
                   {/* Search Icon */}
                   <svg 
                     className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 z-10" 
@@ -470,13 +484,19 @@ export default function Home() {
                     type="text"
                     value={searchDestination}
                     onChange={(e) => setSearchDestination(e.target.value)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     placeholder="Where do you want to go?"
                     className="w-full pl-10 sm:pl-12 pr-12 sm:pr-14 py-3 sm:py-3.5 rounded-full shadow-lg transition-all duration-200 focus:outline-none text-sm sm:text-base"
                     style={{
                       backgroundColor: isDark ? '#0f172a' : '#f8fafc',
                       color: isDark ? '#ffffff' : '#0f172a',
                       border: isDark ? '2px solid #06d6a0' : '2px solid #0f172a'
+                    }}
+                    onFocus={(e) => {
+                      if (isDark) e.target.style.boxShadow = '0 0 0 3px rgba(6, 214, 160, 0.3)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.boxShadow = 'none';
+                      setTimeout(() => setShowSuggestions(false), 200);
                     }}
                   />
                   
@@ -583,8 +603,69 @@ export default function Home() {
                 )}
               </div>
 
+              {/* Transport Mode Icons - Inline Right */}
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setTransportMode('walking')}
+                  className="relative group transition-all duration-200"
+                  title="Walking"
+                >
+                  <div 
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all duration-200"
+                    style={{
+                      backgroundColor: transportMode === 'walking' ? '#06d6a0' : (isDark ? '#475569' : '#e2e8f0'),
+                      color: transportMode === 'walking' ? '#0f172a' : (isDark ? '#cbd5e1' : '#94a3b8'),
+                      border: isDark && transportMode !== 'walking' ? '1px solid #64748b' : 'none'
+                    }}
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="currentColor"
+                      className="w-5 h-5"
+                    >
+                      <path d="M14 6c0-1.1-.9-2-2-2s-2 .9-2 2 .9 2 2 2 2-.9 2-2zm-2 4c-2 0-3.5 1.5-3.5 3.5V18c0 .55.45 1 1 1s1-.45 1-1v-3.5h1V21c0 .55.45 1 1 1s1-.45 1-1v-6.5h1V21c0 .55.45 1 1 1s1-.45 1-1v-7.5C16.5 11.5 15 10 13 10h-1z"/>
+                    </svg>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTransportMode('cycling')}
+                  className="relative group transition-all duration-200"
+                  title="Cycling"
+                >
+                  <div 
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all duration-200"
+                    style={{
+                      backgroundColor: transportMode === 'cycling' ? '#06d6a0' : (isDark ? '#475569' : '#e2e8f0'),
+                      color: transportMode === 'cycling' ? '#0f172a' : (isDark ? '#cbd5e1' : '#94a3b8'),
+                      border: isDark && transportMode !== 'cycling' ? '1px solid #64748b' : 'none'
+                    }}
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      className="w-5 h-5"
+                    >
+                      <circle cx="18.5" cy="17.5" r="3.5"/>
+                      <circle cx="5.5" cy="17.5" r="3.5"/>
+                      <circle cx="15" cy="5" r="1"/>
+                      <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+                    </svg>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+
             {/* Map */}
-            <div className="relative w-full h-64 sm:h-80 md:h-96 lg:h-[400px] rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-lg" style={{ 
+            <div className="relative w-full h-80 sm:h-80 md:h-96 lg:h-[400px] rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-lg" style={{ 
               borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
             }}>
               <Map
@@ -593,6 +674,7 @@ export default function Home() {
                 height="100%"
                 onMapClick={handleMapClick}
                 hazards={nearbyHazards.filter(h => h.latitude && h.longitude)}
+                selectedHazardId={selectedHazardId}
                 markers={[
                   {
                     position: userLocation,
@@ -602,7 +684,7 @@ export default function Home() {
                   },
                   ...(searchedLocation ? [{
                     position: searchedLocation.position,
-                    color: '#ef4444',
+                    color: '#a78bfa',
                     type: 'marker',
                     popup: <div className="text-sm"><strong>To: {searchedLocation.name}</strong></div>
                   }] : [])
@@ -610,36 +692,82 @@ export default function Home() {
                 routes={routeData ? [{
                   id: 'homepage-route',
                   coordinates: routeData.coordinates,
-                  color: '#06d6a0',
+                  color: transportMode === 'cycling' ? '#3b82f6' : '#06d6a0',
                   weight: 4,
                   opacity: 0.7
                 }] : []}
+                autoFitBounds={!!routeData}
+                fromCoords={userLocation}
+                toCoords={searchedLocation?.position}
               />
             </div>
 
             {/* Nearby Hazards - Horizontal Scroll */}
             {nearbyHazards.length > 0 && (
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-2">
+              <div className="mt-2 sm:mt-4">
+                <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                   <h3 
                     className="text-lg sm:text-xl font-bold"
                     style={{ color: isDark ? '#ffffff' : '#0f172a' }}
                   >
-                    Nearby <span style={{ color: '#06d6a0' }}>Hazards</span> ({nearbyHazards.length})
+                    Nearby <span style={{ color: '#06d6a0' }}>Hazards</span> ({filteredHazards.length})
                   </h3>
-                  <p 
-                    className="text-xs sm:text-sm"
-                    style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+                  <div className="text-right">
+                    <p 
+                      className="text-sm sm:text-base font-medium"
+                      style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+                    >
+                      Within 5km
+                    </p>
+                    {nearbyBuddiesCount > 0 && (
+                      <p className="text-sm sm:text-base font-semibold mt-1" style={{ color: isDark ? '#06d6a0' : '#059669' }}>
+                        Buddies Nearby ({nearbyBuddiesCount})
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hazard Filters */}
+                <div className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide">
+                  <select
+                    value={hazardSourceFilter}
+                    onChange={(e) => setHazardSourceFilter(e.target.value)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
+                    style={{
+                      backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                      color: isDark ? '#ffffff' : '#0f172a',
+                      border: `1px solid ${isDark ? '#d1d5db' : '#cbd5e1'}`
+                    }}
                   >
-                    Within 5km
-                  </p>
+                    <option value="all">All Sources</option>
+                    <option value="community">Community</option>
+                    <option value="traffic">Traffic</option>
+                  </select>
+                  <select
+                    value={hazardTypeFilter}
+                    onChange={(e) => setHazardTypeFilter(e.target.value)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
+                    style={{
+                      backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                      color: isDark ? '#ffffff' : '#0f172a',
+                      border: `1px solid ${isDark ? '#d1d5db' : '#cbd5e1'}`
+                    }}
+                  >
+                    <option value="all">All Types</option>
+                    <option value="pothole">Pothole</option>
+                    <option value="accident">Accident</option>
+                    <option value="construction">Construction</option>
+                    <option value="debris">Debris</option>
+                    <option value="traffic">Traffic</option>
+                    <option value="road">Road</option>
+                  </select>
                 </div>
                 
-                <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-                  {nearbyHazards.map((hazard) => (
+                <div className="flex gap-2 sm:gap-4 overflow-x-auto pb-3 sm:pb-4 scrollbar-hide snap-x snap-mandatory">
+                  {filteredHazards.map((hazard) => (
                     <div 
                       key={hazard.id}
-                      className="flex-none w-64 sm:w-72 md:w-80 rounded-lg sm:rounded-xl p-3 sm:p-4 snap-start transition-transform hover:scale-[1.02] cursor-pointer"
+                      className="flex-none w-64 sm:w-72 md:w-80 rounded-lg sm:rounded-xl p-2.5 sm:p-4 snap-start transition-transform hover:scale-[1.02] cursor-pointer"
                       style={{
                         backgroundColor: isDark ? '#0f172a' : '#e2e8f0',
                         border: isDark ? '2px solid rgba(255, 107, 107, 0.5)' : 'none',
@@ -648,6 +776,7 @@ export default function Home() {
                       onClick={() => {
                         setMapCenter([hazard.latitude, hazard.longitude]);
                         setMapZoom(16);
+                        setSelectedHazardId(hazard.id);
                       }}
                     >
                       <div className="flex items-start gap-2 sm:gap-3">
@@ -707,12 +836,14 @@ export default function Home() {
 
           {/* Old Layout for Small Screens */}
           <div className="md:hidden">
-            <div className="grid items-start gap-3 sm:gap-6 md:gap-10 lg:gap-3 lg:grid-cols-12">
+            <div className="grid items-start gap-2 sm:gap-6 md:gap-10 lg:gap-3 lg:grid-cols-12">
               {/* Map card */}
               <div className="lg:col-span-8 order-1 lg:order-1">
-                {/* Search bar */}
-                <div className="mb-3 sm:mb-4 relative">
-                  <form onSubmit={async (e) => {
+                {/* Search bar with Transport Mode Icons */}
+                <div className="mb-2 sm:mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 relative">
+                      <form onSubmit={async (e) => {
                     e.preventDefault();
                     if (!searchDestination.trim()) return;
                     
@@ -773,13 +904,19 @@ export default function Home() {
                       type="text"
                       value={searchDestination}
                       onChange={(e) => setSearchDestination(e.target.value)}
-                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                       placeholder="Where do you want to go?"
                       className="w-full pl-10 sm:pl-12 pr-12 sm:pr-14 py-3 sm:py-3.5 rounded-full shadow-lg transition-all duration-200 focus:outline-none text-sm sm:text-base"
                       style={{
                         backgroundColor: isDark ? '#0f172a' : '#f8fafc',
                         color: isDark ? '#ffffff' : '#0f172a',
                         border: isDark ? '2px solid #06d6a0' : '2px solid #0f172a'
+                      }}
+                      onFocus={(e) => {
+                        if (isDark) e.target.style.boxShadow = '0 0 0 3px rgba(6, 214, 160, 0.3)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.boxShadow = 'none';
+                        setTimeout(() => setShowSuggestions(false), 200);
                       }}
                     />
                     
@@ -884,9 +1021,70 @@ export default function Home() {
                       <div className="animate-pulse">Searching...</div>
                     </div>
                   )}
+                    </div>
+
+                    {/* Transport Mode Icons - Inline Right */}
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setTransportMode('walking')}
+                        className="relative group transition-all duration-200"
+                        title="Walking"
+                      >
+                        <div 
+                          className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all duration-200"
+                          style={{
+                            backgroundColor: transportMode === 'walking' ? '#06d6a0' : (isDark ? '#475569' : '#e2e8f0'),
+                            color: transportMode === 'walking' ? '#0f172a' : (isDark ? '#cbd5e1' : '#94a3b8'),
+                            border: isDark && transportMode !== 'walking' ? '1px solid #64748b' : 'none'
+                          }}
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 24 24" 
+                            fill="currentColor"
+                            className="w-5 h-5"
+                          >
+                            <path d="M14 6c0-1.1-.9-2-2-2s-2 .9-2 2 .9 2 2 2 2-.9 2-2zm-2 4c-2 0-3.5 1.5-3.5 3.5V18c0 .55.45 1 1 1s1-.45 1-1v-3.5h1V21c0 .55.45 1 1 1s1-.45 1-1v-6.5h1V21c0 .55.45 1 1 1s1-.45 1-1v-7.5C16.5 11.5 15 10 13 10h-1z"/>
+                          </svg>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTransportMode('cycling')}
+                        className="relative group transition-all duration-200"
+                        title="Cycling"
+                      >
+                        <div 
+                          className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all duration-200"
+                          style={{
+                            backgroundColor: transportMode === 'cycling' ? '#06d6a0' : (isDark ? '#475569' : '#e2e8f0'),
+                            color: transportMode === 'cycling' ? '#0f172a' : (isDark ? '#cbd5e1' : '#94a3b8'),
+                            border: isDark && transportMode !== 'cycling' ? '1px solid #64748b' : 'none'
+                          }}
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                            className="w-5 h-5"
+                          >
+                            <circle cx="18.5" cy="17.5" r="3.5"/>
+                            <circle cx="5.5" cy="17.5" r="3.5"/>
+                            <circle cx="15" cy="5" r="1"/>
+                            <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+                          </svg>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="relative w-full h-56 sm:h-72 md:h-96 lg:h-[280px] xl:h-[300px] rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-lg" style={{ 
+                <div className="relative w-full h-80 sm:h-72 md:h-96 lg:h-[280px] xl:h-[300px] rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-lg" style={{ 
                   borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
                 }}>
                   <Map
@@ -895,6 +1093,7 @@ export default function Home() {
                     height="100%"
                     onMapClick={handleMapClick}
                     hazards={nearbyHazards.filter(h => h.latitude && h.longitude)}
+                    selectedHazardId={selectedHazardId}
                     markers={[
                       {
                         position: userLocation,
@@ -904,7 +1103,7 @@ export default function Home() {
                       },
                       ...(searchedLocation ? [{
                         position: searchedLocation.position,
-                        color: '#ef4444',
+                        color: '#a78bfa',
                         type: 'marker',
                         popup: <div className="text-sm"><strong>To: {searchedLocation.name}</strong></div>
                       }] : [])
@@ -912,12 +1111,37 @@ export default function Home() {
                     routes={routeData ? [{
                       id: 'homepage-route',
                       coordinates: routeData.coordinates,
-                      color: '#06d6a0',
+                      color: transportMode === 'cycling' ? '#3b82f6' : '#06d6a0',
                       weight: 4,
                       opacity: 0.7
                     }] : []}
+                    autoFitBounds={!!routeData}
+                    fromCoords={userLocation}
+                    toCoords={searchedLocation?.position}
                   />
                 </div>
+
+                {/* Clear Destination Link - Below Map */}
+                {(searchedLocation || routeData) && (
+                  <div className="mt-2 flex justify-end pr-2">
+                    <button
+                      onClick={() => {
+                        console.log('Clearing destination...');
+                        setSearchedLocation(null);
+                        setRouteData(null);
+                        setSearchDestination('');
+                        setMapCenter(userLocation);
+                        setMapZoom(13);
+                      }}
+                      className="text-sm underline hover:no-underline transition-all duration-200"
+                      style={{
+                        color: isDark ? '#ffffff' : '#0f172a'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Copy + CTAs */}
@@ -929,29 +1153,6 @@ export default function Home() {
                   <h2 className="mt-1.5 sm:mt-2 lg:mt-2 text-sm sm:text-base md:text-xl lg:text-lg" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
                     Safer journeys for walkers &amp; cyclists
                   </h2>
-
-                  <div className="mt-4 sm:mt-6 lg:mt-6 flex flex-col sm:flex-row gap-2.5 sm:gap-3 lg:gap-3 lg:justify-start justify-center">
-                    <button
-                      onClick={(e) => handleProtectedAction(e, '/suggested-routes')}
-                      className="btn-primary inline-flex items-center gap-2 justify-center text-sm sm:text-base lg:text-base px-5 sm:px-6 lg:px-6 py-2.5 sm:py-3 lg:py-2.5 rounded-lg min-h-[42px] lg:min-h-0 w-full sm:w-auto"
-                      title="Plan a safe journey"
-                    >
-                      Go Safe
-                    </button>
-                    <button
-                      onClick={(e) => handleProtectedAction(e, '/report-hazards')}
-                      className="inline-flex items-center gap-2 justify-center text-sm sm:text-base lg:text-base px-5 sm:px-6 lg:px-6 py-2.5 sm:py-3 lg:py-2.5 rounded-lg font-semibold transition-all duration-200 min-h-[42px] lg:min-h-0 w-full sm:w-auto"
-                      style={{
-                        backgroundColor: '#f87171',
-                        color: '#ffffff'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#ef4444'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = '#f87171'}
-                      title="Help others: report a hazard here"
-                    >
-                      Report Hazard
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
@@ -964,21 +1165,65 @@ export default function Home() {
                     className="text-lg sm:text-xl font-bold"
                     style={{ color: isDark ? '#ffffff' : '#0f172a' }}
                   >
-                    Nearby <span style={{ color: '#06d6a0' }}>Hazards</span> ({nearbyHazards.length})
+                    Nearby <span style={{ color: '#06d6a0' }}>Hazards</span> ({filteredHazards.length})
                   </h3>
-                  <p 
-                    className="text-xs sm:text-sm"
-                    style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+                  <div className="text-right">
+                    <p 
+                      className="text-sm sm:text-base font-medium"
+                      style={{ color: isDark ? '#94a3b8' : '#64748b' }}
+                    >
+                      Within 5km
+                    </p>
+                    {nearbyBuddiesCount > 0 && (
+                      <p className="text-sm sm:text-base font-semibold mt-1" style={{ color: isDark ? '#06d6a0' : '#059669' }}>
+                        Buddies Nearby ({nearbyBuddiesCount})
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hazard Filters */}
+                <div className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide">
+                  <select
+                    value={hazardSourceFilter}
+                    onChange={(e) => setHazardSourceFilter(e.target.value)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
+                    style={{
+                      backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                      color: isDark ? '#ffffff' : '#0f172a',
+                      border: `1px solid ${isDark ? '#d1d5db' : '#cbd5e1'}`
+                    }}
                   >
-                    Within 5km
-                  </p>
+                    <option value="all">All Sources</option>
+                    <option value="community">Community</option>
+                    <option value="traffic">Traffic</option>
+                  </select>
+                  <select
+                    value={hazardTypeFilter}
+                    onChange={(e) => setHazardTypeFilter(e.target.value)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
+                    style={{
+                      backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                      color: isDark ? '#ffffff' : '#0f172a',
+                      border: `1px solid ${isDark ? '#d1d5db' : '#cbd5e1'}`
+                    }}
+                  >
+                    <option value="all">All Types</option>
+                    <option value="pothole">Pothole</option>
+                    <option value="accident">Accident</option>
+                    <option value="construction">Construction</option>
+                    <option value="debris">Debris</option>
+                    <option value="traffic">Traffic</option>
+                    <option value="road">Road</option>
+                  </select>
                 </div>
                 
                 <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-                  {nearbyHazards.map((hazard) => (
+                  {filteredHazards.map((hazard, index) => {
+                    return (
                     <div 
                       key={hazard.id}
-                      className="flex-none w-64 sm:w-72 md:w-80 rounded-lg sm:rounded-xl p-3 sm:p-4 snap-start transition-transform hover:scale-[1.02] cursor-pointer"
+                      className="flex-none w-56 sm:w-64 md:w-72 rounded-lg sm:rounded-xl p-3 sm:p-4 snap-start transition-transform hover:scale-[1.02] cursor-pointer relative"
                       style={{
                         backgroundColor: isDark ? '#0f172a' : '#e2e8f0',
                         border: isDark ? '2px solid rgba(255, 107, 107, 0.5)' : 'none',
@@ -987,11 +1232,33 @@ export default function Home() {
                       onClick={() => {
                         setMapCenter([hazard.latitude, hazard.longitude]);
                         setMapZoom(16);
+                        setSelectedHazardId(hazard.id);
                       }}
                     >
+                      {/* Source Badge - Top Right */}
+                      {hazard.source && (
+                        <div className="absolute top-2 right-2">
+                          <span 
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shadow-md"
+                            style={{
+                              backgroundColor: hazard.source === 'tomtom' ? 'rgba(255, 152, 0, 0.95)' : 'rgba(6, 214, 160, 0.95)',
+                              color: '#ffffff'
+                            }}
+                          >
+                            {hazard.source === 'tomtom' ? (
+                              <>🚦</>
+                            ) : (
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="flex items-start gap-2 sm:gap-3">
                         {(hazard.image_url || hazard.imageUrl) ? (
-                          <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-lg overflow-hidden shrink-0">
+                          <div className="w-14 sm:w-16 h-14 sm:h-16 rounded-lg overflow-hidden shrink-0">
                             <img 
                               src={(() => {
                                 const imageUrl = hazard.image_url || hazard.imageUrl;
@@ -1007,15 +1274,37 @@ export default function Home() {
                             />
                           </div>
                         ) : (
-                          <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#ff6b6b' }}>
-                            <span className="text-lg sm:text-xl">⚠️</span>
+                          <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#ff6b6b' }}>
+                            <span className="text-base sm:text-lg">⚠️</span>
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-base sm:text-lg" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
                             {hazard.hazardType || hazard.type || 'Unknown Hazard'}
                           </h3>
-                          <div className="flex items-center gap-1.5 sm:gap-2 mt-1">
+                          {(() => {
+                            const dateField = hazard.reportedAt || hazard.reported_at || hazard.created_at || hazard.createdAt || hazard.start_date;
+                            if (dateField) {
+                              try {
+                                const date = new Date(dateField);
+                                if (!isNaN(date.getTime())) {
+                                  return (
+                                    <p className="text-xs mt-0.5" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                                      {date.toLocaleDateString('en-GB', { 
+                                        day: 'numeric', 
+                                        month: 'short', 
+                                        year: 'numeric' 
+                                      })}
+                                    </p>
+                                  );
+                                }
+                              } catch (e) {
+                                console.error('Error parsing date:', e);
+                              }
+                            }
+                            return null;
+                          })()}
+                          <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
                             {hazard.severity && (
                               <span 
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-sm font-semibold"
@@ -1038,125 +1327,11 @@ export default function Home() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Buddy Preview Section - Below Map, All Screens */}
-          <div className="mt-4 sm:mt-5 animate-fadeIn">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="text-lg sm:text-xl font-bold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
-                Find a <span style={{ color: '#06d6a0' }}>Buddy</span>
-              </h2>
-              <button
-                onClick={(e) => handleProtectedAction(e, '/findBuddy')}
-                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200"
-                style={{
-                  backgroundColor: isDark ? '#06d6a0' : '#06d6a0',
-                  color: '#0f172a'
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
-              >
-                Find Buddy
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Buddy Cards - Horizontal Scroll */}
-            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-              {/* Mock Buddy 1 */}
-              <div 
-                className="flex-none w-64 sm:w-72 md:w-80 rounded-lg sm:rounded-xl p-3 sm:p-4 snap-start transition-transform hover:scale-[1.02]"
-                style={{
-                  backgroundColor: isDark ? '#0f172a' : '#e2e8f0',
-                  border: isDark ? '2px solid rgba(6, 214, 160, 0.5)' : 'none',
-                  boxShadow: isDark ? '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3)' : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
-                }}
-              >
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#06d6a0' }}>
-                    <svg className="w-5 sm:w-6 h-5 sm:h-6" style={{ color: '#0f172a' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base sm:text-lg" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>Sarah Johnson</h3>
-                    <div className="flex items-center gap-1.5 sm:gap-2 mt-1">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(6, 214, 160, 0.2)', color: isDark ? '#ffffff' : '#1e293b' }}>
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
-                        </svg>
-                        Walking
-                      </span>
-                      <span className="text-xs" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>0.8 km away</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-xs font-medium" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>Available now</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Mock Buddy 2 */}
-              <div 
-                className="flex-none w-64 sm:w-72 md:w-80 rounded-lg sm:rounded-xl p-3 sm:p-4 snap-start transition-transform hover:scale-[1.02]"
-                style={{
-                  backgroundColor: isDark ? '#0f172a' : '#e2e8f0',
-                  border: isDark ? '2px solid rgba(6, 214, 160, 0.5)' : 'none',
-                  boxShadow: isDark ? '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3)' : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)'
-                }}
-              >
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#06d6a0' }}>
-                    <svg className="w-5 sm:w-6 h-5 sm:h-6" style={{ color: '#0f172a' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base sm:text-lg" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>Michael Chen</h3>
-                    <div className="flex items-center gap-1.5 sm:gap-2 mt-1">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(6, 214, 160, 0.2)', color: isDark ? '#ffffff' : '#1e293b' }}>
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M5 18.89H6.41421L12 13.3042L17.5858 18.89H19V17.4758L12 10.4758L5 17.4758V18.89Z"/>
-                          <path d="M21 15.89C20.4477 15.89 20 16.3377 20 16.89C20 17.4423 20.4477 17.89 21 17.89C21.5523 17.89 22 17.4423 22 16.89C22 16.3377 21.5523 15.89 21 15.89ZM19 16.89C19 15.7854 19.8954 14.89 21 14.89C22.1046 14.89 23 15.7854 23 16.89C23 17.9946 22.1046 18.89 21 18.89C19.8954 18.89 19 17.9946 19 16.89Z"/>
-                          <path d="M3 15.89C2.44772 15.89 2 16.3377 2 16.89C2 17.4423 2.44772 17.89 3 17.89C3.55228 17.89 4 17.4423 4 16.89C4 16.3377 3.55228 15.89 3 15.89ZM1 16.89C1 15.7854 1.89543 14.89 3 14.89C4.10457 14.89 5 15.7854 5 16.89C5 17.9946 4.10457 18.89 3 18.89C1.89543 18.89 1 17.9946 1 16.89Z"/>
-                          <circle cx="12" cy="6" r="2"/>
-                        </svg>
-                        Cycling
-                      </span>
-                      <span className="text-xs" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>1.2 km away</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-xs font-medium" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>Available now</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile View All Button */}
-            <button
-              onClick={(e) => handleProtectedAction(e, '/findBuddy')}
-              className="sm:hidden w-full mt-2.5 sm:mt-4 inline-flex items-center gap-2 justify-center px-4 py-2.5 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all duration-200"
-              style={{
-                backgroundColor: isDark ? '#06d6a0' : '#06d6a0',
-                color: '#0f172a'
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#06d6a0'}
-            >
-              Find Buddy
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
           </div>
         </div>
       </Section>

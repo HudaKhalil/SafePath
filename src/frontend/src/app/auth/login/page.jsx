@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { authService } from '../../../lib/services';
 
 export default function Login() {
-  console.log('🔄 Login component rendering/re-rendering');
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
@@ -17,16 +16,25 @@ export default function Login() {
   const [isDark, setIsDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Mark component as mounted - DISABLED to prevent redirects
   useEffect(() => {
     setMounted(true);
-    // Temporarily disable auto-redirect to debug
-    // if (authService.isLoggedIn()) {
-    //   router.push('/');
-    // }
+    
+    // Restore error from sessionStorage after mount (client-side only)
+    const savedError = sessionStorage.getItem('loginError');
+    if (savedError) {
+      setErrors({ general: savedError });
+    }
   }, []);
 
-  // Track dark mode changes
+  // Persist errors to sessionStorage
+  useEffect(() => {
+    if (errors.general) {
+      sessionStorage.setItem('loginError', errors.general);
+    } else if (Object.keys(errors).length === 0) {
+      sessionStorage.removeItem('loginError');
+    }
+  }, [errors]);
+
   useEffect(() => {
     const checkDarkMode = () => {
       setIsDark(document.documentElement.classList.contains('dark'));
@@ -39,15 +47,45 @@ export default function Login() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    console.log('📝 Field changed:', name, '=', value);
+    // Clear specific field error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+    // Clear general error when user starts typing
+    if (errors.general) {
+      sessionStorage.removeItem('loginError');
+      setErrors({});
+    }
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    // Clear all errors when user starts typing
-    if (errors[name] || errors.general) {
-      console.log('🗑️ Clearing errors because user is typing');
-      setErrors({});
+  };
+
+  const handleResendVerification = async (email) => {
+    try {
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'
+        }/auth/resend-verification`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        alert('✅ Verification email sent! Please check your inbox.');
+      } else {
+        alert('❌ ' + (data.message || 'Failed to resend email'));
+      }
+    } catch (error) {
+      alert('❌ Failed to resend verification email. Please try again.');
     }
   };
 
@@ -57,7 +95,7 @@ export default function Login() {
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+      newErrors.email = 'Please enter a valid email address';
     }
 
     if (!formData.password) {
@@ -68,29 +106,8 @@ export default function Login() {
       setErrors(newErrors);
       return false;
     }
+    // DO NOT clear errors here - they should persist until user corrects or login succeeds
     return true;
-  };
-
-  const handleResendVerification = async (email) => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/auth/resend-verification`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        }
-      );
-      const data = await response.json();
-      if (data.success) {
-        alert('✅ Verification email sent! Please check your inbox.');
-      } else {
-        alert('❌ ' + (data.message || 'Failed to resend email'));
-      }
-    } catch (error) {
-      console.error('Resend error:', error);
-      alert('❌ Failed to resend verification email. Please try again.');
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -99,17 +116,24 @@ export default function Login() {
       e.stopPropagation();
     }
     
-    console.log('🔵 handleSubmit called');
-    console.log('Current formData:', formData);
-    console.log('Current errors:', errors);
+    // Validate but don't let it affect existing errors
+    const validationErrors = {};
+    if (!formData.email) {
+      validationErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      validationErrors.email = 'Please enter a valid email address';
+    }
+    if (!formData.password) {
+      validationErrors.password = 'Password is required';
+    }
     
-    if (!validateForm()) {
-      console.log('❌ Validation failed');
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
-    console.log('✅ Validation passed, starting login...');
     setIsLoading(true);
+    // Don't clear errors here - let them persist until we get a new result
 
     try {
       const loginData = {
@@ -117,79 +141,78 @@ export default function Login() {
         password: formData.password
       };
 
-      console.log('Attempting login with:', { email: loginData.email });
-      console.log('API Base URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api');
-      
       const result = await authService.login(loginData);
-      console.log('Login result:', result);
 
       if (result.success) {
-        console.log('✅ Login successful, redirecting...');
-        setTimeout(() => {
-          console.log('🔄 Executing redirect now');
-          window.location.href = '/';
-        }, 100);
+        sessionStorage.removeItem('loginError');
+        window.location.href = '/';
       } else if (result.requiresVerification) {
         // Email not verified - show message with option to resend
-        console.log('⚠️ Email verification required');
         const resend = confirm(
           '📧 Please verify your email before logging in.\n\n' +
-          'We sent a verification link to ' + result.email + '\n\n' +
-          'Didn\'t receive it? Click OK to resend the verification email.'
+            'We sent a verification link to ' +
+            result.email +
+            '\n\n' +
+            'Didn\'t receive it? Click OK to resend the verification email.'
         );
-        
+
         if (resend) {
           await handleResendVerification(result.email);
         }
         setIsLoading(false);
       } else {
-        console.log('❌ Login failed:', result.message);
         const errorMsg = result.message || 'Login failed';
-        console.log('Setting errors to:', errorMsg);
-        setErrors({ general: errorMsg });
         setIsLoading(false);
+        setErrors({ general: errorMsg });
       }
     } catch (error) {
       console.error('Login error:', error);
       
-      let errorMessage = 'Login failed. Please try again.';
-      
-      if (!error.response) {
-        errorMessage = error.message || 'Cannot connect to server. Please ensure the backend is running on port 5001.';
-        setErrors({ general: errorMessage });
-        setIsLoading(false);
-      } else if (error.response?.status === 403 && error.response?.data?.requiresVerification) {
+      // Check if email verification is required
+      if (
+        error.response?.status === 403 &&
+        error.response?.data?.requiresVerification
+      ) {
         // Email verification required - from backend error response
-        console.log('⚠️ Email verification required (from error response)');
         const resend = confirm(
           '📧 Please verify your email before logging in.\n\n' +
-          'We sent a verification link to ' + (error.response?.data?.email || formData.email) + '\n\n' +
-          'Didn\'t receive it? Click OK to resend the verification email.'
+            'We sent a verification link to ' +
+            (error.response?.data?.email || formData.email) +
+            '\n\n' +
+            'Didn\'t receive it? Click OK to resend the verification email.'
         );
-        
+
         if (resend) {
-          await handleResendVerification(error.response?.data?.email || formData.email);
+          await handleResendVerification(
+            error.response?.data?.email || formData.email
+          );
         }
         setIsLoading(false);
         return;
-      } else if (error.response?.status === 401 || error.response?.status === 400) {
-        errorMessage = error.response.data?.message || 'Invalid email or password';
-        setErrors({ general: errorMessage });
-        setIsLoading(false);
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-        setErrors({ general: errorMessage });
-        setIsLoading(false);
-      } else if (error.message) {
-        errorMessage = error.message;
-        setErrors({ general: errorMessage });
-        setIsLoading(false);
-      } else {
-        setErrors({ general: 'Login failed. Please try again.' });
-        setIsLoading(false);
       }
       
-      console.log('Setting error message:', errorMessage);
+      // Determine error message
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (!error.response) {
+        // Network error or backend not running
+        errorMessage = 'Cannot connect to server. Please check your connection and try again.';
+      } else if (error.response?.status === 401 || error.response?.status === 400) {
+        // Invalid credentials
+        errorMessage = error.response.data?.message || 'Invalid email or password';
+      } else if (error.response?.status === 500) {
+        // Server error
+        errorMessage = 'Server error occurred. Please try again later.';
+      } else if (error.response?.data?.message) {
+        // Other API errors
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        // Generic error with message
+        errorMessage = error.message;
+      }
+      
+      // Show alert for user-friendly error
+      alert('❌ ' + errorMessage);
       
       // Handle field-specific validation errors
       if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
@@ -201,14 +224,18 @@ export default function Login() {
           setErrors(fieldErrors);
         }
       }
+      
+      // Clear errors after showing alert
+      setErrors({});
+      setIsLoading(false);
     }
     
     console.log('🔵 handleSubmit completed');
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: isDark ? 'transparent' : '#f1f5f9' }}>
-      <div className="max-w-md w-full space-y-6 rounded-2xl p-8 shadow-2xl dark:border dark:border-white/20" style={{ backgroundColor: 'var(--bg-card)' }}>
+    <div className="flex-1 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: isDark ? 'transparent' : '#f1f5f9' }} suppressHydrationWarning>
+      <div className="max-w-md w-full space-y-6 rounded-2xl p-8 shadow-2xl dark:border dark:border-white/20" style={{ backgroundColor: 'var(--bg-card)' }} suppressHydrationWarning>
         <div>
           <div className="flex justify-center">
             <div className="w-16 h-16 flex items-center justify-center">
@@ -227,10 +254,10 @@ export default function Login() {
           </p>
         </div>
 
-        <div className="mt-4 space-y-4">
-          <div className="space-y-3">
+        <form className="mt-4 space-y-4" onSubmit={handleSubmit} noValidate suppressHydrationWarning>
+          <div className="space-y-3" suppressHydrationWarning>
             {/* Email */}
-            <div>
+            <div suppressHydrationWarning>
               <label htmlFor="email" className="block text-lg font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
                 Email Address
               </label>
@@ -247,15 +274,26 @@ export default function Login() {
                 placeholder="Enter your email address"
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+                <p className="mt-1 text-base text-red-400">{errors.email}</p>
               )}
             </div>
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-lg font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
-                Password
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-lg font-medium" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
+                  Password
+                </label>
+                <Link 
+                  href="/auth/forgot-password"
+                  className="text-sm font-medium transition-colors"
+                  style={{ color: isDark ? '#06d6a0' : '#0f172a' }}
+                  onMouseEnter={(e) => e.target.style.color = isDark ? '#ffffff' : '#059669'}
+                  onMouseLeave={(e) => e.target.style.color = isDark ? '#06d6a0' : '#0f172a'}
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 id="password"
                 name="password"
@@ -269,25 +307,27 @@ export default function Login() {
                 placeholder="Enter your password"
               />
               {errors.password && (
-                <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+                <p className="mt-1 text-base text-red-400">{errors.password}</p>
               )}
             </div>
           </div>
 
-          {errors.general && (
-            <div className="bg-red-900/20 border border-red-500 text-red-400 px-4 py-3 rounded relative">
-              {errors.general}
-            </div>
-          )}
+          <div suppressHydrationWarning>
+            {errors.general && (
+              <div className="bg-red-900/20 border border-red-500 text-red-400 px-4 py-3 rounded relative mb-4">
+                {errors.general}
+              </div>
+            )}
+          </div>
 
           {/* Submit Button */}
-          <div>
+          <div suppressHydrationWarning>
             <button
               type="button"
+              suppressHydrationWarning
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('🔵 Button clicked');
                 handleSubmit(e);
               }}
               disabled={isLoading}
@@ -296,14 +336,15 @@ export default function Login() {
                 backgroundColor: 'var(--color-accent)',
                 color: 'var(--color-text-on-accent)'
               }}
+              suppressHydrationWarning
             >
               {isLoading ? 'Logging In...' : 'Log In'}
             </button>
           </div>
 
           {/* Sign Up Link */}
-          <div className="text-center">
-            <p className="text-sm" style={{ color: isDark ? '#06d6a0' : '#0f172a' }}>
+          <div className="text-center" suppressHydrationWarning>
+            <p className="text-sm" style={{ color: isDark ? '#06d6a0' : '#0f172a' }} suppressHydrationWarning>
               Don't have an account?{' '}
               <Link 
                 href="/auth/signup" 
@@ -316,8 +357,30 @@ export default function Login() {
               </Link>
             </p>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

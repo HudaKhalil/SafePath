@@ -130,17 +130,82 @@ const getPresetPercentages = (presetId) => {
   return toPercentageWeights(weights);
 };
 
-// Load preferences from localStorage
-const loadPreferences = () => {
+// Get auth token from localStorage
+const getAuthToken = () => {
+  if (typeof window === 'undefined') return null;
+  // Check localStorage first (for JWT token)
+  const token = localStorage.getItem('token');
+  if (token) return token;
+  
+  // Fallback to cookie for backward compatibility
+  const cookies = document.cookie.split(';');
+  const authCookie = cookies.find(c => c.trim().startsWith('auth_token='));
+  return authCookie ? authCookie.split('=')[1] : null;
+};
+
+// Load preferences from database API or localStorage fallback
+// For authenticated users: fetches from GET /api/safety/preferences
+// For guests: reads from localStorage
+const loadPreferences = async () => {
   if (typeof window === 'undefined') return { preset: DEFAULT_PRESET, customWeights: null };
+  
+  // Try to load from API if authenticated
+  const token = getAuthToken();
+  console.log('🔐 Auth token found:', token ? 'YES' : 'NO');
+    if (token) {
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '');
+      console.log('📡 Fetching preferences from API:', `${apiUrl}/api/safety/preferences`);
+      const response = await fetch(`${apiUrl}/api/safety/preferences`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+
+      console.log('📡 API Response status:', response.status, response.ok ? 'OK' : 'FAILED');
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('✅ Loaded preferences from database:', responseData);
+        
+        // API returns { success: true, data: { factorWeights: {...}, preset: "balanced", ... } }
+        const prefs = responseData.data;
+        
+        // Map database fields to frontend format
+        const preset = sanitizePresetId(prefs.preset);
+        const customWeights = preset === 'custom' && prefs.factorWeights ? {
+          crime: prefs.factorWeights.crime * 100,  // Convert 0.4 to 40%
+          collision: prefs.factorWeights.collision * 100,
+          lighting: prefs.factorWeights.lighting * 100,
+          hazard: prefs.factorWeights.hazard * 100,
+        } : null;
+
+        // Sync to localStorage as cache
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ preset, customWeights }));
+        console.log('💾 Synced to localStorage, returning preset:', preset);
+        
+        return { preset, customWeights };
+      } else {
+        console.warn('❌ API returned non-OK status, falling back to localStorage');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load preferences from API:', error);
+    }
+  }
+  
+  // Fallback to localStorage (for guests or if API fails)
+  console.log('📦 Loading from localStorage (fallback)');
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) {
+      console.log('📦 No saved preferences, using default:', DEFAULT_PRESET);
       return { preset: DEFAULT_PRESET, customWeights: null };
     }
 
     const parsed = JSON.parse(saved);
     const preset = sanitizePresetId(parsed?.preset);
+    console.log('📦 Loaded from localStorage:', preset);
     const customWeights = preset === 'custom' && typeof parsed?.customWeights === 'object'
       ? parsed.customWeights
       : null;
@@ -151,35 +216,101 @@ const loadPreferences = () => {
   }
 };
 
-// Save preferences to localStorage
-const savePreferences = (prefs) => {
+// Save preferences to database API and localStorage
+// For authenticated users: saves to PUT /api/safety/preferences
+// Always saves to localStorage as backup
+const savePreferences = async (prefs) => {
   if (typeof window === 'undefined') return;
+  
+  const preset = sanitizePresetId(prefs?.preset);
+  const payload = {
+    preset,
+    customWeights: preset === 'custom' && typeof prefs?.customWeights === 'object'
+      ? prefs.customWeights
+      : null
+  };
+  
+  // Always save to localStorage as backup/cache
   try {
-    const preset = sanitizePresetId(prefs?.preset);
-    const payload = {
-      preset,
-      customWeights: preset === 'custom' && typeof prefs?.customWeights === 'object'
-        ? prefs.customWeights
-        : null
-    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (e) {
-    console.warn('Failed to save safety preferences:', e);
+    console.warn('Failed to save to localStorage:', e);
+  }
+  
+  // Save to API if authenticated
+  const token = getAuthToken();
+  console.log('💾 Saving preferences, preset:', preset, 'auth:', token ? 'YES' : 'NO');
+  if (token) {
+    try {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001').replace(/\/api$/, '');
+      
+      // Map frontend format to database format
+      let weights;
+      if (preset === 'custom' && payload.customWeights) {
+        // Custom weights are already normalized to sum to 1.0 by applyCustomWeights
+        weights = {
+          crimeWeight: payload.customWeights.crime,
+          collisionWeight: payload.customWeights.collision,
+          lightingWeight: payload.customWeights.lighting,
+          hazardWeight: payload.customWeights.hazard,
+        };
+      } else {
+        const presetWeights = SAFETY_PRESETS[preset]?.weights || SAFETY_PRESETS[DEFAULT_PRESET].weights;
+        weights = {
+          crimeWeight: presetWeights.crime,
+          collisionWeight: presetWeights.collision,
+          lightingWeight: presetWeights.lighting,
+          hazardWeight: presetWeights.hazard,
+        };
+      }
+      
+      const requestBody = {
+        preset: preset,
+        factorWeights: {
+          crime: weights.crimeWeight,
+          collision: weights.collisionWeight,
+          lighting: weights.lightingWeight,
+          hazard: weights.hazardWeight,
+        },
+      };
+      
+      console.log('📤 Sending to API:', JSON.stringify(requestBody, null, 2));
+      
+      const apiResponse = await fetch(`${apiUrl}/api/safety/preferences`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify(requestBody),
+      });
+      
+      if (apiResponse.ok) {
+        const responseData = await apiResponse.json();
+        console.log('✅ Preferences saved to database successfully:', responseData);
+      } else {
+        const errorText = await apiResponse.text();
+        console.warn('❌ Failed to save to database, status:', apiResponse.status, 'response:', errorText);
+      }
+    } catch (error) {
+      console.error('❌ Failed to save preferences to API:', error);
+    }
   }
 };
 
-// Get current factor weights based on preferences
-export const getSafetyWeights = () => {
-  const prefs = loadPreferences();
+// Get current factor weights based on preferences (async)
+export const getSafetyWeights = async () => {
+  const prefs = await loadPreferences();
   if (prefs.preset === 'custom' && prefs.customWeights) {
     return prefs.customWeights;
   }
   return SAFETY_PRESETS[prefs.preset]?.weights || SAFETY_PRESETS[DEFAULT_PRESET].weights;
 };
 
-// Get current preset ID
-export const getCurrentPreset = () => {
-  const prefs = loadPreferences();
+// Get current preset ID (async)
+export const getCurrentPreset = async () => {
+  const prefs = await loadPreferences();
   return prefs.preset;
 };
 
@@ -196,15 +327,21 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
 
   // Load saved preferences on mount
   useEffect(() => {
-    const prefs = loadPreferences();
-    setSelectedPreset(prefs.preset);
-    if (prefs.preset === 'custom' && prefs.customWeights) {
-      setCustomWeights(toPercentageWeights(prefs.customWeights));
-      setShowCustom(true);
-    } else {
-      setCustomWeights(getPresetPercentages(prefs.preset));
-      setShowCustom(false);
-    }
+    const loadSavedPreferences = async () => {
+      const prefs = await loadPreferences();
+      setSelectedPreset(prefs.preset);
+      if (prefs.preset === 'custom' && prefs.customWeights) {
+        // prefs.customWeights is already in percentage format (40, 20, 25, 15)
+        // Do NOT call toPercentageWeights again as it would normalize them to equal shares
+        setCustomWeights(prefs.customWeights);
+        setShowCustom(true);
+      } else {
+        setCustomWeights(getPresetPercentages(prefs.preset));
+        setShowCustom(false);
+      }
+    };
+    
+    loadSavedPreferences();
   }, [isOpen]);
 
   const handlePresetSelect = (presetId) => {
@@ -449,7 +586,7 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
                     color: '#ffffff'
                   }}
                 >
-                  {customWeights.crime}%
+                  {Number(customWeights.crime).toFixed(2)}%
                 </span>
               </div>
               <input
@@ -487,7 +624,7 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
                     color: '#0f172a'
                   }}
                 >
-                  {customWeights.lighting}%
+                  {Number(customWeights.lighting).toFixed(2)}%
                 </span>
               </div>
               <input
@@ -526,7 +663,7 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
                     color: '#ffffff'
                   }}
                 >
-                  {customWeights.collision}%
+                  {Number(customWeights.collision).toFixed(2)}%
                 </span>
               </div>
               <input
@@ -564,7 +701,7 @@ export default function SafetySettings({ isOpen, onClose, isDark, onSettingsChan
                     color: '#ffffff'
                   }}
                 >
-                  {customWeights.hazard}%
+                  {Number(customWeights.hazard).toFixed(2)}%
                 </span>
               </div>
               <input

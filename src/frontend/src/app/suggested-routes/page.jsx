@@ -8,7 +8,15 @@ import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import AddressAutocomplete from "../../components/AddressAutocomplete";
 import RoutesSheet from "../../components/RoutesSheet";
 import SafetySettings, { SafetySettingsButton, getSafetyWeights, getCurrentPreset, getPresetName } from "../../components/SafetySettings";
+import TimeOfDayIndicator from "../../components/TimeOfDayIndicator";
 import { LOCATION_CONFIG } from "../../lib/locationConfig";
+import { 
+  getStoredLocation, 
+  getStoredMapCenter, 
+  getStoredMapZoom,
+  getCurrentLocation,
+  saveMapView 
+} from "../../lib/locationManager";
 
 const normalizeCoordinates = (lat, lon) => {
   const parsedLat = typeof lat === 'string' ? parseFloat(lat) : lat;
@@ -23,7 +31,7 @@ const Map = dynamic(() => import("../../components/Map"), { ssr: false });
 
 function SuggestedRoutesContent() {
   const [mapKey, setMapKey] = useState(0);
-  const [mapCenter, setMapCenter] = useState(null);
+  const [mapCenter, setMapCenter] = useState(() => getStoredMapCenter() || getStoredLocation());
   const [isDark, setIsDark] = useState(false);
   
   const clearBackendRoutes = () => {
@@ -82,7 +90,7 @@ function SuggestedRoutesContent() {
   const [transportMode, setTransportMode] = useState("cycling");
   const [backendRoutes, setBackendRoutes] = useState([]);
   const [backendLoading, setBackendLoading] = useState(false);
-  const [mapZoom, setMapZoom] = useState(14);
+  const [mapZoom, setMapZoom] = useState(() => getStoredMapZoom());
   const resultsRef = useRef(null);
   const [selectedRouteId, setSelectedRouteId] = useState(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
@@ -93,6 +101,9 @@ function SuggestedRoutesContent() {
   const [safetyWeights, setSafetyWeights] = useState(null);
   const [currentSafetyPreset, setCurrentSafetyPreset] = useState('balanced');
   const [hazards, setHazards] = useState([]);
+  const [timeOfDay, setTimeOfDay] = useState('day');
+  const [crossModeAlternative, setCrossModeAlternative] = useState(null);
+  const [showCrossModeModal, setShowCrossModeModal] = useState(false);
 
   const desktopPanelViewportHeight = 'calc(100vh - 96px)';
   const mobileComparisonViewportHeight = 'calc(100vh - 140px)';
@@ -107,10 +118,10 @@ function SuggestedRoutesContent() {
         setBackendRoutes(data.data.routes);
         console.log("Fetched backendRoutes:", data.data.routes);
       } else {
-        setError(data.message || "Failed to fetch suggested routes");
+        setError(data.message || "Failed to fetch Routes");
       }
     } catch (err) {
-      setError("Failed to fetch suggested routes");
+      setError("Failed to fetch Routes");
     } finally {
       setBackendLoading(false);
     }
@@ -118,28 +129,33 @@ function SuggestedRoutesContent() {
 
   const loadHazardsForArea = async (lat, lng, radius = 5000) => {
     try {
-      console.log(`Loading hazards for area: lat=${lat}, lng=${lng}, radius=${radius}`);
-      const response = await hazardsService.getNearbyHazards(lat, lng, { radius, limit: 50 });
-      console.log('Hazards API response:', response);
+      console.log(`Loading combined hazards (community + TomTom) for area: lat=${lat}, lng=${lng}, radius=${radius}`);
+      const response = await hazardsService.getCombinedHazards(lat, lng, { radius, limit: 100, includeTomTom: true });
+      console.log('Combined hazards API response:', response);
       if (response.success) {
         const hazardsData = response.data?.hazards || [];
         setHazards(hazardsData);
-        console.log(`Loaded ${hazardsData.length} hazards in area:`, hazardsData);
+        console.log(`Loaded ${hazardsData.length} combined hazards (community + TomTom):`, hazardsData);
       } else {
-        console.warn('Failed to load hazards:', response);
+        console.warn('Failed to load combined hazards:', response);
         setHazards([]);
       }
     } catch (error) {
-      console.error('Error loading hazards:', error);
+      console.error('Error loading combined hazards:', error);
       setHazards([]);
     }
   };
 
   useEffect(() => {
     getUserLocation();
-    // Load saved safety weights and preset
-    setSafetyWeights(getSafetyWeights());
-    setCurrentSafetyPreset(getCurrentPreset());
+    // Load saved safety weights and preset (now async)
+    const loadSafetySettings = async () => {
+      const weights = await getSafetyWeights();
+      const preset = await getCurrentPreset();
+      setSafetyWeights(weights);
+      setCurrentSafetyPreset(preset);
+    };
+    loadSafetySettings();
     
     // Check if returning from navigation
     const returningFromNav = sessionStorage.getItem('returning_from_navigation');
@@ -342,22 +358,34 @@ function SuggestedRoutesContent() {
     });
   };
 
-  const getUserLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const location = [pos.coords.latitude, pos.coords.longitude];
-          setUserLocation(location);
-          if (!mapCenter) setMapCenter(location);
-        },
-        () => {
-          setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER);
-          if (!mapCenter) setMapCenter(LOCATION_CONFIG.DEFAULT_CENTER);
+  const getUserLocation = async () => {
+    try {
+      // Check stored location first (GDPR-compliant sessionStorage)
+      let location = getStoredLocation();
+      
+      if (location) {
+        console.log('📍 Using stored location in Routes:', location);
+        setUserLocation(location);
+        if (!mapCenter) {
+          setMapCenter(location);
+          saveMapView(location, mapZoom);
         }
-      );
-    } else {
-      setUserLocation(LOCATION_CONFIG.DEFAULT_CENTER);
-      if (!mapCenter) setMapCenter(LOCATION_CONFIG.DEFAULT_CENTER);
+      } else {
+        console.log('📍 No stored location, requesting GPS in Routes...');
+        location = await getCurrentLocation({ autoSave: true });
+        setUserLocation(location);
+        if (!mapCenter) {
+          setMapCenter(location);
+          saveMapView(location, mapZoom);
+        }
+      }
+    } catch (error) {
+      console.error('Error getting user location:', error);
+      const storedLoc = getStoredLocation() || LOCATION_CONFIG.DEFAULT_CENTER;
+      setUserLocation(storedLoc);
+      if (!mapCenter) {
+        setMapCenter(storedLoc);
+      }
     }
   };
 
@@ -422,7 +450,7 @@ function SuggestedRoutesContent() {
      console.log('Calling API:', `${baseUrl}/api/routes/find`);
      
      // Get current safety weights for the request
-     const currentWeights = safetyWeights || getSafetyWeights();
+     const currentWeights = safetyWeights || await getSafetyWeights();
      console.log('🛡️ Using safety weights:', currentWeights);
      
      const response = await fetch(`${baseUrl}/api/routes/find`, {
@@ -454,7 +482,7 @@ function SuggestedRoutesContent() {
      }
 
      if (result.success && result.data) {
-       const { fastest, safest } = result.data;
+       const { fastest, safest, crossModeAlternative } = result.data;
        
        console.log('🚀 Route data received from API:');
        console.log('Fastest route:', {
@@ -476,12 +504,24 @@ function SuggestedRoutesContent() {
          sameAsFastest: safest.sameAsFastest
        });
        
+       if (crossModeAlternative) {
+         console.log('🔄 Cross-mode alternative available:', {
+           coordinates: crossModeAlternative.coordinates?.length + ' points',
+           distance: crossModeAlternative.distance + ' km',
+           time: crossModeAlternative.time + ' min',
+           safetyRating: crossModeAlternative.safetyRating,
+           mode: crossModeAlternative.mode,
+           alternativeMode: crossModeAlternative.alternativeMode,
+           safetyImprovement: crossModeAlternative.safetyImprovement + '%'
+         });
+       }
+       
        const formattedRoutes = [
          {
            id: 'fastest',
            name: 'Fastest Route',
            type: 'fastest',
-           color: '#a78bfa', // Light purple for fastest
+           color: transportMode === 'cycling' ? '#3b82f6' : '#06d6a0', // Blue for cycling, green for walking
            coordinates: fastest.coordinates || [],
            distance: fastest.distance,
            estimatedTime: fastest.time,
@@ -497,7 +537,7 @@ function SuggestedRoutesContent() {
            id: 'safest',
            name: 'Safest Route',
            type: 'safest',
-           color: '#4CBB17', // Kelly green for safest
+           color: transportMode === 'cycling' ? '#3b82f6' : '#06d6a0', // Blue for cycling, green for walking
            coordinates: safest.coordinates || [],
            distance: safest.distance,
            estimatedTime: safest.time,
@@ -510,6 +550,28 @@ function SuggestedRoutesContent() {
            sameAsFastest: safest.sameAsFastest
          }
        ];
+       
+       // Store cross-mode alternative separately (don't add to route cards)
+       if (crossModeAlternative) {
+         setCrossModeAlternative({
+           id: 'cross-mode',
+           name: `Safer ${crossModeAlternative.alternativeMode === 'cycling' ? 'Cycling' : 'Walking'} Route`,
+           type: 'cross-mode-alternative',
+           color: '#FF6B35',
+           coordinates: crossModeAlternative.coordinates || [],
+           distance: crossModeAlternative.distance,
+           estimatedTime: crossModeAlternative.time,
+           safetyRating: crossModeAlternative.safetyRating ?? ((1 - crossModeAlternative.safetyScore) * 10),
+           safetyScore: crossModeAlternative.safetyScore,
+           instructions: crossModeAlternative.instructions || [],
+           provider: crossModeAlternative.provider || result.provider,
+           mode: crossModeAlternative.mode,
+           alternativeMode: crossModeAlternative.alternativeMode,
+           safetyImprovement: crossModeAlternative.safetyImprovement
+         });
+       } else {
+         setCrossModeAlternative(null);
+       }
 
        console.log('📍 Formatted routes:', formattedRoutes.map(r => ({
          id: r.id,
@@ -683,7 +745,7 @@ function SuggestedRoutesContent() {
           </h1>
          
           <p className="mt-2" style={{ color: 'var(--color-text-primary)', opacity: 0.8 }}>
-            Click on map or use the search form to plan your route
+            Click on map or use the search form to Plan Route
           </p>
         </div>
 
@@ -731,7 +793,7 @@ function SuggestedRoutesContent() {
               <div className="mb-6 flex items-center justify-between pt-4">
                 <div>
                   <h2 className="text-xl md:text-2xl font-bold mb-1" style={{ color: isDark ? '#ffffff' : '#1e293b' }}>
-                    Plan Your <span style={{ color: '#06d6a0' }}>Route</span>
+                    Plan <span style={{ color: '#06d6a0' }}>Route</span>
                   </h2>
                   <p className="text-base hidden min-[428px]:block" style={{ color: isDark ? '#ffffff' : '#64748b' }}>
                     Find the safest path
@@ -876,6 +938,17 @@ function SuggestedRoutesContent() {
                   <span className="font-medium london-text hover:underline">Set to London</span>
                 </button>
               </div>
+              
+              {/* Time of Day Indicator - Below Set to London */}
+              <div className="mb-4 flex justify-end">
+                <TimeOfDayIndicator 
+                  isDark={isDark}
+                  onModeChange={(mode) => {
+                    setTimeOfDay(mode);
+                    console.log('🕐 Time mode changed:', mode);
+                  }}
+                />
+              </div>
               <form onSubmit={handleFindRoutes} className="space-y-3">
                 <AddressAutocomplete
                   value={fromLocation}
@@ -948,9 +1021,9 @@ function SuggestedRoutesContent() {
                 isOpen={showSafetySettings}
                 onClose={() => setShowSafetySettings(false)}
                 isDark={isDark}
-                onSettingsChange={(weights, presetId) => {
+                onSettingsChange={async (weights, presetId) => {
                   setSafetyWeights(weights);
-                  setCurrentSafetyPreset(presetId || getCurrentPreset());
+                  setCurrentSafetyPreset(presetId || await getCurrentPreset());
                   console.log('🛡️ Safety weights updated:', weights, 'Preset:', presetId);
                 }}
               />
@@ -963,13 +1036,13 @@ function SuggestedRoutesContent() {
               key={routes.length > 0 ? 'routes-active' : 'routes-empty'}
               title={
                 <span style={{ color: isDark ? '#ffffff' : '#1e293b' }}>
-                  Plan Your <span style={{ color: '#06d6a0' }}>Route</span>
+                  Plan <span style={{ color: '#06d6a0' }}>Route</span>
                 </span>
               }
               subtitle={typeof window !== 'undefined' && window.innerWidth >= 428 ? "Find the safest path" : ""}
               initialExpanded={false}
               minHeight={160}
-              collapsedHeight={112}
+              collapsedHeight={70}
               contentMinHeight={360}
               settingsButton={
                 <button
@@ -1107,6 +1180,18 @@ function SuggestedRoutesContent() {
                     <span className="font-medium london-text hover:underline">Set to London</span>
                   </button>
                 </div>
+                
+                {/* Time of Day Indicator - Mobile */}
+                <div className="mb-3 flex justify-end">
+                  <TimeOfDayIndicator 
+                    isDark={isDark}
+                    onModeChange={(mode) => {
+                      setTimeOfDay(mode);
+                      console.log('🕐 Time mode changed:', mode);
+                    }}
+                  />
+                </div>
+                
                 <form onSubmit={handleFindRoutes} className="space-y-2">
                   <AddressAutocomplete
                     value={fromLocation}
@@ -1186,9 +1271,9 @@ function SuggestedRoutesContent() {
                   isOpen={showSafetySettings}
                   onClose={() => setShowSafetySettings(false)}
                   isDark={isDark}
-                  onSettingsChange={(weights, presetId) => {
+                  onSettingsChange={async (weights, presetId) => {
                     setSafetyWeights(weights);
-                    setCurrentSafetyPreset(presetId || getCurrentPreset());
+                    setCurrentSafetyPreset(presetId || await getCurrentPreset());
                     console.log('🛡️ Safety weights updated:', weights, 'Preset:', presetId);
                   }}
                 />
@@ -1225,7 +1310,7 @@ function SuggestedRoutesContent() {
                           id: r.id,
                           name: r.name,
                           type: r.type,
-                          color: r.color || "#3b82f6",
+                          color: transportMode === 'cycling' ? '#3b82f6' : '#06d6a0',
                           coordinates: r.coordinates || [],
                           safetyRating: r.safetyRating,
                           distance: r.distance,
@@ -1393,7 +1478,12 @@ function SuggestedRoutesContent() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        startNavigation(route);
+                        // Check if cross-mode alternative exists before starting
+                        if (crossModeAlternative) {
+                          setShowCrossModeModal(true);
+                        } else {
+                          startNavigation(route);
+                        }
                       }}
                       className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
                       style={{
@@ -1411,26 +1501,49 @@ function SuggestedRoutesContent() {
 
                 {routes.length === 2 && (
                   <div className="sticky bottom-4">
-                    <div className="rounded-lg p-3 mx-2 shadow-md" style={{ 
-                      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
-                      border: `1px solid ${isDark ? '#3b82f6' : '#bfdbfe'}`
-                    }}>
-                      <h4 className="font-bold mb-2 text-base" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>Route Analysis</h4>
-                      <div className="text-sm space-y-1" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
-                        <p>
-                          • Safest is {Math.abs(((routes[1].distance - routes[0].distance) / routes[0].distance) * 100).toFixed(0)}% {routes[1].distance >= routes[0].distance ? 'longer' : 'shorter'}
-                          {routes[1].safetyRating > routes[0].safetyRating && ` with better safety (${routes[1].safetyRating.toFixed(1)} vs ${routes[0].safetyRating.toFixed(1)})`}
-                        </p>
-                        {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) >= 0.5 && (
+                    {/* Show special message if routes are identical */}
+                    {routes[1].sameAsFastest ? (
+                      <div className="rounded-lg p-3 mx-2 shadow-md" style={{ 
+                        backgroundColor: isDark ? 'rgba(251, 191, 36, 0.1)' : '#fef3c7',
+                        border: `1px solid ${isDark ? '#f59e0b' : '#fbbf24'}`
+                      }}>
+                        <h4 className="font-bold mb-2 text-base flex items-center gap-2" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
+                          <span>ℹ️</span> Routes Are Identical
+                        </h4>
+                        <div className="text-sm space-y-1" style={{ color: isDark ? '#fde68a' : '#78350f' }}>
                           <p>
-                            • Time difference: {(Math.round(Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) * 2) / 2).toFixed(1)} min
+                            • Both fastest and safest routes follow the same path
                           </p>
-                        )}
-                        <p>
-                          • Based on crime data, lighting & hazard reports
-                        </p>
+                          <p>
+                            • No safer alternatives available within reasonable distance
+                          </p>
+                          <p>
+                            • This is already the optimal route considering crime data, lighting, and hazards
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="rounded-lg p-3 mx-2 shadow-md" style={{ 
+                        backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
+                        border: `1px solid ${isDark ? '#3b82f6' : '#bfdbfe'}`
+                      }}>
+                        <h4 className="font-bold mb-2 text-base" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>Route Analysis</h4>
+                        <div className="text-sm space-y-1" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
+                          <p>
+                            • Safest is {Math.abs(((routes[1].distance - routes[0].distance) / routes[0].distance) * 100).toFixed(0)}% {routes[1].distance >= routes[0].distance ? 'longer' : 'shorter'}
+                            {routes[1].safetyRating > routes[0].safetyRating && ` with better safety (${routes[1].safetyRating.toFixed(1)} vs ${routes[0].safetyRating.toFixed(1)})`}
+                          </p>
+                          {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) >= 0.5 && (
+                            <p>
+                              • Time difference: {(Math.round(Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) * 2) / 2).toFixed(1)} min
+                            </p>
+                          )}
+                          <p>
+                            • Based on crime data, lighting & hazard reports
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1521,7 +1634,12 @@ function SuggestedRoutesContent() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      startNavigation(route);
+                      // Check if cross-mode alternative exists before starting
+                      if (crossModeAlternative) {
+                        setShowCrossModeModal(true);
+                      } else {
+                        startNavigation(route);
+                      }
                     }}
                     className="w-full font-bold py-2.5 rounded-lg transition shadow-md text-sm"
                     style={{
@@ -1535,53 +1653,84 @@ function SuggestedRoutesContent() {
               ))}
 
               {routes.length === 2 && (
-                <div className="rounded-xl p-4 mt-4 mb-12 shadow-lg border-2" style={{ 
-                  backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
-                  borderColor: isDark ? '#3b82f6' : '#bfdbfe'
-                }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <svg className="w-5 h-5" style={{ color: isDark ? '#60a5fa' : '#1e40af' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 12l2 2 4-4"/>
-                      <circle cx="12" cy="12" r="10"/>
-                    </svg>
-                    <h4 className="font-bold text-lg" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>
-                      Route Analysis
-                    </h4>
-                  </div>
-                  <div className="space-y-2.5 text-sm" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
-                    <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
-                      <span className="shrink-0">📏</span>
-                      <p>
-                        <strong>Distance:</strong> Safest is {Math.abs(((routes[1].distance - routes[0].distance) / routes[0].distance) * 100).toFixed(0)}% {routes[1].distance >= routes[0].distance ? 'longer' : 'shorter'} than fastest
-                      </p>
-                    </div>
-                    
-                    {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) >= 0.5 && (
-                      <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
-                        <span className="shrink-0">⏱️</span>
-                        <p>
-                          <strong>Time difference:</strong> {(Math.round(Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) * 2) / 2).toFixed(1)} minutes
-                        </p>
+                <>
+                  {/* Show special message if routes are identical */}
+                  {routes[1].sameAsFastest ? (
+                    <div className="rounded-xl p-4 mt-4 mb-12 shadow-lg border-2" style={{ 
+                      backgroundColor: isDark ? 'rgba(251, 191, 36, 0.15)' : '#fef3c7',
+                      borderColor: isDark ? '#f59e0b' : '#fbbf24'
+                    }}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-2xl">ℹ️</span>
+                        <h4 className="font-bold text-lg" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>
+                          Routes Are Identical
+                        </h4>
                       </div>
-                    )}
-                    
-                    {routes[1].safetyRating > routes[0].safetyRating && (
-                      <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
-                        <span className="shrink-0">🛡️</span>
-                        <p>
-                          <strong>Safety improvement:</strong> Safest route scores {routes[1].safetyRating.toFixed(1)}/10 vs {routes[0].safetyRating.toFixed(1)}/10
-                        </p>
+                      <div className="space-y-2.5 text-sm" style={{ color: isDark ? '#fde68a' : '#78350f' }}>
+                        <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(251, 191, 36, 0.1)' : 'rgba(254, 243, 199, 0.5)' }}>
+                          <span className="shrink-0">✓</span>
+                          <p>Both fastest and safest routes follow the same path</p>
+                        </div>
+                        <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(251, 191, 36, 0.1)' : 'rgba(254, 243, 199, 0.5)' }}>
+                          <span className="shrink-0">🔍</span>
+                          <p>No safer alternatives available within reasonable distance</p>
+                        </div>
+                        <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(251, 191, 36, 0.1)' : 'rgba(254, 243, 199, 0.5)' }}>
+                          <span className="shrink-0">🎯</span>
+                          <p>This is already the optimal route considering crime data, lighting, and hazards</p>
+                        </div>
                       </div>
-                    )}
-                    
-                    <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
-                      <span className="shrink-0">📊</span>
-                      <p>
-                        Based on crime data, lighting conditions & hazard reports
-                      </p>
                     </div>
-                  </div>
-                </div>
+                  ) : (
+                    <div className="rounded-xl p-4 mt-4 mb-12 shadow-lg border-2" style={{ 
+                      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
+                      borderColor: isDark ? '#3b82f6' : '#bfdbfe'
+                    }}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <svg className="w-5 h-5" style={{ color: isDark ? '#60a5fa' : '#1e40af' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 12l2 2 4-4"/>
+                          <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                        <h4 className="font-bold text-lg" style={{ color: isDark ? '#60a5fa' : '#1e40af' }}>
+                          Route Analysis
+                        </h4>
+                      </div>
+                      <div className="space-y-2.5 text-sm" style={{ color: isDark ? '#93c5fd' : '#1e40af' }}>
+                        <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                          <span className="shrink-0">📏</span>
+                          <p>
+                            <strong>Distance:</strong> Safest is {Math.abs(((routes[1].distance - routes[0].distance) / routes[0].distance) * 100).toFixed(0)}% {routes[1].distance >= routes[0].distance ? 'longer' : 'shorter'} than fastest
+                          </p>
+                        </div>
+                        
+                        {Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) >= 0.5 && (
+                          <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                            <span className="shrink-0">⏱️</span>
+                            <p>
+                              <strong>Time difference:</strong> {(Math.round(Math.abs(routes[0].estimatedTime - routes[1].estimatedTime) * 2) / 2).toFixed(1)} minutes
+                            </p>
+                          </div>
+                        )}
+                        
+                        {routes[1].safetyRating > routes[0].safetyRating && (
+                          <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                            <span className="shrink-0">🛡️</span>
+                            <p>
+                              <strong>Safety improvement:</strong> Safest route scores {routes[1].safetyRating.toFixed(1)}/10 vs {routes[0].safetyRating.toFixed(1)}/10
+                            </p>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(191, 219, 254, 0.3)' }}>
+                          <span className="shrink-0">📊</span>
+                          <p>
+                            Based on crime data, lighting conditions & hazard reports
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>
@@ -1635,7 +1784,7 @@ function SuggestedRoutesContent() {
                 borderColor: isDark ? '#334155' : '#e5e7eb'
               }}>
                 <h2 className="text-xl font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
-                  🛡️ Suggested Routes
+                  Routes
                 </h2>
               </div>
               
@@ -1731,7 +1880,7 @@ function SuggestedRoutesContent() {
         {backendRoutes.length > 0 && (
           <section className="md:hidden max-w-6xl mx-auto py-6 rounded-2xl shadow-lg mt-6" style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
             <h2 className="text-xl font-bold text-center mb-4 px-4" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
-              🛡️ Suggested Routes
+              Routes
             </h2>
             <div className="space-y-3 px-4">
               {[...backendRoutes]
@@ -1816,6 +1965,117 @@ function SuggestedRoutesContent() {
                 ))}
             </div>
           </section>
+        )}
+
+        {/* Cross-Mode Alternative Modal */}
+        {showCrossModeModal && crossModeAlternative && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+            onClick={() => setShowCrossModeModal(false)}
+          >
+            <div 
+              className="rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in"
+              style={{ backgroundColor: isDark ? '#1e293b' : '#ffffff' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ backgroundColor: isDark ? 'rgba(255, 107, 53, 0.2)' : '#ffedd5' }}>
+                  🚴‍♂️
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold" style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>
+                    Safer Route Available!
+                  </h3>
+                  <p className="text-sm" style={{ color: isDark ? '#94a3b8' : '#6b7280' }}>
+                    Consider switching your mode
+                  </p>
+                </div>
+              </div>
+
+              {/* Alert Message */}
+              <div className="rounded-lg p-4 mb-4" style={{ 
+                backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fee2e2',
+                border: `1px solid ${isDark ? '#ef4444' : '#fca5a5'}`
+              }}>
+                <p className="text-sm font-medium" style={{ color: isDark ? '#fca5a5' : '#991b1b' }}>
+                  ⚠️ Your selected {transportMode === 'walking' ? 'walking' : 'cycling'} route has high-risk areas
+                </p>
+              </div>
+
+              {/* Alternative Suggestion */}
+              <div className="rounded-lg p-4 mb-5" style={{ 
+                backgroundColor: isDark ? 'rgba(34, 197, 94, 0.1)' : '#dcfce7',
+                border: `1px solid ${isDark ? '#22c55e' : '#86efac'}`
+              }}>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0" style={{ backgroundColor: '#FF6B35', color: '#ffffff' }}>
+                    {crossModeAlternative.alternativeMode === 'cycling' ? '🚴' : '🚶'}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold mb-1" style={{ color: isDark ? '#86efac' : '#166534' }}>
+                      Switch to {crossModeAlternative.alternativeMode === 'cycling' ? 'Cycling' : 'Walking'}
+                    </h4>
+                    <p className="text-sm mb-2" style={{ color: isDark ? '#bbf7d0' : '#15803d' }}>
+                      ✓ <strong>{crossModeAlternative.safetyImprovement}% safer</strong> route available
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span style={{ color: isDark ? '#86efac' : '#166534' }}>Distance: </span>
+                        <strong style={{ color: '#FF6B35' }}>{crossModeAlternative.distance} km</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: isDark ? '#86efac' : '#166534' }}>Time: </span>
+                        <strong style={{ color: '#FF6B35' }}>{crossModeAlternative.estimatedTime} min</strong>
+                      </div>
+                      <div className="col-span-2">
+                        <span style={{ color: isDark ? '#86efac' : '#166534' }}>Safety: </span>
+                        <strong className="text-green-600">{crossModeAlternative.safetyRating.toFixed(1)}/10</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCrossModeModal(false);
+                    // Start with cross-mode alternative
+                    startNavigation(crossModeAlternative);
+                  }}
+                  className="flex-1 font-bold py-3 rounded-lg transition shadow-md text-sm"
+                  style={{
+                    backgroundColor: '#FF6B35',
+                    color: '#ffffff'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#E85A24'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#FF6B35'}
+                >
+                  Use Safer Route
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCrossModeModal(false);
+                    // Continue with originally selected route
+                    const selectedRoute = routes.find(r => r.id === selectedRouteId) || routes[0];
+                    startNavigation(selectedRoute);
+                  }}
+                  className="flex-1 font-bold py-3 rounded-lg transition shadow-md text-sm"
+                  style={{
+                    backgroundColor: isDark ? '#334155' : '#e5e7eb',
+                    color: isDark ? '#f8fafc' : '#0f172a'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = isDark ? '#475569' : '#d1d5db'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = isDark ? '#334155' : '#e5e7eb'}
+                >
+                  Continue Anyway
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </ProtectedRoute>
