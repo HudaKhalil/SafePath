@@ -719,15 +719,70 @@ SafePath is optimized for speed and efficiency:
 
 ---
 
-##  Roadmap
+# SafePath – Sprint Overview & Roadmap
 
-### S1 2025
+Our SafePath development was completed across 11 structured sprints, following an agile approach. Each sprint focused on delivering a specific layer of the system — from research, routing engine development, UI design, to evaluation and deployment.
 
-### S2 2025
+<!-- Optional: Add your burndown chart image once uploaded -->
+<!-- Example: ![Sprint Burndown Chart](./images/sprint-burndown.png) -->
 
-### S3 2025
+---
 
-### S4 2025
+## Sprint 1 – Project Setup & Vision Alignment
+- Repo and environment setup  
+- Defined project goals, vision, and success criteria  
+- Allocated team roles and created initial backlog
+
+## Sprint 2 – User Research & Requirements Gathering
+- Conducted exploratory surveys & interviews  
+- Identified safety needs around lighting, crime, and hazards  
+- Translated insights into user stories & acceptance criteria
+
+## Sprint 3 – Low-Fidelity UI & Architecture Planning
+- Designed wireframes and core user journey flows  
+- Planned backend architecture (ETL → API → PostGIS → UI)  
+- Defined data sources and integration strategy
+
+## Sprint 4 – Backend API Foundations
+- Built initial Node.js/Express API structure  
+- Added placeholder endpoints for routing & hazards  
+- Created base database schema
+
+## Sprint 5 – ETL Pipeline & Data Integration
+- Implemented Python ETL for crime data imports  
+- Integrated OSM lighting data and cleaned datasets  
+- Normalised formats and stored outputs in PostGIS
+
+## Sprint 6 – Safety Scoring Engine
+- Developed multi-factor safety scoring model  
+- Implemented PostGIS spatial queries (buffer, distance, hotspots)  
+- Generated early versions of safest vs fastest routes
+
+## Sprint 7 – Hazard Reporting System
+- Built hazard submission flow with photo upload  
+- Connected hazard records to database  
+- Displayed hazard markers on frontend map
+
+## Sprint 8 – Map UI & Safety Visualisation
+- Implemented Leaflet map with layers, overlays & icons  
+- Added legend, colour codes and walking/cycling mode  
+- Improved clarity of safety visualisation
+
+## Sprint 9 – FindBuddy & Real-Time Updates
+- Implemented WebSocket for live hazard updates  
+- Built FindBuddy matching prototype  
+- Displayed nearby users travelling similar routes
+
+## Sprint 10 – Usability Evaluation & Refinement
+- Conducted task-based usability tests & interviews  
+- Refined UI wording, icons, legend and map contrast  
+- Reduced steps to plan a route or report hazards
+
+## Sprint 11 – Final Integration, Demo & Documentation
+- Integrated all modules end-to-end  
+- Created final demo, video walkthrough and presentation  
+- Cleaned repository and updated README & documentation
+
 
 
 ---
