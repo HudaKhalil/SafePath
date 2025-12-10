@@ -944,7 +944,7 @@ export default function FindBuddy() {
           >
             <button
               onClick={() => setShowBuddyPanel(!showBuddyPanel)}
-              className="absolute z-[65] transition-all duration-300 shadow-lg"
+              className="hidden md:block absolute z-[65] transition-all duration-300 shadow-lg"
               style={{
                 top: isMdScreen ? '8rem' : '10rem',
                 right: showBuddyPanel ? '1rem' : (isMdScreen ? '-9rem' : 'calc(-100vw + 1rem)')
