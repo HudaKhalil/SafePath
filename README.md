@@ -5,7 +5,7 @@
 </div>
 <div align="center">
   
-<img src="./src/frontend/public/logo.png" alt="SafePath Logo" width="100" height="100">
+<img src="./Development/src/frontend/public/logo.png" alt="SafePath Logo" width="100" height="100">
 
 **Navigate safely with real-time hazard detection and intelligent route planning**
 
@@ -378,9 +378,8 @@ SafePath_Deploy/
 │       ├── package.json
 │       └── .env
 │
-├── SAFETY_ROUTING_ENGINE_DOCUMENTATION.md
-├── BUDDY_IMPLEMENTATION.md
 ├── README.md                       # This file
+│
 └── LICENSE
 ```
 
