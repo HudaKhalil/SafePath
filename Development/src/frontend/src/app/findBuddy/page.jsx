@@ -5,12 +5,12 @@ import dynamic from 'next/dynamic';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Toast from '@/components/Toast';
 import { hazardsService } from '../../lib/services';
-import { 
-  getStoredLocation, 
-  getStoredMapCenter, 
+import {
+  getStoredLocation,
+  getStoredMapCenter,
   getStoredMapZoom,
   getCurrentLocation,
-  saveMapView 
+  saveMapView
 } from '../../lib/locationManager';
 import { LOCATION_CONFIG } from '../../lib/locationConfig';
 
@@ -25,12 +25,12 @@ export default function FindBuddy() {
   const [isMdScreen, setIsMdScreen] = useState(false);
   const [isLgScreen, setIsLgScreen] = useState(false);
   const [activeTab, setActiveTab] = useState('nearby');
-  
+ 
   // Location state
   const [userLocation, setUserLocation] = useState(() => getStoredLocation() || [51.5074, -0.1278]);
   const [mapCenter, setMapCenter] = useState(() => getStoredMapCenter() || getStoredLocation() || [51.5074, -0.1278]);
   const [mapZoom, setMapZoom] = useState(() => getStoredMapZoom());
-  
+ 
   // Buddies state
   const [buddies, setBuddies] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -38,11 +38,11 @@ export default function FindBuddy() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedBuddy, setSelectedBuddy] = useState(null);
-  
+ 
   // Filters state
   const [radius, setRadius] = useState(5000);
   const [transportMode, setTransportMode] = useState('all');
-  
+ 
   // Route planning state
   const [routeStart, setRouteStart] = useState('');
   const [routeEnd, setRouteEnd] = useState('');
@@ -55,16 +55,16 @@ export default function FindBuddy() {
   const [routeCoordinates, setRouteCoordinates] = useState(null);
   const [isSearchingRoute, setIsSearchingRoute] = useState(false);
   const [routeBuddies, setRouteBuddies] = useState([]);
-  
+ 
   // Group routes state
   const [groupRoutes, setGroupRoutes] = useState([]);
   const [routeName, setRouteName] = useState('');
   const [selectedBuddiesForRoute, setSelectedBuddiesForRoute] = useState([]);
   const [showCreateGroupRoute, setShowCreateGroupRoute] = useState(false);
-  
+ 
   // Hazards state (for map display)
   const [hazards, setHazards] = useState([]);
-  
+ 
   // Toast state
   const [toast, setToast] = useState(null);
 
@@ -111,7 +111,7 @@ export default function FindBuddy() {
       try {
         // Check stored location first (GDPR-compliant sessionStorage)
         let location = getStoredLocation();
-        
+       
         if (location) {
           console.log('📍 Using stored location in FindBuddy:', location);
           setUserLocation(location);
@@ -137,19 +137,18 @@ export default function FindBuddy() {
         }
       }
     };
-    
+   
     getUserLocation();
   }, []);
 
   // ==========================================
   // API CALLS
   // ==========================================
-// Modify the existing fetchNearbyBuddies function (around line 130):
   const fetchNearbyBuddies = async () => {
     if (!userLocation) return;
     setIsLoading(true);
     setError(null);
-    
+   
     try {
       const token = getToken();
       if (!token) {
@@ -158,34 +157,32 @@ export default function FindBuddy() {
         setIsLoading(false);
         return;
       }
-      
-      // ✅ ADD THIS: Update my location FIRST so others can find me
+     
       await updateMyLocation();
-      
-      // Then search for buddies
+     
       const params = new URLSearchParams({
         lat: userLocation[0].toString(),
         lon: userLocation[1].toString(),
         radius: radius.toString(),
         limit: '50'
       });
-      
+     
       if (transportMode !== 'all') {
         params.append('transport_mode', transportMode);
       }
-      
+     
       const response = await fetch(`${API_URL}/api/buddies/nearby?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
-      
+     
       if (response.status === 403 || response.status === 401) {
         console.error('❌ Authentication failed');
         setError('Session expired. Please login again.');
         setIsLoading(false);
         return;
       }
-      
+     
       const data = await response.json();
       if (data.success) {
         setBuddies(data.data?.buddies || []);
@@ -200,10 +197,10 @@ export default function FindBuddy() {
     }
   };
 
-  
+ 
   const updateMyLocation = async () => {
     if (!userLocation || !userLocation[0] || !userLocation[1]) return;
-    
+   
     try {
       const token = getToken();
       const response = await fetch(`${API_URL}/buddies/location`, {
@@ -218,7 +215,7 @@ export default function FindBuddy() {
           lon: userLocation[1]
         })
       });
-      
+     
       const data = await response.json();
       if (data.success) {
         console.log('✅ My location updated in database');
@@ -238,24 +235,24 @@ export default function FindBuddy() {
         setToast({ message: 'Please login again to view buddy requests', type: 'warning' });
         return;
       }
-      
+     
       console.log('🔍 Fetching pending requests...');
       const response = await fetch(`${API_URL}/api/buddies/requests?status=pending`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
-      
+     
       console.log('Response status:', response.status);
-      
+     
       if (response.status === 403 || response.status === 401) {
         console.error('❌ Authentication failed - token may be expired');
         setToast({ message: 'Session expired. Please login again.', type: 'warning' });
         return;
       }
-      
+     
       const data = await response.json();
       console.log('Pending requests response:', data);
-      
+     
       if (data.success) {
         const requests = data.data?.requests || [];
         console.log(`✅ Found ${requests.length} pending requests`);
@@ -306,10 +303,10 @@ export default function FindBuddy() {
     if (!userLocation) return;
     try {
       console.log(`Loading combined hazards (community + TomTom) for FindBuddy: lat=${userLocation[0]}, lng=${userLocation[1]}, radius=10000`);
-      const response = await hazardsService.getCombinedHazards(userLocation[0], userLocation[1], { 
-        radius: 10000, 
-        limit: 100, 
-        includeTomTom: true 
+      const response = await hazardsService.getCombinedHazards(userLocation[0], userLocation[1], {
+        radius: 10000,
+        limit: 100,
+        includeTomTom: true
       });
       console.log('Combined hazards API response:', response);
       if (response.success) {
@@ -449,7 +446,6 @@ export default function FindBuddy() {
 
     setIsSearchingRoute(true);
     try {
-      // Get route from OSRM
       const routeResponse = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson`
       );
@@ -460,7 +456,6 @@ export default function FindBuddy() {
         setRouteCoordinates(coordinates);
         setShowCreateGroupRoute(true);
 
-        // Fetch buddies along route
         const token = getToken();
         const response = await fetch(`${API_URL}/api/buddies/along-route`, {
           method: 'POST',
@@ -636,7 +631,7 @@ export default function FindBuddy() {
               <span>
                 {(() => {
                   const distKm = parseFloat(buddy.distance_km || 0);
-                  return distKm < 1 
+                  return distKm < 1
                     ? `${Math.round(distKm * 1000)} m away`
                     : `${distKm.toFixed(2)} km away`;
                 })()}
@@ -671,13 +666,13 @@ export default function FindBuddy() {
               const mode = buddy.transport_mode || buddy.sender_transport_mode || buddy.buddy_transport_mode || 'walking';
               if (mode === 'cycling') {
                 return (
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
                     strokeLinejoin="round"
                     className="w-5 h-5"
                   >
@@ -689,9 +684,9 @@ export default function FindBuddy() {
                 );
               } else {
                 return (
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    viewBox="0 0 24 24" 
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
                     fill="currentColor"
                     className="w-5 h-5"
                   >
@@ -700,7 +695,6 @@ export default function FindBuddy() {
                 );
               }
             })()}
-            {/* Tooltip */}
             <span
               className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
               style={{
@@ -720,19 +714,18 @@ export default function FindBuddy() {
             style={(() => {
               const safetyPercent = (buddy.safety_priority || 0.5) * 100;
               if (safetyPercent >= 70) {
-                return { backgroundColor: '#d1fae5', color: '#065f46' }; // Light green
+                return { backgroundColor: '#d1fae5', color: '#065f46' };
               } else if (safetyPercent >= 40) {
-                return { backgroundColor: '#fef3c7', color: '#92400e' }; // Light amber
+                return { backgroundColor: '#fef3c7', color: '#92400e' };
               } else {
-                return { backgroundColor: '#fee2e2', color: '#991b1b' }; // Light red
+                return { backgroundColor: '#fee2e2', color: '#991b1b' };
               }
             })()}
           >
             Safety: {((buddy.safety_priority || 0.5) * 100).toFixed(0)}%
           </span>
         </div>
-        
-        {/* Profile button */}
+       
         <button
           onClick={() => setSelectedBuddy(buddy)}
           className="w-10 h-10 rounded-full font-medium text-base transition-colors flex items-center justify-center relative group"
@@ -742,15 +735,14 @@ export default function FindBuddy() {
           onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
           onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
         >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            viewBox="0 0 24 24" 
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
             fill="#ffffff"
             className="w-5 h-5"
           >
             <path fillRule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clipRule="evenodd" />
           </svg>
-          {/* Tooltip */}
           <span
             className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
             style={{
@@ -765,7 +757,6 @@ export default function FindBuddy() {
       </div>
 
       <div className="flex gap-2">
-        {/* Request response buttons */}
         {isRequest && !buddy.is_sender && (
           <>
             <button
@@ -789,7 +780,6 @@ export default function FindBuddy() {
           </>
         )}
 
-        {/* Plan Route button for accepted buddies */}
         {isAccepted && (
           <button
             onClick={() => {
@@ -807,7 +797,6 @@ export default function FindBuddy() {
           </button>
         )}
 
-        {/* Pending indicator */}
         {buddy.request_status === 'pending' && buddy.is_sender && (
           <span className="flex-1 px-4 py-2 rounded-lg font-medium text-base text-center bg-yellow-100 text-yellow-800">
             Pending
@@ -892,7 +881,6 @@ export default function FindBuddy() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen">
-        {/* Toast */}
         {toast && (
           <Toast
             message={toast.message}
@@ -901,7 +889,6 @@ export default function FindBuddy() {
           />
         )}
 
-        {/* Hero Section - Compact */}
         <section
           className="relative overflow-hidden py-3"
           style={{
@@ -922,12 +909,10 @@ export default function FindBuddy() {
           </div>
         </section>
 
-        {/* Main Content Section */}
         <section
           className="relative min-h-[calc(100vh-80px)]"
           style={{ backgroundColor: isLightMode ? '#ffffff' : '#0f172a' }}
         >
-          {/* Custom Scrollbar Styles */}
           <style jsx global>{`
             .custom-scrollbar::-webkit-scrollbar {
               width: 6px;
@@ -948,29 +933,29 @@ export default function FindBuddy() {
             }
           `}</style>
 
-         {/* Side Panel - Wider and properly positioned */}
           <div
-            className="fixed left-0 top-23 bottom-0 z-50 w-[65vw] md:w-[340px] lg:w-[360px] transition-transform duration-300 shadow-2xl"
+            className="fixed left-0 bottom-0 z-50 transition-transform duration-300 shadow-2xl"
             style={{
+              top: isMdScreen ? '5.75rem' : '0',
+              width: isMdScreen ? (isLgScreen ? '360px' : '340px') : '100vw',
               transform: showBuddyPanel ? 'translateX(0)' : 'translateX(-100%)',
               backgroundColor: isLightMode ? '#ffffff' : '#0f172a',
             }}
           >
-            {/* Toggle Button attached to right edge of panel, aligned with map header */}
             <button
               onClick={() => setShowBuddyPanel(!showBuddyPanel)}
               className="absolute z-[65] transition-all duration-300 shadow-lg"
-              style={{ 
-                top: '5.9rem',
-                right: showBuddyPanel ? '-3rem' : '-9rem'
+              style={{
+                top: isMdScreen ? '8rem' : '10rem',
+                right: showBuddyPanel ? '1rem' : (isMdScreen ? '-9rem' : 'calc(-100vw + 1rem)')
               }}
-              title="Buddy Cards"
+              title={showBuddyPanel ? "Close" : "Buddy Cards"}
             >
               <div
-                className="flex items-center gap-2 py-2 px-3"
+                className="flex items-center gap-2 py-2 px-3 rounded-lg"
                 style={{
                   backgroundColor: isLightMode ? '#0f172a' : '#06d6a0',
-                  borderRadius: '0 8px 8px 0',
+                  ...(isMdScreen && !showBuddyPanel && { borderRadius: '0 8px 8px 0' })
                 }}
               >
                 <svg
@@ -985,10 +970,10 @@ export default function FindBuddy() {
                 >
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
-                {!showBuddyPanel && (
-                  <span 
+                {!showBuddyPanel && isMdScreen && (
+                  <span
                     className="text-sm font-semibold whitespace-nowrap"
-                    style={{ 
+                    style={{
                       color: isLightMode ? '#ffffff' : '#0f172a'
                     }}
                   >
@@ -998,8 +983,7 @@ export default function FindBuddy() {
               </div>
             </button>
 
-            <div className="h-full overflow-y-auto custom-scrollbar">
-
+            <div className="h-full overflow-y-auto custom-scrollbar" style={{ paddingTop: isMdScreen ? '0' : '3.5rem' }}>
               <div className="p-4 pb-24">
                 <div
                   className="border-2 rounded-2xl p-4"
@@ -1008,8 +992,6 @@ export default function FindBuddy() {
                     borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
                   }}
                 >
-
-                  {/* Filters */}
                   <div className="space-y-3 mb-4">
                     <div className="grid grid-cols-2 gap-2">
                       <select
@@ -1056,34 +1038,52 @@ export default function FindBuddy() {
                     >
                       {isLoading ? 'Searching...' : 'Refresh'}
                     </button>
+                   
+                    <button
+                      onClick={() => setShowBuddyPanel(false)}
+                      className="w-full px-4 py-2 rounded-lg font-medium transition-colors text-sm md:hidden"
+                      style={{
+                        backgroundColor: isLightMode ? '#ef4444' : '#dc2626',
+                        color: '#ffffff'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#b91c1c'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = isLightMode ? '#ef4444' : '#dc2626'}
+                    >
+                      Close Panel
+                    </button>
                   </div>
 
-                  {/* Tabs */}
                   <div
-                    className="flex border-b mb-4"
-                    style={{ borderColor: isLightMode ? '#e5e7eb' : '#374151' }}
+                    className="grid grid-cols-4 gap-1 mb-4 p-1 rounded-lg"
+                    style={{
+                      backgroundColor: isLightMode ? '#f3f4f6' : '#1e293b'
+                    }}
                   >
                     {[
-                      { id: 'nearby', label: `Nearby (${buddies.length})` },
-                      { id: 'pending', label: `Requests (${pendingRequests.filter(r => r.is_receiver).length})` },
-                      { id: 'accepted', label: `Buddies (${acceptedBuddies.length})` },
-                      { id: 'routes', label: 'Routes', hasIcon: true }
+                      { id: 'nearby', label: 'Nearby', count: buddies.length },
+                      { id: 'pending', label: 'Requests', count: pendingRequests.filter(r => r.is_receiver).length },
+                      { id: 'accepted', label: 'Buddies', count: acceptedBuddies.length },
+                      { id: 'routes', label: 'Routes' }
                     ].map((tab) => (
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 px-2 py-3 text-base font-medium ${activeTab === tab.id ? 'border-b-2' : ''} flex items-start justify-center`}
+                        className="px-2 py-2.5 rounded-md text-xs font-medium transition-all duration-200"
                         style={{
-                          color: activeTab === tab.id ? '#06d6a0' : (isLightMode ? '#6b7280' : '#9ca3af'),
-                          borderColor: activeTab === tab.id ? '#06d6a0' : 'transparent'
+                          backgroundColor: activeTab === tab.id ? '#06d6a0' : 'transparent',
+                          color: activeTab === tab.id ? '#0f172a' : (isLightMode ? '#6b7280' : '#9ca3af')
                         }}
                       >
-                        {tab.label}
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="font-semibold">{tab.label}</span>
+                          {tab.count !== undefined && (
+                            <span className="text-[10px] opacity-75">({tab.count})</span>
+                          )}
+                        </div>
                       </button>
                     ))}
                   </div>
 
-                  {/* Tab Content */}
                   <div className="space-y-3">
                     {error && (
                       <div
@@ -1098,7 +1098,6 @@ export default function FindBuddy() {
                       </div>
                     )}
 
-                    {/* NEARBY TAB */}
                     {activeTab === 'nearby' && (
                       <>
                         {isLoading ? (
@@ -1121,7 +1120,6 @@ export default function FindBuddy() {
                       </>
                     )}
 
-                    {/* PENDING REQUESTS TAB */}
                     {activeTab === 'pending' && (
                       <>
                         {pendingRequests.filter(r => r.is_receiver).length === 0 ? (
@@ -1149,7 +1147,6 @@ export default function FindBuddy() {
                       </>
                     )}
 
-                    {/* ACCEPTED BUDDIES TAB */}
                     {activeTab === 'accepted' && (
                       <>
                         {acceptedBuddies.length === 0 ? (
@@ -1168,121 +1165,119 @@ export default function FindBuddy() {
                       </>
                     )}
 
-                    {/* ROUTES TAB */}
                     {activeTab === 'routes' && (
                       <div className="space-y-4">
-                        {/* Plan Your Route */}
                         <div
-                          className="rounded-lg p-4 border"
+                          className="rounded-lg p-3 border"
                           style={{
                             backgroundColor: isLightMode ? '#f9fafb' : 'rgba(59, 130, 246, 0.1)',
                             borderColor: isLightMode ? '#e5e7eb' : 'rgba(59, 130, 246, 0.3)'
                           }}
                         >
-                          <h4 className="font-semibold mb-3 flex items-center gap-2" style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>
-                            🧭 Plan Your Route
+                          <h4 className="font-semibold mb-3 text-sm flex items-center gap-2" style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>
+                            Plan Your Route
                           </h4>
 
-                          {/* Start Location */}
-                          <div className="relative mb-3" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-green-500">●</span>
-                              <input
-                                type="text"
-                                value={routeStart}
-                                onChange={(e) => {
-                                  setRouteStart(e.target.value);
-                                  searchLocation(e.target.value, 'start');
-                                }}
-                                onFocus={() => startSuggestions.length > 0 && setShowStartSuggestions(true)}
-                                placeholder="Start location..."
-                                className="flex-1 px-3 py-2 border rounded-lg text-sm"
-                                style={{
-                                  backgroundColor: isLightMode ? '#ffffff' : '#374151',
-                                  color: isLightMode ? '#0f172a' : '#ffffff',
-                                  borderColor: isLightMode ? '#d1d5db' : '#4b5563'
-                                }}
-                              />
-                              {routeStart && (
-                                <button onClick={() => clearRoute('start')} className="p-1">
-                                  ✕
-                                </button>
+                          <div className="space-y-2 mb-3">
+                            <div className="relative" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-green-500 text-sm">●</span>
+                                <input
+                                  type="text"
+                                  value={routeStart}
+                                  onChange={(e) => {
+                                    setRouteStart(e.target.value);
+                                    searchLocation(e.target.value, 'start');
+                                  }}
+                                  onFocus={() => startSuggestions.length > 0 && setShowStartSuggestions(true)}
+                                  placeholder="Start location..."
+                                  className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                                  style={{
+                                    backgroundColor: isLightMode ? '#ffffff' : '#374151',
+                                    color: isLightMode ? '#0f172a' : '#ffffff',
+                                    borderColor: isLightMode ? '#d1d5db' : '#4b5563'
+                                  }}
+                                />
+                                {routeStart && (
+                                  <button onClick={() => clearRoute('start')} className="p-1 text-sm">
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                              {showStartSuggestions && startSuggestions.length > 0 && (
+                                <div
+                                  className="absolute left-6 right-0 mt-1 border rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto"
+                                  style={{
+                                    backgroundColor: isLightMode ? '#ffffff' : '#374151',
+                                    borderColor: isLightMode ? '#d1d5db' : '#4b5563'
+                                  }}
+                                >
+                                  {startSuggestions.map((s, i) => (
+                                    <button
+                                      key={i}
+                                      onClick={() => selectLocation(s, 'start')}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 truncate"
+                                      style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}
+                                    >
+                                      {s.display_name}
+                                    </button>
+                                  ))}
+                                </div>
                               )}
                             </div>
-                            {showStartSuggestions && startSuggestions.length > 0 && (
-                              <div
-                                className="absolute left-6 right-0 mt-1 border rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto"
-                                style={{
-                                  backgroundColor: isLightMode ? '#ffffff' : '#374151',
-                                  borderColor: isLightMode ? '#d1d5db' : '#4b5563'
-                                }}
-                              >
-                                {startSuggestions.map((s, i) => (
-                                  <button
-                                    key={i}
-                                    onClick={() => selectLocation(s, 'start')}
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 truncate"
-                                    style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}
-                                  >
-                                    {s.display_name}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
 
-                          {/* End Location */}
-                          <div className="relative mb-3" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-red-500">●</span>
-                              <input
-                                type="text"
-                                value={routeEnd}
-                                onChange={(e) => {
-                                  setRouteEnd(e.target.value);
-                                  searchLocation(e.target.value, 'end');
-                                }}
-                                onFocus={() => endSuggestions.length > 0 && setShowEndSuggestions(true)}
-                                placeholder="End location..."
-                                className="flex-1 px-3 py-2 border rounded-lg text-sm"
-                                style={{
-                                  backgroundColor: isLightMode ? '#ffffff' : '#374151',
-                                  color: isLightMode ? '#0f172a' : '#ffffff',
-                                  borderColor: isLightMode ? '#d1d5db' : '#4b5563'
-                                }}
-                              />
-                              {routeEnd && (
-                                <button onClick={() => clearRoute('end')} className="p-1">
-                                  ✕
-                                </button>
+                            <div className="relative" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-red-500 text-sm">●</span>
+                                <input
+                                  type="text"
+                                  value={routeEnd}
+                                  onChange={(e) => {
+                                    setRouteEnd(e.target.value);
+                                    searchLocation(e.target.value, 'end');
+                                  }}
+                                  onFocus={() => endSuggestions.length > 0 && setShowEndSuggestions(true)}
+                                  placeholder="End location..."
+                                  className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                                  style={{
+                                    backgroundColor: isLightMode ? '#ffffff' : '#374151',
+                                    color: isLightMode ? '#0f172a' : '#ffffff',
+                                    borderColor: isLightMode ? '#d1d5db' : '#4b5563'
+                                  }}
+                                />
+                                {routeEnd && (
+                                  <button onClick={() => clearRoute('end')} className="p-1 text-sm">
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                              {showEndSuggestions && endSuggestions.length > 0 && (
+                                <div
+                                  className="absolute left-6 right-0 mt-1 border rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto"
+                                  style={{
+                                    backgroundColor: isLightMode ? '#ffffff' : '#374151',
+                                    borderColor: isLightMode ? '#d1d5db' : '#4b5563'
+                                  }}
+                                >
+                                  {endSuggestions.map((s, i) => (
+                                    <button
+                                      key={i}
+                                      onClick={() => selectLocation(s, 'end')}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 truncate"
+                                      style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}
+                                    >
+                                      {s.display_name}
+                                    </button>
+                                  ))}
+                                </div>
                               )}
                             </div>
-                            {showEndSuggestions && endSuggestions.length > 0 && (
-                              <div
-                                className="absolute left-6 right-0 mt-1 border rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto"
-                                style={{
-                                  backgroundColor: isLightMode ? '#ffffff' : '#374151',
-                                  borderColor: isLightMode ? '#d1d5db' : '#4b5563'
-                                }}
-                              >
-                                {endSuggestions.map((s, i) => (
-                                  <button
-                                    key={i}
-                                    onClick={() => selectLocation(s, 'end')}
-                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 truncate"
-                                    style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}
-                                  >
-                                    {s.display_name}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
                           </div>
 
                           <button
                             onClick={findRouteAndBuddies}
                             disabled={!startCoords || !endCoords || isSearchingRoute}
-                            className="w-full px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                            className="w-full px-3 py-2 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
                             style={{
                               backgroundColor: startCoords && endCoords ? '#3b82f6' : '#9ca3af',
                               color: '#ffffff'
@@ -1292,7 +1287,6 @@ export default function FindBuddy() {
                           </button>
                         </div>
 
-                        {/* Create Group Route Section */}
                         {showCreateGroupRoute && (
                           <div
                             className="rounded-lg p-4 border"
@@ -1382,7 +1376,6 @@ export default function FindBuddy() {
                           </div>
                         )}
 
-                        {/* My Group Routes */}
                         <div>
                           <h4 className="font-semibold mb-3" style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>
                             My Group Routes ({groupRoutes.length})
@@ -1408,7 +1401,6 @@ export default function FindBuddy() {
                           )}
                         </div>
 
-                        {/* Buddies on Route */}
                         {routeBuddies.length > 0 && (
                           <div>
                             <h4 className="font-semibold mb-3" style={{ color: isLightMode ? '#0f172a' : '#ffffff' }}>
@@ -1429,7 +1421,6 @@ export default function FindBuddy() {
             </div>
           </div>
 
-          {/* Map Area */}
           <div
             className="transition-all duration-300"
             style={{ marginLeft: showBuddyPanel && isMdScreen ? (isLgScreen ? '360px' : '340px') : '0' }}
@@ -1442,9 +1433,7 @@ export default function FindBuddy() {
                   borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
                 }}
               >
-                {/* Map Header with London Button */}
                 <div className="flex items-center justify-end mb-2">
-                  {/* London Button */}
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -1491,20 +1480,18 @@ export default function FindBuddy() {
                     saveMapView(center, zoom);
                   }}
                   markers={[
-                    // User location
                     ...(userLocation && userLocation[0] && userLocation[1] ? [{
                       position: userLocation,
                       color: '#10b981',
                       type: 'marker',
                       popup: <div className="text-sm"><strong>You</strong><br/>Your current location</div>
                     }] : []),
-                    // Buddy markers
                     ...(buddies.map(buddy => {
                       const distKm = parseFloat(buddy.distance_km || 0);
-                      const distanceText = distKm < 1 
+                      const distanceText = distKm < 1
                         ? `${Math.round(distKm * 1000)} m away`
                         : `${distKm.toFixed(2)} km away`;
-                      
+                     
                       return {
                         position: [
                           buddy.lat || userLocation[0] + (Math.random() - 0.5) * 0.02,
@@ -1515,14 +1502,12 @@ export default function FindBuddy() {
                         popup: <div className="text-sm"><strong>{buddy.name || buddy.buddy_name}</strong><br/>{distanceText}</div>
                       };
                     })),
-                    // Start marker
                     ...(startCoords ? [{
                       position: startCoords,
                       color: '#22c55e',
                       type: 'start',
                       popup: <div className="text-sm"><strong>Start</strong></div>
                     }] : []),
-                    // End marker
                     ...(endCoords ? [{
                       position: endCoords,
                       color: '#ef4444',
@@ -1536,7 +1521,28 @@ export default function FindBuddy() {
           </div>
         </section>
 
-        {/* Profile Modal */}
+        {/* Floating Buddy Cards Button - Mobile Only */}
+        {!showBuddyPanel && (
+          <button
+            onClick={() => setShowBuddyPanel(true)}
+            className="fixed bottom-20 right-4 z-40 md:hidden px-4 py-3 rounded-full shadow-lg font-medium text-sm flex items-center gap-2"
+            style={{
+              backgroundColor: isLightMode ? '#0f172a' : '#06d6a0',
+              color: isLightMode ? '#ffffff' : '#0f172a'
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-5 h-5"
+            >
+              <path d="M4.5 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM14.25 8.625a3.375 3.375 0 116.75 0 3.375 3.375 0 01-6.75 0zM1.5 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM17.25 19.128l-.001.144a2.25 2.25 0 01-.233.96 10.088 10.088 0 005.06-1.01.75.75 0 00.42-.643 4.875 4.875 0 00-6.957-4.611 8.586 8.586 0 011.71 5.157v.003z" />
+            </svg>
+            <span>Buddy Cards</span>
+          </button>
+        )}
+
         {selectedBuddy && (
           <div
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -1577,7 +1583,7 @@ export default function FindBuddy() {
                   <span>
                     {(() => {
                       const distKm = parseFloat(selectedBuddy.distance_km || 0);
-                      return distKm < 1 
+                      return distKm < 1
                         ? `${Math.round(distKm * 1000)} m away`
                         : `${distKm.toFixed(2)} km away`;
                     })()}
@@ -1599,13 +1605,13 @@ export default function FindBuddy() {
                       const mode = selectedBuddy.transport_mode || selectedBuddy.buddy_transport_mode || 'walking';
                       if (mode === 'cycling') {
                         return (
-                          <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            viewBox="0 0 24 24" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            strokeWidth="2" 
-                            strokeLinecap="round" 
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
                             strokeLinejoin="round"
                             className="w-5 h-5"
                           >
@@ -1617,9 +1623,9 @@ export default function FindBuddy() {
                         );
                       } else {
                         return (
-                          <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            viewBox="0 0 24 24" 
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
                             fill="currentColor"
                             className="w-5 h-5"
                           >
