@@ -14,7 +14,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-316192?logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[Features](#-features) • [Demo](#-demo) • [Installation](#-installation) • [Architecture](#-architecture) • [Contributing](#-contributing)
+[Features](#features) • [Demo](#demo) • [Installation](#installation) • [Architecture](#architecture) • [Contributing](#contributing)
 
 </div>
 
@@ -373,9 +373,6 @@ SafePath_Deploy/
 │       │   ├── geocoding.js        # Location services
 │       │   ├── hazards.js          # Hazard reporting endpoints
 │       │   └── routes.js           # Route calculation endpoints
-│       ├── uploads/                # User-uploaded files
-│       │   ├── hazards/
-│       │   └── profiles/
 │       ├── server.js               # Express server entry point
 │       ├── package.json
 │       └── .env
@@ -782,8 +779,6 @@ Our SafePath development was completed across 11 structured sprints, following a
 - Integrated all modules end-to-end  
 - Created final demo, video walkthrough and presentation  
 - Cleaned repository and updated README & documentation
-
-
 
 ---
 
