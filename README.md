@@ -1,6 +1,7 @@
 <div align="center">
   <h1>SafePath</h1>
-  <h4>Safety Routing System</h4>
+  <h4>More than Navigation, Smarter, Safer Journeys!
+</h4>
 </div>
 <div align="center">
   
@@ -606,31 +607,41 @@ socket.on('new_hazard', (data) => {
 ## Screenshots
 
 ### Home Page
-![Home Page](screenshots/home.png)
+<img src="./screenshots/home.png" width="20%" height="40%">
+
 *Interactive map showing user location with safety navigation*
 
 ### Route Planning
-![Route Planning](screenshots/route_01.png)
+
+<img src="./screenshots/route_01.png" width="20%" height="40%">
+
 *Plan route page*
 
-![Route Planning](screenshots/route_02.png)
+<img src="./screenshots/route_02.png" width="20%" height="40%">
+
 *Route Settings*
 
-![Route Planning](screenshots/route_03.png)
+<img src="./screenshots/route_03.png" width="20%" height="40%">
+
 *Side-by-side comparison of safest vs. fastest routes*
 
-![Route Planning](screenshots/route_04.png)
+
+<img src="./screenshots/route_04.png" width="20%" height="40%">
+
 *Suggestions for route*
 
 ### Hazard Reporting
-![Hazard Reporting](screenshots/hazard.png)
+
+<img src="./screenshots/hazard.png" width="20%" height="40%">
+
 *Real-time hazard reporting with map-based selection*
 
 ### Buddy System
-![Buddy System](screenshots/buddy_01.png)
+<img src="./screenshots/buddy_01.png" width="20%" height="40%">
+
 *Find nearby walking companions*
 
-![Buddy System](screenshots/buddy_02.png)
+<img src="./screenshots/buddy_02.png" width="20%" height="40%">
 *Find Buddies cards*
 
 ---
