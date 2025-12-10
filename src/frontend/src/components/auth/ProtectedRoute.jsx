@@ -21,6 +21,7 @@ export default function ProtectedRoute({ children }) {
       setIsAuthenticated(true);
       setIsChecking(false);
     }
+     
   }, [router, pathname]);
 
   // Show loading state while checking authentication

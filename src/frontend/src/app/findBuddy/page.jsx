@@ -174,7 +174,7 @@ export default function FindBuddy() {
         params.append('transport_mode', transportMode);
       }
       
-      const response = await fetch(`${API_URL}/buddies/nearby?${params}`, {
+      const response = await fetch(`${API_URL}/api/buddies/nearby?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
@@ -240,7 +240,7 @@ export default function FindBuddy() {
       }
       
       console.log('🔍 Fetching pending requests...');
-      const response = await fetch(`${API_URL}/buddies/requests?status=pending`, {
+      const response = await fetch(`${API_URL}/api/buddies/requests?status=pending`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
@@ -273,7 +273,7 @@ export default function FindBuddy() {
   const fetchAcceptedBuddies = async () => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/buddies/accepted`, {
+      const response = await fetch(`${API_URL}/api/buddies/accepted`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
@@ -289,7 +289,7 @@ export default function FindBuddy() {
   const fetchGroupRoutes = async () => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/buddies/group-routes`, {
+      const response = await fetch(`${API_URL}/api/buddies/group-routes`, {
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
@@ -329,7 +329,7 @@ export default function FindBuddy() {
   const sendBuddyRequest = async (receiverId) => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/buddies/requests`, {
+      const response = await fetch(`${API_URL}/api/buddies/requests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -358,7 +358,7 @@ export default function FindBuddy() {
   const respondToRequest = async (requestId, action) => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/buddies/requests/${requestId}`, {
+      const response = await fetch(`${API_URL}/api/buddies/requests/${requestId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -462,7 +462,7 @@ export default function FindBuddy() {
 
         // Fetch buddies along route
         const token = getToken();
-        const response = await fetch(`${API_URL}/buddies/along-route`, {
+        const response = await fetch(`${API_URL}/api/buddies/along-route`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -500,7 +500,7 @@ export default function FindBuddy() {
 
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/buddies/group-routes`, {
+      const response = await fetch(`${API_URL}/api/buddies/group-routes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -537,7 +537,7 @@ export default function FindBuddy() {
   const joinRoute = async (routeId) => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/buddies/group-routes/${routeId}/join`, {
+      const response = await fetch(`${API_URL}/api/buddies/group-routes/${routeId}/join`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
