@@ -606,20 +606,32 @@ socket.on('new_hazard', (data) => {
 ## Screenshots
 
 ### Home Page
-![Home Page](docs/screenshots/home.png)
+![Home Page](screenshots/home.png)
 *Interactive map showing user location with safety navigation*
 
 ### Route Planning
-![Route Planning](docs/screenshots/routes.png)
+![Route Planning](screenshots/route_01.png)
+*Plan route page*
+
+![Route Planning](screenshots/route_02.png)
+*Route Settings*
+
+![Route Planning](screenshots/route_03.png)
 *Side-by-side comparison of safest vs. fastest routes*
 
+![Route Planning](screenshots/route_04.png)
+*Suggestions for route*
+
 ### Hazard Reporting
-![Hazard Reporting](docs/screenshots/hazards.png)
+![Hazard Reporting](screenshots/hazard.png)
 *Real-time hazard reporting with map-based selection*
 
 ### Buddy System
-![Buddy System](docs/screenshots/buddies.png)
-*Find nearby walking companions with shared routes*
+![Buddy System](screenshots/buddy_01.png)
+*Find nearby walking companions*
+
+![Buddy System](screenshots/buddy_02.png)
+*Find Buddies cards*
 
 ---
 
