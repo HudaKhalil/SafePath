@@ -612,35 +612,35 @@ socket.on('new_hazard', (data) => {
 
 ### Route Planning
 
-<img src="./screenshots/route_01.png" width="20%" height="40%">
+<img src="./Screenshots/route_01.png" width="20%" height="40%">
 
 *Plan route page*
 
-<img src="./screenshots/route_02.png" width="20%" height="40%">
+<img src="./Screenshots/route_02.png" width="20%" height="40%">
 
 *Route Settings*
 
-<img src="./screenshots/route_03.png" width="20%" height="40%">
+<img src="./Screenshots/route_03.png" width="20%" height="40%">
 
 *Side-by-side comparison of safest vs. fastest routes*
 
 
-<img src="./screenshots/route_04.png" width="20%" height="40%">
+<img src="./Screenshots/route_04.png" width="20%" height="40%">
 
 *Suggestions for route*
 
 ### Hazard Reporting
 
-<img src="./screenshots/hazard.png" width="20%" height="40%">
+<img src="./Screenshots/hazard.png" width="20%" height="40%">
 
 *Real-time hazard reporting with map-based selection*
 
 ### Buddy System
-<img src="./screenshots/buddy_01.png" width="20%" height="40%">
+<img src="./Screenshots/buddy_01.png" width="20%" height="40%">
 
 *Find nearby walking companions*
 
-<img src="./screenshots/buddy_02.png" width="20%" height="40%">
+<img src="./Screenshots/buddy_02.png" width="20%" height="40%">
 *Find Buddies cards*
 
 ---
